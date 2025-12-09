@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/alignment_menu_normal"
+        android:title="@string/align_normal"
+        app:showAsAction="withText"/>
+    <item
+        android:id="@+id/alignment_menu_center"
+        android:title="@string/align_center"
+        app:showAsAction="withText"/>
+    <item
+        android:id="@+id/alignment_menu_opposite"
+        android:title="@string/align_opposite"
+        app:showAsAction="withText"/>
+</menu>

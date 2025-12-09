@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+    <data>
+        <variable
+            name="task"
+            type="com.thando.accountable.ui.cards.MarkupLanguageCard" />
+        <variable
+            name="cardViewHolder"
+            type="com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.MarkupLanguageCardViewHolder" />
+    </data>
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/background"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="@color/white"
+        app:cardCornerRadius="0dp"
+        app:cardBackgroundColor="@{task.backgroundColour}"
+        android:layout_marginHorizontal="2dp"
+        android:layout_marginVertical="4dp"
+        app:cardElevation="30dp"
+        app:contentPadding="1dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <TextView
+                android:id="@+id/markupLanguageCardChar_example_textview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/black"
+                android:text="@{task.spannedString.spannableStringBuilder}"
+                android:textSize="26sp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <androidx.constraintlayout.helper.widget.Flow
+                android:id="@+id/flow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:flow_horizontalGap="8dp"
+                app:flow_horizontalStyle="spread_inside"
+                app:flow_verticalGap="8dp"
+                app:flow_verticalStyle="spread_inside"
+                app:flow_wrapMode="chain"
+                app:layout_constraintBottom_toTopOf="@id/barrier2"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/markupLanguageCardChar_example_textview" />
+
+            <TextView
+                android:id="@+id/markupLanguageCardChar_textview"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@{task.tag.spanName+':'}"
+                android:textColor="@color/black"
+                android:textSize="26sp"
+                app:layout_constraintBottom_toTopOf="@id/barrier2"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/markupLanguageCardChar_example_textview" />
+
+            <EditText
+                android:id="@+id/markupLanguageCardChar_edit_view"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:autofillHints="@null"
+                android:hint="@null"
+                android:inputType="text"
+                android:maxLength="10"
+                android:minWidth="60dp"
+                android:minHeight="48dp"
+                android:text="@={task.tag.spanCharValue.first}"
+                android:textColor="@color/black"
+                android:textSize="26sp"
+                app:layout_constraintBottom_toTopOf="@id/barrier2"
+                app:layout_constraintEnd_toStartOf="@id/markupLanguageCardChar_value_edit_view"
+                app:layout_constraintStart_toEndOf="@id/markupLanguageCardChar_textview"
+                app:layout_constraintTop_toBottomOf="@id/markupLanguageCardChar_example_textview"
+                tools:ignore="TextFields" />
+
+            <EditText
+                android:id="@+id/markupLanguageCardChar_value_edit_view"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:autofillHints="@null"
+                android:hint="@null"
+                android:inputType="number"
+                android:minWidth="60dp"
+                android:minHeight="48dp"
+                android:text="@={task.tag.spanCharValue.second}"
+                android:textColor="@color/black"
+                android:textSize="26sp"
+                android:visibility="@{task.valueEditTextVisibility}"
+                app:layout_constraintBottom_toTopOf="@id/barrier2"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@id/markupLanguageCardChar_edit_view"
+                app:layout_constraintTop_toBottomOf="@id/markupLanguageCardChar_example_textview" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/markupLanguageCardChar_colour_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/pick_colour"
+                android:textColor="@color/black"
+                android:enabled="@{task.colourButtonEnabled}"
+                android:visibility="@{task.colourButtonVisibility}"
+                app:layout_constraintBottom_toTopOf="@id/barrier2"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@id/markupLanguageCardChar_edit_view"
+                app:layout_constraintTop_toBottomOf="@id/markupLanguageCardChar_example_textview" />
+
+            <androidx.constraintlayout.widget.Barrier
+                android:id="@+id/barrier2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:barrierDirection="bottom"
+                app:constraint_referenced_ids="markupLanguageCardChar_example_textview,flow,markupLanguageCardChar_textview,markupLanguageCardChar_edit_view,markupLanguageCardChar_value_edit_view,markupLanguageCardChar_colour_button" />
+
+            <TextView
+                android:id="@+id/errorMessage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/red"
+                android:visibility="@{task.errorMessageVisibility}"
+                android:text="@{task.duplicateErrorMessage}"
+                android:textSize="18sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/barrier2" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.cardview.widget.CardView>
+</layout>

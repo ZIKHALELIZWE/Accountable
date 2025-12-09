@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".fragments.FoldersAndScriptsFragment">
+    <item
+        android:id="@+id/menu_switch_folder_script"
+        android:orderInCategory="1"
+        android:icon="@drawable/folder_drawable"
+        android:title="@string/switch_between_folder_and_script_button"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/search"
+        android:icon="@drawable/search"
+        android:title="@string/search"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/order"
+        android:icon="@drawable/arrow_down"
+        android:title="@string/change_entry_order"
+        app:showAsAction="ifRoom"/>
+</menu>

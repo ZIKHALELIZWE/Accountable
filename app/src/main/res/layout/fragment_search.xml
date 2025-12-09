@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    tools:context=".fragments.SearchFragment">
+    <data>
+        <import type="android.view.View"/>
+        <variable
+            name="viewModel"
+            type="com.thando.accountable.fragments.viewmodels.SearchViewModel" />
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/rootConstraintLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <EditText
+            android:id="@+id/search_edit_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:autofillHints="@null"
+            android:hint="@string/search"
+            android:inputType="textMultiLine"
+            android:text="@={viewModel.searchString}"
+            app:layout_constraintEnd_toStartOf="@id/match_case_check_textview"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/match_case_check_textview"
+            style="@style/CustomChipChoice"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:checkable="true"
+            android:checked="@={viewModel.matchCaseCheck}"
+            android:gravity="center"
+            android:text="@string/case_string"
+            app:layout_constraintBottom_toBottomOf="@id/search_edit_text"
+            app:layout_constraintEnd_toStartOf="@id/word_check_textview"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/word_check_textview"
+            style="@style/CustomChipChoice"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:checkable="true"
+            android:checked="@={viewModel.wordCheck}"
+            android:gravity="center"
+            android:text="@string/word"
+            app:layout_constraintBottom_toBottomOf="@id/search_edit_text"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <androidx.constraintlayout.widget.Barrier
+            android:id="@+id/barrier"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:barrierDirection="bottom"
+            app:constraint_referenced_ids="search_edit_text,match_case_check_textview,word_check_textview" />
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="@{viewModel.searchJob==null?View.GONE:View.VISIBLE}"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/barrier"/>
+        
+        <TextView
+            android:id="@+id/occurrences"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="5dp"
+            android:text="@{@string/scripts_and_occurrences(String.valueOf(viewModel.numScripts),String.valueOf(viewModel.occurrences))}"
+            android:textColor="@color/black"
+            android:visibility="@{viewModel.searchString.length()==0?View.GONE:View.VISIBLE}"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/barrier"/>
+
+        <androidx.constraintlayout.widget.Barrier
+            android:id="@+id/barrier2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:barrierDirection="bottom"
+            app:constraint_referenced_ids="progressBar,occurrences"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/search_recycler_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/barrier2" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</layout>

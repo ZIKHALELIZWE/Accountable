@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+        <variable
+            name="task"
+            type="com.thando.accountable.database.tables.Folder" />
+    </data>
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/background"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="@color/white"
+        app:cardCornerRadius="0dp"
+        android:layout_marginHorizontal="2dp"
+        android:layout_marginVertical="4dp"
+        app:cardElevation="30dp"
+        app:contentPadding="1dp">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <ProgressBar
+                android:id="@+id/ProgressBar"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:visibility="@{task.progressBarVisibility}"
+                app:layout_constraintBottom_toTopOf="@id/folderName"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <ImageView
+                android:id="@+id/folderImageView"
+                android:layout_width="0dp"
+                android:layout_height="250dp"
+                android:contentDescription="@string/folder_display_image"
+                android:saveEnabled="true"
+                android:src="@{task.getUri(context)}"
+                android:scaleType="centerCrop"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"/>
+
+            <TextView
+                android:id="@+id/folderName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@{task.folderName}"
+                android:autoSizeTextType="none"
+                android:gravity="start|center"
+                android:textAlignment="textStart"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="5dp"
+                android:textColor="@color/black"
+                android:background="@color/white"
+                android:textSize="20sp"
+                app:layout_constraintStart_toStartOf="@id/folderImageView"
+                app:layout_constraintBottom_toTopOf="@id/NumbersLL"/>
+
+            <LinearLayout
+                android:id="@+id/NumbersLL"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="bottom|end"
+                android:orientation="horizontal"
+                android:paddingHorizontal="5dp"
+                android:background="@color/white"
+                app:layout_constraintStart_toStartOf="@id/folderImageView"
+                app:layout_constraintBottom_toBottomOf="@id/folderImageView">
+
+                <TextView
+                    android:id="@+id/folderSize"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textAlignment="viewStart"
+                    android:textColor="@color/black"
+                    android:textSize="20sp"/>
+
+                <ImageView
+                    android:id="@+id/numFoldersImage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/folders_image_icon"
+                    app:srcCompat="@drawable/folder_drawable" />
+
+                <TextView
+                    android:id="@+id/numFoldersText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@{String.valueOf(task.numFolders)}"
+                    android:layout_marginHorizontal="5dp"
+                    android:textAlignment="textEnd"
+                    android:textColor="@color/black"
+                    android:textSize="20sp" />
+
+                <ImageView
+                    android:id="@+id/numScriptsImage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/scripts_image_icon"
+                    app:srcCompat="@drawable/scripts_drawable" />
+
+                <TextView
+                    android:id="@+id/numScriptsText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|end"
+                    android:text="@{task.folderType==com.thando.accountable.database.tables.Folder.FolderType.SCRIPTS?String.valueOf(task.numScripts):String.valueOf(task.numGoals)}"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp"
+                    android:gravity="end|bottom"
+                    android:textAlignment="textEnd"
+                    android:textColor="@color/black"
+                    android:textSize="20sp" />
+            </LinearLayout>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </androidx.cardview.widget.CardView>
+</layout>

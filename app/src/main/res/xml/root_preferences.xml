@@ -1,0 +1,57 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory app:title="@string/appearance">
+        <ListPreference
+            app:key="main_image_setting"
+            app:title="@string/main_display_image"
+            app:entries="@array/main_image_setting_options_entries"
+            app:entryValues="@array/main_image_setting_options_values"
+            app:useSimpleSummaryProvider="true"/>
+        <com.thando.accountable.ui.NumberPickerPreference
+            android:key="text_size_preference"
+            android:title="Select Text Size"
+            android:summary="Select Text Size Between 70 and 120"
+            android:defaultValue="90"
+            app:minValue="70"
+            app:maxValue="120" />
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/backup">
+        <Preference android:title="@string/restore_from_downloads_backup_folder" android:key="restore_from_backup"/>
+        <Preference app:title="Backup Data To Folder" android:key="make_backup"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/messages_header">
+
+        <EditTextPreference
+            app:key="signature"
+            app:title="@string/signature_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
+            app:defaultValue="reply"
+            app:entries="@array/reply_entries"
+            app:entryValues="@array/reply_values"
+            app:key="reply"
+            app:title="@string/reply_title"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="@string/sync_header">
+
+        <SwitchPreferenceCompat
+            app:key="sync"
+            app:title="@string/sync_title" />
+
+        <SwitchPreferenceCompat
+            app:dependency="sync"
+            app:key="attachment"
+            app:summaryOff="@string/attachment_summary_off"
+            app:summaryOn="@string/attachment_summary_on"
+            app:title="@string/attachment_title" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>
