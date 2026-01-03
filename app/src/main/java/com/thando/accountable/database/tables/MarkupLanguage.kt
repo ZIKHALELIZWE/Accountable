@@ -36,6 +36,7 @@ import android.util.Range
 import android.view.MenuItem
 import android.view.View
 import android.widget.PopupMenu
+import androidx.compose.ui.text.AnnotatedString
 import androidx.core.text.set
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -409,6 +410,39 @@ data class MarkupLanguage(
             }
         }
 
+        fun applyTagAnnotated(
+            annotatedString: MutableStateFlow<AnnotatedString>,
+            context: Context? = null,
+            clickable: (() -> Unit)? = null,
+        ) {
+            if (isParagraph) {
+                if (contentRange != null) {
+                    var stringBuilder = annotatedString.value
+                    val storedContentRange = contentRange
+                    findParagraphs(
+                        annotatedString.value.text,
+                        contentRange!!.first,
+                        contentRange!!.last
+                    ).forEach {
+                        contentRange = it
+                        stringBuilder = executeFunction(
+                            stringBuilder,
+                            context,
+                            clickable
+                        )
+                    }
+                    contentRange = storedContentRange
+                    annotatedString.value = stringBuilder
+                }
+            } else {
+                annotatedString.value = executeFunction(
+                    annotatedString.value,
+                    context,
+                    clickable
+                )
+            }
+        }
+
         private fun executeFunction(
             spannableStringBuilder: SpannableStringBuilder,
             context: Context? = null,
@@ -469,6 +503,68 @@ data class MarkupLanguage(
                 }
             }
             return spannableStringBuilder
+        }
+
+        private fun executeFunction(
+            annotatedString: AnnotatedString,
+            context: Context? = null,
+            clickable: (() -> Unit)? = null
+        ): AnnotatedString {
+            /*if (contentRange!=null && contentRange!!.last<annotatedString.length) {
+                when (spanType) {
+                    TagType.FUNCTION -> return function!!(
+                        annotatedString,
+                        contentRange!!
+                    )
+
+                    TagType.FUNCTION_INT -> return functionInt!!(
+                        annotatedString,
+                        getInt(spanCharValue.second)!!,
+                        contentRange!!
+                    )
+
+                    TagType.FUNCTION_FLOAT -> return functionFloat!!(
+                        annotatedString,
+                        getFloat(spanCharValue.second)!!,
+                        contentRange!!
+                    )
+
+                    TagType.FUNCTION_COLOUR -> return functionColour!!(
+                        annotatedString,
+                        getColour(spanCharValue.second)!!,
+                        contentRange!!
+                    )
+
+                    TagType.FUNCTION_IMAGE_URI -> if (context != null){
+                        return functionImageUri!!(
+                            annotatedString,
+                            context,
+                            AppResources.ImageResource(spanCharValue.second.value).getAbsoluteUri(
+                                context
+                            ),
+                            contentRange!!
+                        )
+                    }
+                    TagType.FUNCTION_URL -> return functionUrl!!(
+                        annotatedString,
+                        spanCharValue.second.value,
+                        contentRange!!
+                    )
+
+                    TagType.FUNCTION_CLICKABLE -> if (clickable != null) return functionClickable!!(
+                        annotatedString,
+                        clickable,
+                        contentRange!!
+                    )
+
+                    TagType.FUNCTION_STRING -> return functionString!!(
+                        annotatedString,
+                        spanCharValue.second.value,
+                        contentRange!!
+                    )
+                }
+            }*/
+            return annotatedString
         }
     }
 

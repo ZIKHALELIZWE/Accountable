@@ -24,6 +24,7 @@ import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.databinding.ScriptEditTextLongClickDialogBinding
 import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
+import com.thando.accountable.ui.screens.ContentPosition
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -38,7 +39,7 @@ class AddMediaDialog(
     private val contentItemAdapter: ContentItemAdapter,
     private val item: Content,
     private val aboveBelowContentType: Pair<Content.ContentType?,Content.ContentType?>,
-    private val processResults: (List<Uri>?,Content.ContentType, ContentPosition) -> Unit
+    private val processResults: (List<Uri>?, Content.ContentType, ContentPosition) -> Unit
 ): BottomSheetDialogFragment() {
 
     private val contentType: Content.ContentType = item.type
@@ -48,7 +49,6 @@ class AddMediaDialog(
     private val accessorChosen = MutableStateFlow(false)
     private val deleteChosen = MutableStateFlow(false)
     private enum class NonMediaType{ TEXT,SCRIPT }
-    enum class ContentPosition{ ABOVE, AT_CURSOR_POINT, BELOW }
 
     override fun onCreateView(
         inflater: LayoutInflater,

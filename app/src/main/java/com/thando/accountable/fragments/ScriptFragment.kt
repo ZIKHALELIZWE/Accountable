@@ -1,6 +1,7 @@
 package com.thando.accountable.fragments
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -40,16 +41,23 @@ import com.thando.accountable.ui.screens.MenuItemData
 import com.thando.accountable.ui.screens.ScriptFragmentCatalog
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
+import java.util.concurrent.atomic.AtomicReference
 
 class ScriptFragment : Fragment() {
 
     private lateinit var contentAdapter: ContentItemAdapter
 
     val viewModel : ScriptViewModel by viewModels { ScriptViewModel.Factory }
-    private val galleryLauncherMultiple = registerForActivityResult(ActivityResultContracts.GetMultipleContents()){ list -> contentAdapter.multipleContentsCallback(list) }
+    private val galleryLauncherMultiple = registerForActivityResult(
+        ActivityResultContracts.GetMultipleContents()
+    ){
+        list -> multipleContentsStateFlow.value = list
+    }
     private val galleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { galleryUri ->
         try{
             if (galleryUri!=null){
@@ -72,6 +80,9 @@ class ScriptFragment : Fragment() {
         }
         viewModel.contentRetrieved()
     }
+
+    private val multipleContentsStateFlow: MutableStateFlow<List<@JvmSuppressWildcards Uri>?> = MutableStateFlow(null)
+    private val multipleContentsJob = AtomicReference<Job?>(null)
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -319,6 +330,8 @@ class ScriptFragment : Fragment() {
         val scriptContent by viewModel.scriptContentList.collectAsStateWithLifecycle()
         val isEditingScript by viewModel.isEditingScript.collectAsStateWithLifecycle()
         var menuAddTimeStampTitle by remember { viewModel.menuAddTimeStampTitle }
+        val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
+        val markupLanguage by viewModel.markupLanguage.collectAsStateWithLifecycle()
 
         script?.let { script ->
             val scriptUri by script.getUri(LocalContext.current).collectAsStateWithLifecycle()
@@ -339,6 +352,22 @@ class ScriptFragment : Fragment() {
                 script = script,
                 isEditingScript,
                 scriptContentList = scriptContent,
+                markupLanguage = markupLanguage,
+                appSettings = appSettings,
+                teleprompterSettings = null,
+                galleryLauncherMultiple = galleryLauncherMultiple,
+                processResults = { multipleContentList, contentType, contentPosition, content, cursorPosition ->
+                    viewModel.addContent(
+                        multipleContentList,
+                        contentType,
+                        contentPosition,
+                        content,
+                        cursorPosition
+                    )
+                },
+                multipleContentsStateFlow = multipleContentsStateFlow,
+                multipleContentsJob = multipleContentsJob,
+                fragmentLifecycleScope = lifecycleScope,
                 modifier = modifier,
                 collapseType = ToolbarState.CollapseType.EnterAlwaysCollapsed,
                 navigationIcon = { modifier ->

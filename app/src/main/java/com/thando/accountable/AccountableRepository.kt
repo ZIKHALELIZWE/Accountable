@@ -25,11 +25,14 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.TeleprompterSettings
+import com.thando.accountable.databinding.TextItemBinding
 import com.thando.accountable.fragments.FoldersAndScriptsFragment.FoldersAndScriptsLists
+import com.thando.accountable.fragments.dialogs.AddMediaDialog
 import com.thando.accountable.fragments.viewmodels.FoldersAndScriptsViewModel.Companion.INITIAL_FOLDER_ID
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import com.thando.accountable.player.AccountablePlayer
 import com.thando.accountable.ui.AccountableNotification
+import com.thando.accountable.ui.screens.ContentPosition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -773,7 +776,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             scriptDateTime = AppResources.CalendarResource(Calendar.getInstance()),
                             scriptPosition = scripts.size.toLong(),
                         )
-                        scriptContentList.value = mutableListOf()
+                        scriptContentList.value = appendTextFieldIfNeeded(mutableListOf())
                         scriptMarkupLanguage.value = null
                         isEditingScript.value = true
                         script.value!!.scriptId = withContext(Dispatchers.IO) { dao.insert(script.value!!) }
@@ -791,7 +794,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             tempScript
                         }
                         scriptContentList.value =
-                            withContext(Dispatchers.IO) { dao.getContentList(scriptId).toMutableList() }
+                            withContext(Dispatchers.IO) {
+                                appendTextFieldIfNeeded(dao.getContentList(scriptId).toMutableList())
+                            }
                     }
                 }
                 if (script.value == null) {
@@ -805,6 +810,38 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 }
             }
         }
+    }
+
+    private fun appendTextFieldIfNeeded(list: MutableList<Content>? = null):MutableList<Content>{
+        if (list != null){
+            if (list.lastIndex == -1 || list.last().type!= ContentType.TEXT){
+                // Make a new TextProcessor and add the content's content
+                if(script.value!=null && script.value!!.scriptId!=null) {
+                    list.add(
+                        Content(
+                            type = ContentType.TEXT,
+                            script = script.value!!.scriptId!!,
+                            position = list.size.toLong()
+                        )
+                    )
+                }
+            }
+        }
+        else {
+            if (scriptContentList.value.lastIndex == -1 || scriptContentList.value.last().type!= ContentType.TEXT){
+                // Make a new TextProcessor and add the content's content
+                if(script.value!=null && script.value!!.scriptId!=null) {
+                    scriptContentList.value.add(
+                        Content(
+                            type = ContentType.TEXT,
+                            script = script.value!!.scriptId!!,
+                            position = scriptContentList.value.size.toLong()
+                        )
+                    )
+                }
+            }
+        }
+        return list?:mutableListOf()
     }
 
     fun deleteScriptImage(){
@@ -1783,6 +1820,75 @@ class AccountableRepository(val application: Application): AutoCloseable {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 changeFragment(AccountableFragment.GoalsFragment)
+            }
+        }
+    }
+
+    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:ContentPosition, item: Content, cursorPosition:Int?){
+        repositoryScope.launch {
+            withContext(Dispatchers.IO) {
+                val inputIndex = when (contentPosition) {
+                    ContentPosition.ABOVE ->
+                        scriptContentList.value.indexOf(item)
+
+                    ContentPosition.AT_CURSOR_POINT -> {
+                        val inputIndex =
+                            scriptContentList.value.indexOf(item) + 1
+                        if (cursorPosition != null) {
+                            // split the string
+                            val text = item.content.value
+
+                            // Split the string
+                            val topString = text.take(cursorPosition)
+                            val bottomString =
+                                text.substring(cursorPosition, text.length)
+
+                            item.content.value = topString
+                            val newContent = Content(
+                                type = ContentType.TEXT,
+                                script = script.value!!.scriptId!!,
+                                position = inputIndex.toLong(),
+                                content = MutableStateFlow(bottomString)
+                            )
+                            scriptContentList.value.add(inputIndex, newContent)
+                            newContent.id = dao.insert(newContent)
+                        } else return@withContext
+                        inputIndex
+                    }
+
+                    ContentPosition.BELOW ->
+                        scriptContentList.value.indexOf(item) + 1
+                }
+                multipleContentList?.forEach {
+                    val newContent = Content(
+                        type = contentType,
+                        script = script.value!!.scriptId!!,
+                        position = inputIndex.toLong(),
+                        filename = MutableStateFlow(it.lastPathSegment?:"")
+                    )
+                    scriptContentList.value.add(inputIndex, newContent)
+                    newContent.id = dao.insert(newContent)
+                    when (contentType) {
+                        ContentType.TEXT,
+                        ContentType.SCRIPT -> {}
+                        ContentType.IMAGE,
+                        ContentType.VIDEO,
+                        ContentType.DOCUMENT,
+                        ContentType.AUDIO -> newContent.saveFile(application, it)
+                    }
+                }
+                if (multipleContentList == null && (contentType == ContentType.TEXT || contentType == ContentType.SCRIPT)) {
+                    val newContent = Content(
+                        type = contentType,
+                        script = script.value!!.scriptId!!,
+                        position = inputIndex.toLong()
+                    )
+                    scriptContentList.value.add(inputIndex, newContent)
+                    newContent.id = dao.insert(newContent)
+                }
+                withContext(Dispatchers.Main) {
+                    appendTextFieldIfNeeded()
+                }
             }
         }
     }

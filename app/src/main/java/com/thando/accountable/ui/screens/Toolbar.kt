@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -470,6 +471,7 @@ fun ScriptsCollapsingToolbar(
     progressMax: Float,
     imageUri: Uri?,
     navigationIcon:@Composable (Modifier)-> Unit,
+    addContentButton:(@Composable (Modifier)-> Unit)?,
     shareIcon:@Composable (Modifier)-> Unit,
     teleprompterIcon:@Composable (Modifier)-> Unit,
     basicDropdownMenu:@Composable (Modifier)-> Unit,
@@ -507,15 +509,29 @@ fun ScriptsCollapsingToolbar(
                     .padding(horizontal = ContentPadding)
                     .fillMaxSize()
             ) {
-                ScriptsCollapsingToolbarLayout (progress = progress) {
-                    val mod = Modifier.padding(logoPadding).wrapContentWidth()
-                    navigationIcon(mod)
-                    Text(modifier = mod.graphicsLayer {
-                        alpha = progressMax - progress
-                    }, text = stringResource(R.string.script))
-                    shareIcon(mod)
-                    teleprompterIcon(mod)
-                    basicDropdownMenu(mod)
+                addContentButton?.let {
+                    ScriptsCollapsingToolbarLayout (progress = progress) {
+                        val mod = Modifier.padding(logoPadding).wrapContentWidth()
+                        navigationIcon(mod)
+                        Text(modifier = mod.graphicsLayer {
+                            alpha = progressMax - progress
+                        }, text = stringResource(R.string.script))
+                        shareIcon(mod)
+                        teleprompterIcon(mod)
+                        basicDropdownMenu(mod)
+                        addContentButton(mod)
+                    }
+                }?:run{
+                    ScriptsCollapsingToolbarLayout (progress = progress) {
+                        val mod = Modifier.padding(logoPadding).wrapContentWidth()
+                        navigationIcon(mod)
+                        Text(modifier = mod.graphicsLayer {
+                            alpha = progressMax - progress
+                        }, text = stringResource(R.string.script))
+                        shareIcon(mod)
+                        teleprompterIcon(mod)
+                        basicDropdownMenu(mod)
+                    }
                 }
             }
         }
@@ -532,7 +548,7 @@ private fun ScriptsCollapsingToolbarLayout(
         modifier = modifier,
         content = content
     ) { measurables, constraints ->
-        check(measurables.size == 5)
+        check(measurables.size == 5 || measurables.size == 6)
 
         val items = measurables.map {
             it.measure(constraints)
@@ -546,6 +562,7 @@ private fun ScriptsCollapsingToolbarLayout(
             val shareIcon = items[2]
             val teleprompterIcon = items[3]
             val basicDropdownMenu = items[4]
+            val addContentIcon = if (measurables.size == 6) items[5] else null
             navigationIcon.placeRelative(
                 x = 0,
                 y = lerp(
@@ -555,9 +572,18 @@ private fun ScriptsCollapsingToolbarLayout(
                 )
             )
             titleText.placeRelative(
-                x = navigationIcon.width + titleText.width/2 + ((constraints.maxWidth - basicDropdownMenu.width - teleprompterIcon.width - shareIcon.width - navigationIcon.width)/2)/2,
+                x = navigationIcon.width + titleText.width/2 + ((constraints.maxWidth - basicDropdownMenu.width - teleprompterIcon.width - shareIcon.width - (addContentIcon?.width
+                    ?: 0) - navigationIcon.width)/2)/2,
                 y = lerp(
                     start = (constraints.maxHeight - titleText.height) / 2,
+                    stop = 0,
+                    fraction = progress
+                )
+            )
+            addContentIcon?.placeRelative(
+                x = constraints.maxWidth - basicDropdownMenu.width - teleprompterIcon.width - shareIcon.width - addContentIcon.width,
+                y = lerp(
+                    start = (constraints.maxHeight - addContentIcon.height) / 2,
                     stop = 0,
                     fraction = progress
                 )

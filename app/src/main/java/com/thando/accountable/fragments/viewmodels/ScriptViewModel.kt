@@ -17,7 +17,9 @@ import com.thando.accountable.AccountableRepository
 import com.thando.accountable.AppResources
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
+import com.thando.accountable.database.tables.Content.ContentType
 import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
+import com.thando.accountable.ui.screens.ContentPosition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -37,7 +39,7 @@ class ScriptViewModel(
     private val viewModelScope = CoroutineScope(Dispatchers.Main + viewModelJob)
 
     // Data
-    private val appSettings = repository.getAppSettings()
+    val appSettings = repository.getAppSettings()
     val script = repository.getScript()
     val scriptContentList = repository.getScriptContentList()
     val markupLanguage = repository.getScriptMarkupLanguage()
@@ -129,6 +131,16 @@ class ScriptViewModel(
         viewModelScope.launch {
             _chooseContent.emit(AppResources.ContentType.DOCUMENT)
         }
+    }
+
+    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:ContentPosition, item: Content, cursorPosition:Int?){
+        repository.addContent(
+            multipleContentList,
+            contentType,
+            contentPosition,
+            item,
+            cursorPosition
+        )
     }
 
     fun addTimeStamp(context: Context){

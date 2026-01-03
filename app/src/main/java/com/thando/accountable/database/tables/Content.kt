@@ -53,6 +53,7 @@ data class Content(
     enum class ContentType {
         TEXT, IMAGE, SCRIPT, VIDEO, DOCUMENT, AUDIO
     }
+    enum class NonMediaType{ TEXT,SCRIPT }
 
     @Ignore
     private val contentPrefix = "Content_"

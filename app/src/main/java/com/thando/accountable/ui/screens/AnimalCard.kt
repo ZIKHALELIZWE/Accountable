@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
@@ -44,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
@@ -281,6 +283,7 @@ fun ScriptCard(
 
     LaunchedEffect(Unit) {
         contentPreview = script.scriptId?.let { onClickListeners.viewModel.getScriptContentPreview(it) }
+        contentPreview?.init()
     }
 
     contentPreview?.let { contentPreview ->
@@ -332,7 +335,6 @@ fun ScriptCard(
                         Color.White,
                         Color.LightGray,
                         Color.DarkGray),
-                    //shape = RoundedCornerShape(100.dp)
                 ) {
                     scriptUri?.let {
                         Image(
@@ -346,7 +348,9 @@ fun ScriptCard(
                         )
                     }
                 }
-                Column(modifier = Modifier.padding(end = 5.dp)) {
+                Column(modifier = Modifier.padding(end = 5.dp).height(113.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text(text = title,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -359,11 +363,11 @@ fun ScriptCard(
                     Text(text = description,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp, horizontal = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(5.dp),
                         textAlign = TextAlign.Start,
                         color = Color.Black) // Description
                     Row(modifier = Modifier
-                        .height(IntrinsicSize.Max)
+                        .height(IntrinsicSize.Max).padding(5.dp)
                         .fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {

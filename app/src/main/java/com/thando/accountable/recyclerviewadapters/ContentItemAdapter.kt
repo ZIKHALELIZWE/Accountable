@@ -45,6 +45,7 @@ import com.thando.accountable.databinding.VideoItemBinding
 import com.thando.accountable.fragments.dialogs.AddMediaDialog
 import com.thando.accountable.player.TrackItem
 import com.thando.accountable.recyclerviewadapters.diffutils.ContentDiffItemCallback
+import com.thando.accountable.ui.screens.ContentPosition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -697,14 +698,14 @@ class ContentItemAdapter(
         else return false
     }
 
-    private fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:AddMediaDialog.ContentPosition, item: Content, binding: TextItemBinding?){
+    private fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:ContentPosition, item: Content, binding: TextItemBinding?){
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val inputIndex = when (contentPosition) {
-                    AddMediaDialog.ContentPosition.ABOVE ->
+                    ContentPosition.ABOVE ->
                         scriptContentList.value.indexOf(item)
 
-                    AddMediaDialog.ContentPosition.AT_CURSOR_POINT -> {
+                    ContentPosition.AT_CURSOR_POINT -> {
                         val inputIndex =
                             scriptContentList.value.indexOf(item) + 1
                         if (binding != null) {
@@ -730,7 +731,7 @@ class ContentItemAdapter(
                         inputIndex
                     }
 
-                    AddMediaDialog.ContentPosition.BELOW ->
+                    ContentPosition.BELOW ->
                         scriptContentList.value.indexOf(item) + 1
                 }
                 multipleContentList?.forEach {
