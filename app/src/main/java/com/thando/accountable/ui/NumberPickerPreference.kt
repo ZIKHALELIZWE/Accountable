@@ -20,8 +20,8 @@ class NumberPickerPreference(context: Context, attrs: AttributeSet?) :
 
     companion object {
         // allowed range
-        const val INITIAL_VALUE = 24
-        const val MIN_VALUE = 16
+        const val INITIAL_VALUE = 16
+        const val MIN_VALUE = 12
         const val MAX_VALUE = 80
     }
 }

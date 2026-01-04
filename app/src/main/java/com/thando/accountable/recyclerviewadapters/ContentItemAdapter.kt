@@ -42,10 +42,10 @@ import com.thando.accountable.databinding.ImageItemBinding
 import com.thando.accountable.databinding.ScriptContentItemBinding
 import com.thando.accountable.databinding.TextItemBinding
 import com.thando.accountable.databinding.VideoItemBinding
+import com.thando.accountable.fragments.ScriptFragment
 import com.thando.accountable.fragments.dialogs.AddMediaDialog
 import com.thando.accountable.player.TrackItem
 import com.thando.accountable.recyclerviewadapters.diffutils.ContentDiffItemCallback
-import com.thando.accountable.ui.screens.ContentPosition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -698,14 +698,14 @@ class ContentItemAdapter(
         else return false
     }
 
-    private fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:ContentPosition, item: Content, binding: TextItemBinding?){
+    private fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:ScriptFragment.ContentPosition, item: Content, binding: TextItemBinding?){
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val inputIndex = when (contentPosition) {
-                    ContentPosition.ABOVE ->
+                    ScriptFragment.ContentPosition.ABOVE ->
                         scriptContentList.value.indexOf(item)
 
-                    ContentPosition.AT_CURSOR_POINT -> {
+                    ScriptFragment.ContentPosition.AT_CURSOR_POINT -> {
                         val inputIndex =
                             scriptContentList.value.indexOf(item) + 1
                         if (binding != null) {
@@ -731,7 +731,7 @@ class ContentItemAdapter(
                         inputIndex
                     }
 
-                    ContentPosition.BELOW ->
+                    ScriptFragment.ContentPosition.BELOW ->
                         scriptContentList.value.indexOf(item) + 1
                 }
                 multipleContentList?.forEach {

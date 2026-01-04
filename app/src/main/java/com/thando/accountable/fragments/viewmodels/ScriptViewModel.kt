@@ -6,6 +6,8 @@ import android.net.Uri
 import android.view.View
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
@@ -18,8 +20,8 @@ import com.thando.accountable.AppResources
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Content.ContentType
+import com.thando.accountable.fragments.ScriptFragment
 import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
-import com.thando.accountable.ui.screens.ContentPosition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,30 +64,6 @@ class ScriptViewModel(
     override fun onCleared() {
         super.onCleared()
         viewModelJob.cancel()
-    }
-
-    fun getContentAdapter(
-        context: Context,
-        viewLifecycleOwner: LifecycleOwner,
-        childFragmentManager: FragmentManager,
-        galleryLauncherMultiple: ActivityResultLauncher<String>,
-        markupLanguageInitializeScrollUnit:(()->Unit)
-    ): ContentItemAdapter {
-        return ContentItemAdapter(
-            context,
-            viewLifecycleOwner,
-            childFragmentManager,
-            galleryLauncherMultiple,
-            markupLanguageInitializeScrollUnit,
-            script,
-            scriptContentList,
-            appSettings,
-            markupLanguage,
-            isEditingScript,
-            viewModelScope,
-            repository,
-            addTimeStampFunction
-        )
     }
 
     fun scriptViewVisibility(uri:Uri?,context: Context):Int{
@@ -133,7 +111,7 @@ class ScriptViewModel(
         }
     }
 
-    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:ContentPosition, item: Content, cursorPosition:Int?){
+    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ScriptFragment.ContentPosition, item: Content, cursorPosition:Int?){
         repository.addContent(
             multipleContentList,
             contentType,
@@ -143,22 +121,30 @@ class ScriptViewModel(
         )
     }
 
-    fun addTimeStamp(context: Context){
+    fun deleteContent(content:Content){
+        repository.deleteContent(content)
+    }
+
+    fun addTimeStamp(context: Context, index:Int, content: Content, updateTextFieldValue:(String,Int)->Unit){
         if (script.value!=null) {
             val cal = AppResources.CalendarResource(Calendar.getInstance())
             val date = cal.getFullDateStateFlow(context).value
             val time = cal.getTimeStateFlow(context).value
-            menuAddTimeStampTitle.value = if (
+            val (title,stampString) = if (
                 script.value!!.scriptDateTime.getFullDateStateFlow(context).value
-                    ==
-                    date
-                ) {
-                    addTimeStampFunction.value?.invoke(time)
-                    context.getString(R.string.add_time_stamp)
-                } else {
-                    addTimeStampFunction.value?.invoke("$time $date")
-                    context.getString(R.string.add_date_stamp)
-                }
+                ==
+                date
+            ) {
+                Pair(context.getString(R.string.add_time_stamp),
+                time)
+            } else {
+                Pair(context.getString(R.string.add_date_stamp),
+                "$time $date")
+            }
+            menuAddTimeStampTitle.value = title
+            val stringBuilder = StringBuilder(if(content.type != ContentType.TEXT) content.description.value else content.content.value)
+            stringBuilder.insert(index, stampString)
+            updateTextFieldValue(stringBuilder.toString(),index+stampString.length)
         }
     }
 

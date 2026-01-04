@@ -73,23 +73,6 @@ class AccountablePlayer : MediaSessionService() {
         player.addListener(playerListener)
     }
 
-    @OptIn(UnstableApi::class)
-    fun setPlayerView(inputPlayerView: PlayerView){
-        controllerFuture.addListener(
-            {
-                // Call controllerFuture.get() to retrieve the MediaController.
-                // MediaController implements the Player interface, so it can be
-                // attached to the PlayerView UI component.
-                inputPlayerView.setPlayer(controllerFuture.get())
-            },
-            MoreExecutors.directExecutor()
-        )
-        inputPlayerView.apply{
-            this@apply.player = this@AccountablePlayer.player
-            hideController()
-        }
-    }
-
     override fun onCreate() {
         super.onCreate()
         init(this.applicationContext,"ServiceAccountablePlayer")
@@ -117,6 +100,23 @@ class AccountablePlayer : MediaSessionService() {
         onDestroy()
     }
 
+    @OptIn(UnstableApi::class)
+    fun setPlayerView(inputPlayerView: PlayerView){
+        controllerFuture.addListener(
+            {
+                // Call controllerFuture.get() to retrieve the MediaController.
+                // MediaController implements the Player interface, so it can be
+                // attached to the PlayerView UI component.
+                inputPlayerView.setPlayer(controllerFuture.get())
+            },
+            MoreExecutors.directExecutor()
+        )
+        inputPlayerView.apply{
+            this@apply.player = this@AccountablePlayer.player
+            hideController()
+        }
+    }
+
     fun addAndPlay(content: Content, playerView: PlayerView,context: Context){
         content.trackItem.value?.let {
             setPlayerView(playerView)
@@ -126,7 +126,7 @@ class AccountablePlayer : MediaSessionService() {
                 onStart(context)
 
                 player.playWhenReady = true
-                player.addMediaItem(MediaItem.fromUri(it.audioUrl))
+                player.setMediaItem(MediaItem.fromUri(it.audioUrl))
                 player.prepare()
             }
             else{

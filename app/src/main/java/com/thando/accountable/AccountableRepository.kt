@@ -27,12 +27,12 @@ import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.databinding.TextItemBinding
 import com.thando.accountable.fragments.FoldersAndScriptsFragment.FoldersAndScriptsLists
+import com.thando.accountable.fragments.ScriptFragment
 import com.thando.accountable.fragments.dialogs.AddMediaDialog
 import com.thando.accountable.fragments.viewmodels.FoldersAndScriptsViewModel.Companion.INITIAL_FOLDER_ID
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import com.thando.accountable.player.AccountablePlayer
 import com.thando.accountable.ui.AccountableNotification
-import com.thando.accountable.ui.screens.ContentPosition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -937,11 +937,86 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return position+1
     }
 
+    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ScriptFragment.ContentPosition, item: Content, cursorPosition:Int?){
+        repositoryScope.launch {
+            withContext(Dispatchers.IO) {
+                scriptContentList.value = scriptContentList.value.toMutableList().apply {
+                    val inputIndex = when (contentPosition) {
+                        ScriptFragment.ContentPosition.ABOVE ->
+                            indexOf(item)
+
+                        ScriptFragment.ContentPosition.AT_CURSOR_POINT -> {
+                            val inputIndex = indexOf(item) + 1
+                            if (cursorPosition != null) {
+                                // split the string
+                                val text = item.content.value
+
+                                // Split the string
+                                val topString = text.take(cursorPosition)
+                                val bottomString =
+                                    text.substring(cursorPosition, text.length)
+
+                                item.content.value = topString
+                                val newContent = Content(
+                                    type = ContentType.TEXT,
+                                    script = script.value!!.scriptId!!,
+                                    position = inputIndex.toLong(),
+                                    content = MutableStateFlow(bottomString)
+                                )
+                                add(inputIndex, newContent)
+                                newContent.id = dao.insert(newContent)
+                            } else return@withContext
+                            inputIndex
+                        }
+
+                        ScriptFragment.ContentPosition.BELOW -> indexOf(item) + 1
+                    }
+                    multipleContentList?.forEach {
+                        val newContent = Content(
+                            type = contentType,
+                            script = script.value!!.scriptId!!,
+                            position = inputIndex.toLong(),
+                            filename = MutableStateFlow(it.lastPathSegment ?: "")
+                        )
+                        add(inputIndex, newContent)
+                        newContent.id = dao.insert(newContent)
+                        when (contentType) {
+                            ContentType.TEXT,
+                            ContentType.SCRIPT -> {
+                            }
+
+                            ContentType.IMAGE,
+                            ContentType.VIDEO,
+                            ContentType.DOCUMENT,
+                            ContentType.AUDIO -> newContent.saveFile(application, it)
+                        }
+                    }
+                    if (multipleContentList == null && (contentType == ContentType.TEXT || contentType == ContentType.SCRIPT)) {
+                        val newContent = Content(
+                            type = contentType,
+                            script = script.value!!.scriptId!!,
+                            position = inputIndex.toLong()
+                        )
+                        add(inputIndex, newContent)
+                        newContent.id = dao.insert(newContent)
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    appendTextFieldIfNeeded()
+                }
+            }
+        }
+    }
+
     fun deleteContent(content: Content){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
+                scriptContentList.value = scriptContentList.value.toMutableList().apply { remove(content) }
                 content.deleteFile(application)
                 dao.delete(content)
+                withContext(Dispatchers.Main) {
+                    appendTextFieldIfNeeded()
+                }
             }
         }
     }
@@ -1820,75 +1895,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 changeFragment(AccountableFragment.GoalsFragment)
-            }
-        }
-    }
-
-    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:ContentPosition, item: Content, cursorPosition:Int?){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                val inputIndex = when (contentPosition) {
-                    ContentPosition.ABOVE ->
-                        scriptContentList.value.indexOf(item)
-
-                    ContentPosition.AT_CURSOR_POINT -> {
-                        val inputIndex =
-                            scriptContentList.value.indexOf(item) + 1
-                        if (cursorPosition != null) {
-                            // split the string
-                            val text = item.content.value
-
-                            // Split the string
-                            val topString = text.take(cursorPosition)
-                            val bottomString =
-                                text.substring(cursorPosition, text.length)
-
-                            item.content.value = topString
-                            val newContent = Content(
-                                type = ContentType.TEXT,
-                                script = script.value!!.scriptId!!,
-                                position = inputIndex.toLong(),
-                                content = MutableStateFlow(bottomString)
-                            )
-                            scriptContentList.value.add(inputIndex, newContent)
-                            newContent.id = dao.insert(newContent)
-                        } else return@withContext
-                        inputIndex
-                    }
-
-                    ContentPosition.BELOW ->
-                        scriptContentList.value.indexOf(item) + 1
-                }
-                multipleContentList?.forEach {
-                    val newContent = Content(
-                        type = contentType,
-                        script = script.value!!.scriptId!!,
-                        position = inputIndex.toLong(),
-                        filename = MutableStateFlow(it.lastPathSegment?:"")
-                    )
-                    scriptContentList.value.add(inputIndex, newContent)
-                    newContent.id = dao.insert(newContent)
-                    when (contentType) {
-                        ContentType.TEXT,
-                        ContentType.SCRIPT -> {}
-                        ContentType.IMAGE,
-                        ContentType.VIDEO,
-                        ContentType.DOCUMENT,
-                        ContentType.AUDIO -> newContent.saveFile(application, it)
-                    }
-                }
-                if (multipleContentList == null && (contentType == ContentType.TEXT || contentType == ContentType.SCRIPT)) {
-                    val newContent = Content(
-                        type = contentType,
-                        script = script.value!!.scriptId!!,
-                        position = inputIndex.toLong()
-                    )
-                    scriptContentList.value.add(inputIndex, newContent)
-                    newContent.id = dao.insert(newContent)
-                }
-                withContext(Dispatchers.Main) {
-                    appendTextFieldIfNeeded()
-                }
             }
         }
     }

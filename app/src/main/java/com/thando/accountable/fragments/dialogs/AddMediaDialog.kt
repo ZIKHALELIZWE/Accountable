@@ -23,8 +23,8 @@ import com.thando.accountable.MainActivity.Companion.collectFlow
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.databinding.ScriptEditTextLongClickDialogBinding
+import com.thando.accountable.fragments.ScriptFragment
 import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
-import com.thando.accountable.ui.screens.ContentPosition
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -39,7 +39,7 @@ class AddMediaDialog(
     private val contentItemAdapter: ContentItemAdapter,
     private val item: Content,
     private val aboveBelowContentType: Pair<Content.ContentType?,Content.ContentType?>,
-    private val processResults: (List<Uri>?, Content.ContentType, ContentPosition) -> Unit
+    private val processResults: (List<Uri>?, Content.ContentType, ScriptFragment.ContentPosition) -> Unit
 ): BottomSheetDialogFragment() {
 
     private val contentType: Content.ContentType = item.type
@@ -118,15 +118,15 @@ class AddMediaDialog(
         }
 
         binding.addAboveButton.setOnClickListener {
-            addContentView(ContentPosition.ABOVE)
+            addContentView(ScriptFragment.ContentPosition.ABOVE)
         }
 
         binding.addAtCursorPointButton.setOnClickListener {
-            addContentView(ContentPosition.AT_CURSOR_POINT)
+            addContentView(ScriptFragment.ContentPosition.AT_CURSOR_POINT)
         }
 
         binding.addBelowButton.setOnClickListener {
-            addContentView(ContentPosition.BELOW)
+            addContentView(ScriptFragment.ContentPosition.BELOW)
         }
 
         binding.deleteButton.setOnClickListener {
@@ -211,13 +211,13 @@ class AddMediaDialog(
         accessorChosen.value = true
     }
 
-    private fun addContentView(position: ContentPosition){
+    private fun addContentView(position: ScriptFragment.ContentPosition){
         if (accessor!=null && chosenContentType!=null) getMultipleContent(accessor!!,chosenContentType!!,position)
         else if (nonMediaType!=null && chosenContentType!=null) getMultipleContent( null, chosenContentType!!, position)
         this.dismiss()
     }
 
-    private fun getMultipleContent(mediaType:String?, contentType: Content.ContentType, position: ContentPosition){
+    private fun getMultipleContent(mediaType:String?, contentType: Content.ContentType, position: ScriptFragment.ContentPosition){
         if (mediaType!=null){
             multipleContentsJob.set(collectFlow(fragmentViewLifecycleOwner,multipleContentsStateFlow){ list ->
                     if (list!=null){
