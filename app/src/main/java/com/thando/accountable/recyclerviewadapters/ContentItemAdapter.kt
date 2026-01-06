@@ -65,7 +65,6 @@ class ContentItemAdapter(
     private val galleryLauncherMultiple: ActivityResultLauncher<String>? = null,
     private val markupLanguageInitializeScrollUnit:(()->Unit),
     private val script: StateFlow<Script?>,
-    private val scriptContentList: StateFlow<MutableList<Content>>,
     val appSettings: StateFlow<AppSettings?>,
     val markupLanguage: StateFlow<MarkupLanguage?>,
     val isEditingScript: MutableStateFlow<Boolean>,
@@ -74,6 +73,7 @@ class ContentItemAdapter(
     private val addTimeStampFunction: MutableStateFlow<((String) -> Unit)?>
 ): ListAdapter<Content, ContentItemAdapter.ContentItemViewHolder>(ContentDiffItemCallback()) {
 
+    private val scriptContentList: StateFlow<MutableList<Content>> = MutableStateFlow(mutableListOf())
     private val viewHolders: MutableList<ContentItemViewHolder> = mutableListOf()
 
     private var teleprompterSettings: MutableStateFlow<StateFlow<TeleprompterSettings?>?> = MutableStateFlow(null)

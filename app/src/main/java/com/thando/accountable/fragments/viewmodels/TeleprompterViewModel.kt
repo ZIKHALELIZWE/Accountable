@@ -100,7 +100,6 @@ class TeleprompterViewModel(
             null,
             markupLanguageInitializeScrollUnit,
             script,
-            scriptContentList,
             appSettings,
             markupLanguage,
             MutableStateFlow(false),

@@ -1,7 +1,6 @@
 package com.thando.accountable.database.dataaccessobjects
 
 import android.content.Context
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Delete
@@ -24,7 +23,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
@@ -140,7 +138,7 @@ interface RepositoryDao {
         when(folder.folderType){
             Folder.FolderType.SCRIPTS -> {
                 val scripts = getScriptsNow(folder.folderId)
-                scripts.forEach { deleteScript(it.scriptId,context) }
+                scripts.forEach { deleteScript(it.scriptId, context) }
             }
             Folder.FolderType.GOALS -> {
                 val goals = getGoalsNow(folder.folderId)
@@ -148,16 +146,16 @@ interface RepositoryDao {
             }
         }
         val folders = getFoldersNow(folder.folderId,folder.folderType)
-        folders.forEach { deleteFolder(it.folderId,context) }
+        folders.forEach { deleteFolder(it.folderId, context) }
 
         folder.deleteFile(context)
         // Fix folder Positions
         val parentFolders = getFoldersNow(folder.folderParent,folder.folderType)
         var passedFolder = false
         parentFolders.forEach {
-            if (!passedFolder){
+            if (!passedFolder) {
                 if (it.folderId == folder.folderId) passedFolder = true
-            } else{
+            } else {
                 it.folderPosition -= 1
                 update(it)
             }
@@ -181,9 +179,9 @@ interface RepositoryDao {
                 val scripts = getScriptsNow(script.scriptParent)
                 var passedScript = false
                 scripts.forEach {
-                    if (!passedScript){
+                    if (!passedScript) {
                         if (it.scriptId == script.scriptId) passedScript = true
-                    } else{
+                    } else {
                         it.scriptPosition -= 1
                         update(it)
                     }
@@ -420,19 +418,25 @@ interface RepositoryDao {
         searchOccurrences.value = 0
         searchNumScripts.value = 0
         val scriptsList = getScriptsNow(id)
-        for (script in scriptsList){
+        for (script in scriptsList) {
             if (script.scriptId == null) continue
-            val scriptSearch = SearchViewModel.ScriptSearch(id,title,script,onScriptClick)
-            val list = searchScriptForString(script.scriptId!!,searchString,matchCaseCheck,wordCheck,script.scriptTitle.value)
+            val scriptSearch = SearchViewModel.ScriptSearch(id, title, script, onScriptClick)
+            val list = searchScriptForString(
+                script.scriptId!!,
+                searchString,
+                matchCaseCheck,
+                wordCheck,
+                script.scriptTitle.value
+            )
             var hasContent = false
-            if (list.isNotEmpty()){
-                list.forEach { withContext(Dispatchers.Main){ searchOccurrences.value += it.second.size } }
+            if (list.isNotEmpty()) {
+                list.forEach { withContext(Dispatchers.Main) { searchOccurrences.value += it.second.size } }
                 scriptSearch.addRanges(list)
                 hasContent = true
             }
-            if (hasContent){
+            if (hasContent) {
                 searchScriptsList.add(scriptSearch)
-                withContext(Dispatchers.Main){ searchNumScripts.value += 1 }
+                withContext(Dispatchers.Main) { searchNumScripts.value += 1 }
             }
         }
         appendedUnit?.invoke()

@@ -9,6 +9,6 @@ class FolderDiffItemCallback: DiffUtil.ItemCallback<Folder>() {
     }
 
     override fun areContentsTheSame(oldItem: Folder, newItem: Folder): Boolean {
-        return oldItem == newItem
+        return true//oldItem == newItem
     }
 }

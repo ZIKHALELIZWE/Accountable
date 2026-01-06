@@ -13,13 +13,16 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AccountableRepository
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Content.ContentType
+import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.fragments.ScriptFragment
 import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +32,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,6 +47,8 @@ class ScriptViewModel(
     // Data
     val appSettings = repository.getAppSettings()
     val script = repository.getScript()
+    /*private var _scriptContentList: MutableStateFlow<List<Content>?> = MutableStateFlow(null)
+    val scriptContentList: StateFlow<List<Content>?> = _scriptContentList.asStateFlow()*/
     val scriptContentList = repository.getScriptContentList()
     val markupLanguage = repository.getScriptMarkupLanguage()
     val isEditingScript = repository.getIsEditingScript()
@@ -230,7 +236,6 @@ class ScriptViewModel(
 
     suspend fun getShareContent(context: Context): Triple<Boolean,ArrayList<Uri>,String>{
         return withContext(Dispatchers.IO) {
-            val contentList = scriptContentList.value
             var hasContent = false
             var sharedText =
                 if (script.value?.scriptTitle?.value != null && !script.value?.scriptTitle?.value.isNullOrEmpty()) {
@@ -245,36 +250,38 @@ class ScriptViewModel(
                 } else ""
 
             val imageUris = arrayListOf<Uri>()
-            contentList.forEach {
-                if (it.type == Content.ContentType.TEXT) {
-                    if (it.content.value.isNotEmpty()) {
-                        sharedText =
-                            (if (sharedText.isNotEmpty()) "$sharedText\n\n" else "") + it.content.value
-                        hasContent = true
-                    }
-                } else if (it.type == Content.ContentType.IMAGE) {
-                    val uri = it.imageResource.fileFromContentUri(context)
-                    if (uri != null) {
-                        val newUri = if (imageUris.isEmpty()) {
-                            uri.buildUpon()
-                                .appendQueryParameter("caption", sharedText)
-                                .build()
-                        } else {
-                            val caption = imageUris.last().getQueryParameter("caption")
-                            val queryText =
-                                caption + (if (!caption.isNullOrEmpty() && sharedText.isNotEmpty()) "\n\n" else "") + sharedText.ifEmpty { "" }
-                            val newUri = imageUris.last().buildUpon().clearQuery()
-                                .appendQueryParameter("caption", queryText)
-                                .build()
-                            imageUris.remove(imageUris.last())
-                            imageUris.add(newUri)
-                            uri.buildUpon()
-                                .appendQueryParameter("caption", "")
-                                .build()
+            scriptContentList.value?.let { contentList ->
+                contentList.forEach {
+                    if (it.type == ContentType.TEXT) {
+                        if (it.content.value.isNotEmpty()) {
+                            sharedText =
+                                (if (sharedText.isNotEmpty()) "$sharedText\n\n" else "") + it.content.value
+                            hasContent = true
                         }
+                    } else if (it.type == ContentType.IMAGE) {
+                        val uri = it.imageResource.fileFromContentUri(context)
+                        if (uri != null) {
+                            val newUri = if (imageUris.isEmpty()) {
+                                uri.buildUpon()
+                                    .appendQueryParameter("caption", sharedText)
+                                    .build()
+                            } else {
+                                val caption = imageUris.last().getQueryParameter("caption")
+                                val queryText =
+                                    caption + (if (!caption.isNullOrEmpty() && sharedText.isNotEmpty()) "\n\n" else "") + sharedText.ifEmpty { "" }
+                                val newUri = imageUris.last().buildUpon().clearQuery()
+                                    .appendQueryParameter("caption", queryText)
+                                    .build()
+                                imageUris.remove(imageUris.last())
+                                imageUris.add(newUri)
+                                uri.buildUpon()
+                                    .appendQueryParameter("caption", "")
+                                    .build()
+                            }
 
-                        imageUris.add(newUri)
-                        sharedText = ""
+                            imageUris.add(newUri)
+                            sharedText = ""
+                        }
                     }
                 }
             }

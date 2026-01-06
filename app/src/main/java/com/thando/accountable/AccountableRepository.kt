@@ -3,10 +3,9 @@ package com.thando.accountable
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
-import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.net.toUri
@@ -25,10 +24,7 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.TeleprompterSettings
-import com.thando.accountable.databinding.TextItemBinding
-import com.thando.accountable.fragments.FoldersAndScriptsFragment.FoldersAndScriptsLists
 import com.thando.accountable.fragments.ScriptFragment
-import com.thando.accountable.fragments.dialogs.AddMediaDialog
 import com.thando.accountable.fragments.viewmodels.FoldersAndScriptsViewModel.Companion.INITIAL_FOLDER_ID
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import com.thando.accountable.player.AccountablePlayer
@@ -61,14 +57,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
     val showScripts = MutableStateFlow<MutableStateFlow<Boolean>?>(null)
     val folderOrder = MutableStateFlow<MutableStateFlow<Boolean>?>(null)
     val listLoaded = MutableStateFlow( false)
-    val scrollStateParent = MutableStateFlow<ScrollState?>(null)
+    val scrollStateParent = MutableStateFlow<LazyListState?>(null)
     var saveScrollPosition: Int? = null
     val listShown = MutableStateFlow(getListShown(false))
 
     private val appSettings = MutableStateFlow<AppSettings?>(null)
-    private val foldersList = mutableStateOf(mutableListOf<Folder>())
-    private val scriptsList = mutableStateOf(mutableListOf<Script>())
-    private val goalsList = mutableStateOf(mutableListOf<Goal>())
+    private val foldersList = MutableStateFlow<List<Folder>?>(null)
+    private val scriptsList = MutableStateFlow<List<Script>?>(null)
+    private val goalsList = MutableStateFlow<List<Goal>?>(null)
     var intentString: String? = null
 
     private val editFolder = MutableStateFlow<Folder?>(null)
@@ -84,7 +80,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val currentFragment = MutableStateFlow<AccountableFragment?>(null)
 
     private val script = MutableStateFlow<Script?>(null)
-    private val scriptContentList = MutableStateFlow<MutableList<Content>>(mutableListOf())
+    private val scriptContentList = MutableStateFlow<List<Content>?>(null)
     private val scriptMarkupLanguage = MutableStateFlow<MarkupLanguage?>(null)
     private val isEditingScript = MutableStateFlow(false)
 
@@ -138,13 +134,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getShowScripts(): StateFlow<MutableStateFlow<Boolean>?>{ return showScripts}
     fun getFolderOrder(): StateFlow<MutableStateFlow<Boolean>?>{ return folderOrder }
     fun getListLoaded(): StateFlow<Boolean>{ return listLoaded }
-    fun getScrollStateParent(): StateFlow<ScrollState?>{ return scrollStateParent }
-    fun getListShown() : StateFlow<FoldersAndScriptsLists.FASListType>{ return listShown}
+    fun getScrollStateParent(): StateFlow<LazyListState?>{ return scrollStateParent }
+    fun getListShown() : StateFlow<Folder.FolderListType>{ return listShown }
 
     fun getAppSettings(): StateFlow<AppSettings?> { return appSettings }
-    fun getFoldersList(): MutableState<MutableList<Folder>> { return foldersList }
-    fun getScriptsList(): MutableState<MutableList<Script>> { return scriptsList }
-    fun getGoalsList(): MutableState<MutableList<Goal>> { return goalsList }
+    fun getFoldersList(): StateFlow<List<Folder>?> { return foldersList }
+    fun getScriptsList(): StateFlow<List<Script>?> { return scriptsList }
+    fun getGoalsList(): StateFlow<List<Goal>?> { return goalsList }
     fun getEditFolder(): StateFlow<Folder?>{ return editFolder }
     fun getNewEditFolder(): StateFlow<Folder?>{ return newEditFolder }
     fun getNewGoal():MutableState<Goal?> { return newGoal }
@@ -153,7 +149,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getCurrentFragment(): SharedFlow<AccountableFragment?>{ return currentFragment }
 
     fun getScript(): StateFlow<Script?>{ return script }
-    fun getScriptContentList(): StateFlow<MutableList<Content>>{ return scriptContentList }
+    fun getScriptContentList(): StateFlow<List<Content>?>{ return scriptContentList }
     fun getScriptMarkupLanguage(): StateFlow<MarkupLanguage?>{ return scriptMarkupLanguage }
     fun getIsEditingScript(): MutableStateFlow<Boolean>{ return isEditingScript }
 
@@ -177,9 +173,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getSearchScriptsList(): MutableList<SearchViewModel.ScriptSearch> { return searchScriptsList }
 
     fun clearFolderLists(){
-        scriptsList.value = mutableListOf()
-        foldersList.value = mutableListOf()
-        goalsList.value = mutableListOf()
+        scriptsList.value = null
+        foldersList.value = null
+        goalsList.value = null
     }
 
     fun loadScriptsList(ascendingOrder:Boolean, folderNotAppSettings:Boolean,
@@ -189,20 +185,15 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
                 if (id != null) {
                     withContext(Dispatchers.Main) {
-                        if (ascendingOrder) scriptsList.value = scriptsList.value.toMutableList().apply {
-                            clear()
-                            addAll(
-                            withContext(Dispatchers.IO) { dao.getScriptsNow(id).toMutableList() }
-                            )
+                        if (ascendingOrder) scriptsList.update {
+                            withContext(Dispatchers.IO) {
+                                dao.getScriptsNow(id)
+                            }
                         }
-                        else scriptsList.value = scriptsList.value.toMutableList().apply {
-                            clear()
-                            addAll(
-                                withContext(Dispatchers.IO) {
-                                    dao.getScriptsNowDESC(id)
-                                        .toMutableList()
-                                }
-                            )
+                        else scriptsList.update {
+                            withContext(Dispatchers.IO) {
+                                dao.getScriptsNowDESC(id)
+                            }
                         }
                     }
                 }
@@ -219,23 +210,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 if (id != null) {
                     withContext(Dispatchers.Main) {
                         if (ascendingOrder) {
-                            goalsList.value = goalsList.value.toMutableList().apply {
-                                clear()
-                                addAll(
-                                    withContext(Dispatchers.IO) {
-                                        dao.getGoalsNow(id).toMutableList()
-                                    }
-                                )
+                            goalsList.update {
+                                withContext(Dispatchers.IO) {
+                                    dao.getGoalsNow(id)
+                                }
                             }
                         }
                         else {
-                            goalsList.value = goalsList.value.toMutableList().apply {
-                                clear()
-                                addAll(
-                                    withContext(Dispatchers.IO) {
-                                        dao.getGoalsNowDESC(id).toMutableList()
-                                    }
-                                )
+                            goalsList.update {
+                                withContext(Dispatchers.IO) {
+                                    dao.getGoalsNowDESC(id)
+                                }
                             }
                         }
                     }
@@ -256,35 +241,19 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     if (folderTypeScriptsNotGoals) Folder.FolderType.SCRIPTS else Folder.FolderType.GOALS
                 withContext(Dispatchers.Main) {
                     if (ascendingOrder){
-                        foldersList.value = foldersList.value.toMutableList().apply {
-                            clear()
-                            addAll(
-                                withContext(Dispatchers.IO) {
-                                    val list = dao.getFoldersNow(id, type).toMutableList()
-                                    list.forEachIndexed { index, folder ->
-                                        folder.folderPosition = index.toLong()
-                                        dao.update(folder)
-                                    }
-                                    list
-                                }
-                            )
+                        foldersList.update {
+                            withContext(Dispatchers.IO) {
+                                val list = dao.getFoldersNow(id, type)
+                                list
+                            }
                         }
                     }
                     else{
-                        foldersList.value = foldersList.value.toMutableList().apply {
-                            clear()
-                            addAll(
-                                withContext(Dispatchers.IO) {
-                                    val list = dao.getFoldersNowDESC(id, type).toMutableList()
-                                    var position = list.size.toLong() - 1L
-                                    list.forEach { folder ->
-                                        folder.folderPosition = position
-                                        dao.update(folder)
-                                        --position
-                                    }
-                                    list
-                                }
-                            )
+                        foldersList.update {
+                            withContext(Dispatchers.IO) {
+                                val list = dao.getFoldersNowDESC(id, type)
+                                list
+                            }
                         }
                     }
                 }
@@ -314,12 +283,12 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun folderIsScripts(): Boolean { return scriptsOrGoalsFolderType.value == Folder.FolderType.SCRIPTS }
 
-    private fun getListShown(showScripts:Boolean):FoldersAndScriptsLists.FASListType{
+    private fun getListShown(showScripts:Boolean): Folder.FolderListType{
         return if (showScripts){
-            if (folderIsScripts()) FoldersAndScriptsLists.FASListType.SCRIPTS
-            else FoldersAndScriptsLists.FASListType.GOALS
+            if (folderIsScripts()) Folder.FolderListType.SCRIPTS
+            else Folder.FolderListType.GOALS
         }
-        else FoldersAndScriptsLists.FASListType.FOLDERS
+        else Folder.FolderListType.FOLDERS
     }
 
     fun loadFolderData(){
@@ -381,9 +350,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
             }
         }
         else{
-            loadFoldersList(ascendingOrder = ascendingOrder,
+            loadFoldersList(
+                ascendingOrder = ascendingOrder,
                 folderNotAppSettings = folderNotAppSettings,
-                folderTypeScriptsNotGoals = folderTypeScriptsNotGoals){
+                folderTypeScriptsNotGoals = folderTypeScriptsNotGoals
+            ){
                 scroll()
             }
         }
@@ -393,10 +364,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
         repositoryScope.launch {
             val returnScrollPosition = if (folder.value == null) {
                 // Get from settings table
-                appSettings.value?.scrollPosition ?: ScrollState(0)
+                appSettings.value?.scrollPosition ?: LazyListState()
             } else {
                 // Get from folder table
-                folder.value?.folderScrollPosition ?: ScrollState(0)
+                folder.value?.folderScrollPosition ?: LazyListState()
             }
             saveScrollPosition?.let {
                 updateScriptsOrGoalsFolderScrollPosition(it) {
@@ -472,14 +443,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
             withContext(Dispatchers.IO) {
                 if (folder.value == null) {
                     // Save to settings table
-                    appSettings.value?.scrollPosition?.scrollTo(scrollPosition)
+                    appSettings.value?.scrollPosition?.requestScrollToItem(scrollPosition)
                     appSettings.value?.let { dao.update(it) }
                 } else {
                     // Saved in Folders table
-                    folder.value?.folderScrollPosition?.scrollTo(scrollPosition)
+                    folder.value?.folderScrollPosition?.requestScrollToItem(scrollPosition)
                     appSettings.value?.let { dao.update(it) }
                 }
-                appendedUnit?.invoke()
+                withContext(Dispatchers.Main){
+                    appendedUnit?.invoke()
+                }
             }
         }
     }
@@ -557,13 +530,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun deleteFolder(id:Long?){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
-                for(i in 0 until foldersList.value.size){
-                    if (foldersList.value[i].folderId == id){
-                        foldersList.value = foldersList.value.toMutableList().apply { removeAt(i) }
-                        break
+                id?.let {
+                    dao.deleteFolder(it, application)
+                    foldersList.value?.let { list ->
+                        val mutableList = list.toMutableList()
+                        mutableList.removeIf { folder ->
+                            folder.folderId == id
+                        }
+                        foldersList.update { mutableList }
                     }
                 }
-                id?.let { dao.deleteFolder(it, application) }
             }
         }
     }
@@ -571,7 +547,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun deleteGoal(id:Long?){
         repositoryScope.launch {
             withContext(Dispatchers.IO){
-                id?.let { dao.deleteGoal(it, application) }
+                id?.let {
+                    dao.deleteGoal(it, application)
+                    goalsList.value?.let { list ->
+                        val mutableList = list.toMutableList()
+                        mutableList.removeIf { goal ->
+                            goal.id == id
+                        }
+                        goalsList.update { mutableList }
+                    }
+                }
             }
         }
     }
@@ -579,7 +564,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun deleteScript(id:Long?){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
-                id?.let { dao.deleteScript(it, application) }
+                id?.let {
+                    dao.deleteScript(it, application)
+                    scriptsList.value?.let { list ->
+                        val mutableList = list.toMutableList()
+                        mutableList.removeIf { script ->
+                            script.scriptId == id
+                        }
+                        scriptsList.update { mutableList }
+                    }
+                }
             }
         }
     }
@@ -601,21 +595,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 } else {
                     if (folder.value == null) {
                         // Update AppSettings Table
-                        newFolder.folderPosition = (appSettings.value?.let {
-                            dao.getFoldersNow(
-                                INITIAL_FOLDER_ID,
-                                scriptsOrGoalsFolderType.value
-                            ).size
-                        } ?: 0).toLong()
+                        newFolder.folderPosition = if (appSettings.value != null) dao.getFoldersNow(
+                            INITIAL_FOLDER_ID,
+                            scriptsOrGoalsFolderType.value
+                        ).size.toLong()
+                        else 0.toLong()
                     } else {
                         // Update Folders Table
-                        newFolder.folderPosition =
-                            (folder.value?.let {
-                                dao.getFoldersNow(
-                                    it.folderId,
-                                    it.folderType
-                                ).size
-                            } ?: 0).toLong()
+                        newFolder.folderPosition = dao.getFoldersNow(
+                            folder.value!!.folderId,
+                            folder.value!!.folderType
+                        ).size.toLong()
                     }
                 }
                 newFolder
@@ -627,7 +617,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         if (to.folderId == from.folderId) return
         to.folderName.value = from.folderName.value
         to.folderPosition = from.folderPosition
-        to.folderScrollPosition.scrollTo(from.folderScrollPosition.value)
+        to.folderScrollPosition.scrollToItem(from.folderScrollPosition.firstVisibleItemIndex)
         to.folderShowScripts.value = from.folderShowScripts.value
         to.saveImage(application, from.imageResource.getUriFromStorage(application))
         dao.update(to)
@@ -704,8 +694,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             }
                             tempScript
                         }
-                        scriptContentList.value =
-                            withContext(Dispatchers.IO) { dao.getContentList(scriptId).toMutableList() }
+                        scriptContentList.value = withContext(Dispatchers.IO) {
+                            dao.getContentList(scriptId)
+                        }
                     }
                 }
                 if (script.value == null) {
@@ -715,23 +706,25 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         Toast.LENGTH_LONG
                     ).show()
                 } else if (!intentString.isNullOrEmpty()) {
-                    if (scriptContentList.value.lastIndex == -1 || scriptContentList.value.last().type!= ContentType.TEXT){
-                        // Make a new TextProcessor and add the content's content
-                        if(script.value!=null && script.value!!.scriptId!=null) {
-                            scriptContentList.value.add(
-                                Content(
-                                    type = ContentType.TEXT,
-                                    script = script.value!!.scriptId!!,
-                                    position = scriptContentList.value.size.toLong()
+                    scriptContentList.value?.let { scriptContentList ->
+                        if (scriptContentList.lastIndex == -1 || scriptContentList.last().type != ContentType.TEXT){
+                            // Make a new TextProcessor and add the content's content
+                            if (script.value != null && script.value!!.scriptId != null) {
+                                dao.insert(
+                                    Content(
+                                        type = ContentType.TEXT,
+                                        script = script.value!!.scriptId!!,
+                                        position = scriptContentList.size.toLong()
+                                    )
                                 )
-                            )
+                            }
                         }
-                    }
-                    withContext(Dispatchers.Main){
-                        scriptContentList.value.last().content.value += "\n$intentString"
-                    }
-                    saveScript {
-                        activity?.finishAndRemoveTask()
+                        withContext(Dispatchers.Main) {
+                            scriptContentList.last().content.value += "\n$intentString"
+                        }
+                        saveScript {
+                            activity?.finishAndRemoveTask()
+                        }
                     }
                 }
                 intentString = null
@@ -776,10 +769,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             scriptDateTime = AppResources.CalendarResource(Calendar.getInstance()),
                             scriptPosition = scripts.size.toLong(),
                         )
-                        scriptContentList.value = appendTextFieldIfNeeded(mutableListOf())
+                        appendTextFieldIfNeeded()
                         scriptMarkupLanguage.value = null
                         isEditingScript.value = true
                         script.value!!.scriptId = withContext(Dispatchers.IO) { dao.insert(script.value!!) }
+                        scriptContentList.value = dao.getContentList(script.value!!.scriptId)
+                        withContext(Dispatchers.IO) {
+                            appendTextFieldIfNeeded()
+                        }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
@@ -793,10 +790,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             }
                             tempScript
                         }
-                        scriptContentList.value =
-                            withContext(Dispatchers.IO) {
-                                appendTextFieldIfNeeded(dao.getContentList(scriptId).toMutableList())
-                            }
+                        scriptContentList.value = dao.getContentList(scriptId)
+                        withContext(Dispatchers.IO) {
+                            appendTextFieldIfNeeded()
+                        }
                     }
                 }
                 if (script.value == null) {
@@ -812,36 +809,25 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    private fun appendTextFieldIfNeeded(list: MutableList<Content>? = null):MutableList<Content>{
-        if (list != null){
-            if (list.lastIndex == -1 || list.last().type!= ContentType.TEXT){
-                // Make a new TextProcessor and add the content's content
-                if(script.value!=null && script.value!!.scriptId!=null) {
-                    list.add(
-                        Content(
+    private fun appendTextFieldIfNeeded(){
+        repositoryScope.launch {
+            scriptContentList.value?.let { scriptContentListTemp ->
+                if (scriptContentListTemp.lastIndex == -1 || scriptContentListTemp.last().type != ContentType.TEXT) {
+                    // Make a new TextProcessor and add the content's content
+                    if (script.value != null && script.value!!.scriptId != null) {
+                        val newText = Content(
                             type = ContentType.TEXT,
                             script = script.value!!.scriptId!!,
-                            position = list.size.toLong()
+                            position = scriptContentListTemp.size.toLong()
                         )
-                    )
+                        newText.id = dao.insert(newText)
+                        val newList = scriptContentListTemp.toMutableList()
+                        newList.add(newText)
+                        scriptContentList.update { newList }
+                    }
                 }
             }
         }
-        else {
-            if (scriptContentList.value.lastIndex == -1 || scriptContentList.value.last().type!= ContentType.TEXT){
-                // Make a new TextProcessor and add the content's content
-                if(script.value!=null && script.value!!.scriptId!=null) {
-                    scriptContentList.value.add(
-                        Content(
-                            type = ContentType.TEXT,
-                            script = script.value!!.scriptId!!,
-                            position = scriptContentList.value.size.toLong()
-                        )
-                    )
-                }
-            }
-        }
-        return list?:mutableListOf()
     }
 
     fun deleteScriptImage(){
@@ -877,48 +863,50 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                 // save content in the list
                 var position = 1L
-                scriptContentList.value.forEach { content ->
-                    when (content.type) {
-                        ContentType.TEXT -> {
-                            if (content.content.value.isNotEmpty()) {
-                                position = saveContent(content, position)
-                            } else dao.delete(content)
-                        }
-
-                        ContentType.IMAGE -> {
-                            if (content.imageResource.getUriFromStorage(application) == null) {
-                                content.deleteFile(application)
-                                dao.delete(content)
-                            } else {
-                                position = saveContent(content, position)
+                scriptContentList.value?.let {
+                    it.forEach { content ->
+                        when (content.type) {
+                            ContentType.TEXT -> {
+                                if (content.content.value.isNotEmpty()) {
+                                    position = saveContent(content, position)
+                                } else dao.delete(content)
                             }
-                        }
 
-                        ContentType.SCRIPT -> TODO()
-                        ContentType.VIDEO -> {
-                            if (content.videoResource.getUriFromStorage(application) == null) {
-                                content.deleteFile(application)
-                                dao.delete(content)
-                            } else {
-                                position = saveContent(content, position)
+                            ContentType.IMAGE -> {
+                                if (content.imageResource.getUriFromStorage(application) == null) {
+                                    content.deleteFile(application)
+                                    dao.delete(content)
+                                } else {
+                                    position = saveContent(content, position)
+                                }
                             }
-                        }
 
-                        ContentType.DOCUMENT -> {
-                            if (content.documentResource.getUriFromStorage(application) == null) {
-                                content.deleteFile(application)
-                                dao.delete(content)
-                            } else {
-                                position = saveContent(content, position)
+                            ContentType.SCRIPT -> TODO()
+                            ContentType.VIDEO -> {
+                                if (content.videoResource.getUriFromStorage(application) == null) {
+                                    content.deleteFile(application)
+                                    dao.delete(content)
+                                } else {
+                                    position = saveContent(content, position)
+                                }
                             }
-                        }
 
-                        ContentType.AUDIO -> {
-                            if (content.audioResource.getUriFromStorage(application) == null) {
-                                content.deleteFile(application)
-                                dao.delete(content)
-                            } else {
-                                position = saveContent(content, position)
+                            ContentType.DOCUMENT -> {
+                                if (content.documentResource.getUriFromStorage(application) == null) {
+                                    content.deleteFile(application)
+                                    dao.delete(content)
+                                } else {
+                                    position = saveContent(content, position)
+                                }
+                            }
+
+                            ContentType.AUDIO -> {
+                                if (content.audioResource.getUriFromStorage(application) == null) {
+                                    content.deleteFile(application)
+                                    dao.delete(content)
+                                } else {
+                                    position = saveContent(content, position)
+                                }
                             }
                         }
                     }
@@ -940,69 +928,73 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ScriptFragment.ContentPosition, item: Content, cursorPosition:Int?){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
-                scriptContentList.value = scriptContentList.value.toMutableList().apply {
-                    val inputIndex = when (contentPosition) {
-                        ScriptFragment.ContentPosition.ABOVE ->
-                            indexOf(item)
+                if (scriptContentList.value!=null) {
+                    scriptContentList.update {
+                        scriptContentList.value!!.toMutableList().apply {
+                            val inputIndex = when (contentPosition) {
+                                ScriptFragment.ContentPosition.ABOVE ->
+                                    indexOf(item)
 
-                        ScriptFragment.ContentPosition.AT_CURSOR_POINT -> {
-                            val inputIndex = indexOf(item) + 1
-                            if (cursorPosition != null) {
-                                // split the string
-                                val text = item.content.value
+                                ScriptFragment.ContentPosition.AT_CURSOR_POINT -> {
+                                    val inputIndex = indexOf(item) + 1
+                                    if (cursorPosition != null) {
+                                        // split the string
+                                        val text = item.content.value
 
-                                // Split the string
-                                val topString = text.take(cursorPosition)
-                                val bottomString =
-                                    text.substring(cursorPosition, text.length)
+                                        // Split the string
+                                        val topString = text.take(cursorPosition)
+                                        val bottomString =
+                                            text.substring(cursorPosition, text.length)
 
-                                item.content.value = topString
+                                        item.content.value = topString
+                                        val newContent = Content(
+                                            type = ContentType.TEXT,
+                                            script = script.value!!.scriptId!!,
+                                            position = inputIndex.toLong(),
+                                            content = MutableStateFlow(bottomString)
+                                        )
+                                        add(inputIndex, newContent)
+                                        newContent.id = dao.insert(newContent)
+                                    } else return@withContext
+                                    inputIndex
+                                }
+
+                                ScriptFragment.ContentPosition.BELOW -> indexOf(item) + 1
+                            }
+                            multipleContentList?.forEach {
                                 val newContent = Content(
-                                    type = ContentType.TEXT,
+                                    type = contentType,
                                     script = script.value!!.scriptId!!,
                                     position = inputIndex.toLong(),
-                                    content = MutableStateFlow(bottomString)
+                                    filename = MutableStateFlow(it.lastPathSegment ?: "")
                                 )
                                 add(inputIndex, newContent)
                                 newContent.id = dao.insert(newContent)
-                            } else return@withContext
-                            inputIndex
-                        }
+                                when (contentType) {
+                                    ContentType.TEXT,
+                                    ContentType.SCRIPT -> {
+                                    }
 
-                        ScriptFragment.ContentPosition.BELOW -> indexOf(item) + 1
-                    }
-                    multipleContentList?.forEach {
-                        val newContent = Content(
-                            type = contentType,
-                            script = script.value!!.scriptId!!,
-                            position = inputIndex.toLong(),
-                            filename = MutableStateFlow(it.lastPathSegment ?: "")
-                        )
-                        add(inputIndex, newContent)
-                        newContent.id = dao.insert(newContent)
-                        when (contentType) {
-                            ContentType.TEXT,
-                            ContentType.SCRIPT -> {
+                                    ContentType.IMAGE,
+                                    ContentType.VIDEO,
+                                    ContentType.DOCUMENT,
+                                    ContentType.AUDIO -> newContent.saveFile(application, it)
+                                }
                             }
-
-                            ContentType.IMAGE,
-                            ContentType.VIDEO,
-                            ContentType.DOCUMENT,
-                            ContentType.AUDIO -> newContent.saveFile(application, it)
+                            if (multipleContentList == null && (contentType == ContentType.TEXT || contentType == ContentType.SCRIPT)) {
+                                val newContent = Content(
+                                    type = contentType,
+                                    script = script.value!!.scriptId!!,
+                                    position = inputIndex.toLong()
+                                )
+                                add(inputIndex, newContent)
+                                newContent.id = dao.insert(newContent)
+                            }
                         }
                     }
-                    if (multipleContentList == null && (contentType == ContentType.TEXT || contentType == ContentType.SCRIPT)) {
-                        val newContent = Content(
-                            type = contentType,
-                            script = script.value!!.scriptId!!,
-                            position = inputIndex.toLong()
-                        )
-                        add(inputIndex, newContent)
-                        newContent.id = dao.insert(newContent)
+                    withContext(Dispatchers.Main) {
+                        appendTextFieldIfNeeded()
                     }
-                }
-                withContext(Dispatchers.Main) {
-                    appendTextFieldIfNeeded()
                 }
             }
         }
@@ -1011,9 +1003,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun deleteContent(content: Content){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
-                scriptContentList.value = scriptContentList.value.toMutableList().apply { remove(content) }
                 content.deleteFile(application)
                 dao.delete(content)
+                scriptContentList.value?.let { contents ->
+                    val list = contents.toMutableList()
+                    list.remove(content)
+                    scriptContentList.update { list }
+                }
                 withContext(Dispatchers.Main) {
                     appendTextFieldIfNeeded()
                 }
@@ -1598,28 +1594,37 @@ class AccountableRepository(val application: Application): AutoCloseable {
         fun getDisplayImage(): StateFlow<Uri?> { return displayImage }
     }
 
-    suspend fun getFolderContentPreview(
+    fun getFolderFolderNum(
         folder:Folder
-    ){
-        withContext(Dispatchers.IO){
-            val folders = dao.getFoldersNow(folder.folderId, folder.folderType)
-            withContext(Dispatchers.Main) {
-                folder.numFolders.update { folders.size }
-            }
-
-            when (folder.folderType) {
-                Folder.FolderType.SCRIPTS -> {
-                    val scripts = dao.getScriptsNow(folder.folderId)
-                    withContext(Dispatchers.Main) {
-                        folder.numScripts.update { scripts.size }
-                    }
+    ) {
+        repositoryScope.launch {
+            withContext(Dispatchers.IO) {
+                dao.getFoldersNow(folder.folderId, folder.folderType).let { folders ->
+                    folder.numFolders.update { folders.size }
                 }
 
-                Folder.FolderType.GOALS -> {
-                    /*val goals = dao.getGoalsNow(folder.folderId)
+            }
+        }
+    }
+
+    fun getFolderScriptGoalNum(
+        folder:Folder
+    ){
+        repositoryScope.launch {
+            withContext(Dispatchers.IO) {
+                when (folder.folderType) {
+                    Folder.FolderType.SCRIPTS -> {
+                        dao.getScriptsNow(folder.folderId).let { scripts ->
+                            folder.numScripts.update { scripts.size }
+                        }
+                    }
+
+                    Folder.FolderType.GOALS -> {
+                        /*val goals = dao.getGoalsNow(folder.folderId)
                     withContext(Dispatchers.Main) {
                         folder.numGoals.update { goals.size }
                     }*/
+                    }
                 }
             }
         }

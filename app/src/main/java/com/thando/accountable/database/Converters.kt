@@ -1,11 +1,11 @@
 package com.thando.accountable.database
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.room.TypeConverter
 import com.thando.accountable.AccountableNavigationController
@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
-import java.util.TimeZone
 
 class Converters {
     @TypeConverter
@@ -123,6 +122,16 @@ class Converters {
     @TypeConverter
     fun fromStateLong(long: Long): MutableState<Long> {
         return mutableLongStateOf(long)
+    }
+
+    @TypeConverter
+    fun toScrollState(lazyListState: LazyListState?): Int {
+        return lazyListState?.firstVisibleItemIndex?:0
+    }
+
+    @TypeConverter
+    fun fromScrollStateLazy(scrollValue: Int): LazyListState {
+        return LazyListState(scrollValue)
     }
 
     @TypeConverter

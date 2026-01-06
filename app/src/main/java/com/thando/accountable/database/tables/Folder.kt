@@ -9,6 +9,7 @@ import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -36,7 +37,7 @@ open class Folder(
     var folderShowScripts: MutableStateFlow<Boolean> = MutableStateFlow(true),
 
     @ColumnInfo (name = "folder_scroll_position")
-    val folderScrollPosition: ScrollState = ScrollState(0),
+    val folderScrollPosition: LazyListState = LazyListState(),
 
     @ColumnInfo (name = "folder_folders_order")
     var folderFoldersOrder: MutableStateFlow<Boolean> = MutableStateFlow(true),
@@ -46,6 +47,10 @@ open class Folder(
 ) {
     enum class FolderType{
         SCRIPTS, GOALS
+    }
+
+    enum class FolderListType{
+        FOLDERS, SCRIPTS, GOALS
     }
 
     companion object {

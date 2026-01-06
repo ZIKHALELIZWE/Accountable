@@ -25,6 +25,14 @@ class SpannedString(inputText: String) {
         tagsList = listOf(tag)
     }
 
+    constructor(
+        inputText: String,
+        context: Context,
+        markupLanguage: MarkupLanguage?
+    ):this(inputText){
+        setText(inputText,context,markupLanguage)
+    }
+
     fun getString():String{ return spannableStringBuilder.value.toString() }
 
     fun setText(inputText: String?, context: Context?, markupLanguage: MarkupLanguage? = null) {

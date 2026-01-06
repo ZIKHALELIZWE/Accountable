@@ -5,7 +5,28 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import androidx.annotation.OptIn
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -22,6 +43,7 @@ import androidx.media3.ui.PlayerNotificationManager
 import androidx.media3.ui.PlayerView
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
 
 @OptIn(UnstableApi::class)
@@ -217,4 +239,110 @@ class AccountablePlayer : MediaSessionService() {
             closeAudioOrVideo()
         }
     }
+}
+
+@Composable
+fun Media3PlayerView(
+    content: Content,
+    thumbnail: Bitmap?,
+    accountablePlayer: AccountablePlayer,
+    isPlaying: Boolean,
+    isEditingScript: Boolean,
+    modifier: Modifier
+) {
+    val player = accountablePlayer.player
+    val displayMetrics = LocalResources.current.displayMetrics
+
+    var imageHeight by remember { mutableStateOf(500.dp/* If thumbnail not found*/) }
+
+    var currentPosition = 0L
+
+    content.getUri(LocalContext.current)?.let { getContentUri ->
+        val uri by getContentUri.collectAsStateWithLifecycle()
+        uri?.let { uri ->
+            LaunchedEffect(uri) {
+                val width = thumbnail?.width?:1280
+                val height = thumbnail?.height?:720
+                val screenWidthPx = displayMetrics.widthPixels
+                val density = displayMetrics.density
+
+                if (width > 0) {
+                    val scaleFactor = screenWidthPx.toFloat() / width
+                    val newHeightPx = height * scaleFactor
+                    imageHeight = (newHeightPx / density).dp
+                }
+            }
+
+            DisposableEffect(Unit) {
+                onDispose {
+                    currentPosition = player.currentPosition
+                    accountablePlayer.close(content)
+                }
+            }
+
+            if (isPlaying) {
+                LaunchedEffect(Unit) {
+                    val mediaItem = MediaItem.fromUri(uri)
+                    player.setMediaItem(mediaItem)
+                    player.prepare()
+                    player.playWhenReady = true
+                    player.seekTo(currentPosition)
+                    player.addListener(object : Player.Listener {
+                        override fun onPlayerError(error: PlaybackException) {
+                            when (error.errorCode) {
+                                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> {
+                                    // Handle network connection error
+                                    println("Network connection error")
+                                }
+
+                                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> {
+                                    // Handle file not found error
+                                    println("File not found")
+                                }
+
+                                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> {
+                                    // Handle decoder initialization error
+                                    println("Decoder initialization error")
+                                }
+
+                                else -> {
+                                    // Handle other types of errors
+                                    println("Other error: ${error.message}")
+                                }
+                            }
+                        }
+                    })
+                }
+                Media3AndroidView(accountablePlayer, content, imageHeight)
+            }
+            else{
+                thumbnail?.let { thumbnail ->
+                    Image(
+                        bitmap = thumbnail.asImageBitmap(),
+                        contentDescription = stringResource(R.string.video),
+                        contentScale = ContentScale.FillWidth,
+                        modifier = if (isEditingScript) modifier.fillMaxWidth()
+                        else Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun Media3AndroidView(accountablePlayer: AccountablePlayer, content: Content, imageHeight: Dp) {
+    AndroidView(
+        modifier = Modifier.fillMaxWidth().height(imageHeight),
+        factory = { context ->
+            PlayerView(context).apply {
+                this.player = accountablePlayer.player
+                this.keepScreenOn = true
+                accountablePlayer.addAndPlay(content,this,context)
+            }
+        },
+        update = { playerView ->
+            playerView.player = accountablePlayer.player
+        }
+    )
 }

@@ -4,8 +4,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.LayoutInflater
-import android.view.Menu
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
@@ -30,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -67,7 +66,6 @@ import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -76,7 +74,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -108,11 +105,11 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
-import androidx.core.content.res.ResourcesCompat
-import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.thando.accountable.AccountableRepository
@@ -138,15 +135,14 @@ import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.random.Random
 
 class FoldersAndScriptsFragment : Fragment() {
 
     private val bottomBarHeightFraction = 0.14f
-    private val topBarHeightFraction = bottomBarHeightFraction / 2
     private val barColor = Color(red = 255f, green = 255f, blue = 255f, alpha = 0.5f)
 
     val viewModel : FoldersAndScriptsViewModel by viewModels<FoldersAndScriptsViewModel> { FoldersAndScriptsViewModel.Factory }
@@ -395,33 +391,25 @@ class FoldersAndScriptsFragment : Fragment() {
         return binding.root*/
     }
 
-    data class FoldersAndScriptsLists(
-        val listShown: FASListType,
-        var foldersList: MutableList<Folder>,
-        var scriptsList: MutableList<Script>,
-        var goalsList: MutableList<Goal>,
-        val onClickListeners: FoldersAndScriptsViewModel.OnClickListeners
-    ){
-        enum class FASListType{
-            FOLDERS, SCRIPTS, GOALS
-        }
-    }
-
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier) {
         val mainActivityViewModel = (requireActivity() as MainActivity).viewModel
         val scope = rememberCoroutineScope()
+        val context = LocalContext.current
 
         val scrollStateParent by viewModel.scrollStateParent.collectAsStateWithLifecycle()
-        val scrollState = remember { scrollStateParent?: ScrollState(0) }
 
         val folder by viewModel.folder.collectAsStateWithLifecycle()
         val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
 
-        val foldersList by remember { viewModel.foldersList }
-        val scriptsList by remember { viewModel.scriptsList }
-        val goalsList by remember { viewModel.goalsList }
+        var result by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
+        LaunchedEffect(folder, appSettings) {
+            result = if (folder != null) folder!!.getUri(context)
+            else if (appSettings!=null) appSettings!!.getUri(context)
+            else MutableStateFlow(null)
+        }
+        val imageUri by result.collectAsStateWithLifecycle(null)
 
         val showScriptsParent by viewModel.showScripts.collectAsStateWithLifecycle()
         val showScripts by showScriptsParent?.collectAsStateWithLifecycle()?:MutableStateFlow(false).collectAsStateWithLifecycle()
@@ -433,28 +421,17 @@ class FoldersAndScriptsFragment : Fragment() {
                 if (viewModel.folderIsScripts()) stringResource(R.string.books)
                 else stringResource(R.string.goals)
             ).collectAsStateWithLifecycle()
-        val listShown by viewModel.listShown.collectAsStateWithLifecycle()
-
-        val listsCollection = FoldersAndScriptsLists(
-            listShown,
-            foldersList,
-            scriptsList,
-            goalsList,
-            FoldersAndScriptsViewModel.OnClickListeners(viewModel)
-        )
 
         collectFlow(this,viewModel.scrollTo){
             setScrollPosition(it)
         }
 
         Catalog(
-            listsCollection = listsCollection,
             columns = 2,
+            scrollStateParent = scrollStateParent,
             modifier = modifier,
             collapseType = ToolbarState.CollapseType.EnterAlwaysCollapsed,
-            imageUri = if (folder != null) {
-                folder!!.getUri(LocalContext.current).collectAsStateWithLifecycle(null).value
-            } else appSettings?.getUri(LocalContext.current)?.collectAsStateWithLifecycle(null)?.value,
+            imageUri = imageUri,
             navigationIcon = { modifier ->
                 IconButton(
                     modifier = modifier,
@@ -472,7 +449,7 @@ class FoldersAndScriptsFragment : Fragment() {
             searchIcon = { modifier ->
                 IconButton(
                     modifier = modifier,
-                    onClick = { lifecycleScope.launch { viewModel.search(getScrollPosition()) } })
+                    onClick = { lifecycleScope.launch { viewModel.search() } })
                 {
                     Icon(
                         imageVector = Icons.Filled.Search,
@@ -498,7 +475,7 @@ class FoldersAndScriptsFragment : Fragment() {
             folderScriptSwitchIcon = { modifier ->
                 IconButton(
                     modifier = modifier,
-                    onClick = { viewModel.switchFolderScript(getScrollPosition()) })
+                    onClick = { viewModel.switchFolderScript() })
                 {
                     Icon(
                         imageVector = if (showScripts) Icons.AutoMirrored.Filled.LibraryBooks
@@ -513,8 +490,8 @@ class FoldersAndScriptsFragment : Fragment() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun Catalog(
-        listsCollection: FoldersAndScriptsLists,
         columns: Int,
+        scrollStateParent: LazyListState?,
         modifier: Modifier = Modifier,
         collapseType: ToolbarState.CollapseType = ToolbarState.CollapseType.Scroll,
         imageUri: Uri?,
@@ -528,140 +505,156 @@ class FoldersAndScriptsFragment : Fragment() {
             MinToolbarHeight.roundToPx()..MaxToolbarHeight.roundToPx()
         }
         val toolbarState = ToolbarState.rememberToolbarState( collapseType, toolbarHeightRange)
-        val listState = rememberLazyListState()
+        scrollStateParent?.let { scrollStateParent ->
+            val scope = rememberCoroutineScope()
+            val nestedScrollConnection = remember {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(
+                        available: Offset,
+                        source: NestedScrollSource
+                    ): Offset {
+                        toolbarState.scrollTopLimitReached = scrollStateParent.firstVisibleItemIndex == 0
+                                && scrollStateParent.firstVisibleItemScrollOffset == 0
+                        toolbarState.scrollOffset -= available.y
+                        return Offset(0f, toolbarState.consumed)
+                    }
 
-        val scope = rememberCoroutineScope()
-        val nestedScrollConnection = remember {
-            object : NestedScrollConnection {
-                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                    toolbarState.scrollTopLimitReached = listState.firstVisibleItemIndex == 0
-                            && listState.firstVisibleItemScrollOffset == 0
-                    toolbarState.scrollOffset -= available.y
-                    return Offset(0f, toolbarState.consumed)
-                }
-
-                override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                    if (available.y > 0){
-                        scope.launch {
-                            animateDecay(
-                                initialValue = toolbarState.height + toolbarState.offset,
-                                initialVelocity = available.y,
-                                animationSpec = FloatExponentialDecaySpec()
-                            ){ value, _ ->
-                                toolbarState.scrollTopLimitReached = listState.firstVisibleItemIndex == 0
-                                        && listState.firstVisibleItemScrollOffset == 0
-                                toolbarState.scrollOffset -= value - (toolbarState.height + toolbarState.offset)
-                                if (toolbarState.scrollOffset == 0f) scope.coroutineContext.cancelChildren()
+                    override suspend fun onPostFling(
+                        consumed: Velocity,
+                        available: Velocity
+                    ): Velocity {
+                        if (available.y > 0) {
+                            scope.launch {
+                                animateDecay(
+                                    initialValue = toolbarState.height + toolbarState.offset,
+                                    initialVelocity = available.y,
+                                    animationSpec = FloatExponentialDecaySpec()
+                                ) { value, _ ->
+                                    toolbarState.scrollTopLimitReached =
+                                        scrollStateParent.firstVisibleItemIndex == 0
+                                                && scrollStateParent.firstVisibleItemScrollOffset == 0
+                                    toolbarState.scrollOffset -= value - (toolbarState.height + toolbarState.offset)
+                                    if (toolbarState.scrollOffset == 0f) scope.coroutineContext.cancelChildren()
+                                }
                             }
                         }
+                        return super.onPostFling(consumed, available)
                     }
-                    return super.onPostFling(consumed, available)
                 }
             }
-        }
 
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val bottomSheet by listsCollection.onClickListeners.bottomSheetListeners.collectAsStateWithLifecycle()
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-        Box(modifier = modifier.nestedScroll(nestedScrollConnection)) {
-            when(listsCollection.listShown){
-                FoldersAndScriptsLists.FASListType.FOLDERS -> {
-                    LazyFolderCatalog(
-                        foldersList = listsCollection.foldersList,
-                        onClickListeners = listsCollection.onClickListeners,
-                        columns = columns,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTapGestures(onPress = { scope.coroutineContext.cancelChildren() })
-                            }
-                            .graphicsLayer { translationY = toolbarState.height + toolbarState.offset },
-                        listState = listState,
-                        contentPadding = PaddingValues(bottom = if (toolbarState is FixedScrollFlagState) MinToolbarHeight else 0.dp)
-                    )
-                }
-                FoldersAndScriptsLists.FASListType.SCRIPTS -> {
-                    LazyScriptCatalog(
-                        scriptsList = listsCollection.scriptsList,
-                        onClickListeners = listsCollection.onClickListeners,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTapGestures(onPress = { scope.coroutineContext.cancelChildren() })
-                            }
-                            .graphicsLayer { translationY = toolbarState.height + toolbarState.offset },
-                        listState = listState,
-                        contentPadding = PaddingValues(bottom = if (toolbarState is FixedScrollFlagState) MinToolbarHeight else 0.dp)
-                    )
-                }
-                FoldersAndScriptsLists.FASListType.GOALS -> {
+            val listShown by viewModel.listShown.collectAsStateWithLifecycle()
+            val bottomSheet by viewModel.bottomSheetListeners.collectAsStateWithLifecycle()
 
+            Box(modifier = modifier.nestedScroll(nestedScrollConnection)) {
+                when (listShown) {
+                    Folder.FolderListType.FOLDERS -> {
+                        LazyFolderCatalog(
+                            columns = columns,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectTapGestures(onPress = { scope.coroutineContext.cancelChildren() })
+                                }
+                                .graphicsLayer {
+                                    translationY = toolbarState.height + toolbarState.offset
+                                },
+                            listState = scrollStateParent,
+                            contentPadding = PaddingValues(bottom = if (toolbarState is FixedScrollFlagState) MinToolbarHeight else 0.dp)
+                        )
+                    }
+
+                    Folder.FolderListType.SCRIPTS -> {
+                        LazyScriptCatalog(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectTapGestures(onPress = { scope.coroutineContext.cancelChildren() })
+                                }
+                                .graphicsLayer {
+                                    translationY = toolbarState.height + toolbarState.offset
+                                },
+                            listState = scrollStateParent,
+                            contentPadding = PaddingValues(bottom = if (toolbarState is FixedScrollFlagState) MinToolbarHeight else 0.dp)
+                        )
+                    }
+
+                    Folder.FolderListType.GOALS -> {
+
+                    }
                 }
+                FoldersAndScriptsCollapsingToolbar(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(with(LocalDensity.current) { toolbarState.height.toDp() })
+                        .graphicsLayer { translationY = toolbarState.offset },
+                    progress = toolbarState.progress,
+                    imageUri,
+                    navigationIcon,
+                    titleText,
+                    searchIcon,
+                    orderIcon,
+                    folderScriptSwitchIcon
+                )
             }
-            FoldersAndScriptsCollapsingToolbar(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(with(LocalDensity.current) { toolbarState.height.toDp() })
-                    .graphicsLayer { translationY = toolbarState.offset },
-                progress = toolbarState.progress,
-                imageUri,
-                navigationIcon,
-                titleText,
-                searchIcon,
-                orderIcon,
-                folderScriptSwitchIcon
-            )
-        }
-        bottomSheet?.let { bottomSheet ->
-            ModalBottomSheet(
-                onDismissRequest = {
-                    listsCollection.onClickListeners.bottomSheetListeners.update { null }
-                },
-                sheetState = sheetState
-            ) {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState())
+            bottomSheet?.let { bottomSheet ->
+                ModalBottomSheet(
+                    onDismissRequest = {
+                        viewModel.bottomSheetListeners.update { null }
+                    },
+                    sheetState = sheetState
                 ) {
-                    bottomSheet.displayView.invoke()
-                    Row {
-                        bottomSheet.onEditClickListener?.let {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState())
+                    ) {
+                        bottomSheet.displayView.invoke()
+                        Row {
+                            bottomSheet.onEditClickListener?.let {
+                                Button(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth(),
+                                    shape = RectangleShape,
+                                    colors = ButtonColors(
+                                        Color.Blue,
+                                        Color.Black,
+                                        Color.LightGray,
+                                        Color.DarkGray
+                                    ),
+                                    onClick = {
+                                        bottomSheet.onEditClickListener.invoke()
+                                        viewModel.bottomSheetListeners.update { null }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = stringResource(R.string.bottom_sheet_edit_button)
+                                    )
+                                }
+                            }
                             Button(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth(),
                                 shape = RectangleShape,
                                 colors = ButtonColors(
-                                    Color.Blue,
+                                    Color.Red,
                                     Color.Black,
                                     Color.LightGray,
                                     Color.DarkGray
                                 ),
                                 onClick = {
-                                    bottomSheet.onEditClickListener.invoke()
-                                    listsCollection.onClickListeners.bottomSheetListeners.update { null }
+                                    bottomSheet.onDeleteClickListener.invoke()
+                                    viewModel.bottomSheetListeners.update { null }
                                 }
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = stringResource(R.string.bottom_sheet_edit_button)
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.bottom_sheet_delete_button)
                                 )
                             }
-                        }
-                        Button(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            shape = RectangleShape,
-                            colors = ButtonColors(Color.Red,Color.Black,Color.LightGray,Color.DarkGray),
-                            onClick = {
-                                bottomSheet.onDeleteClickListener.invoke()
-                                listsCollection.onClickListeners.bottomSheetListeners.update { null }
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.bottom_sheet_delete_button)
-                            )
                         }
                     }
                 }
@@ -671,41 +664,41 @@ class FoldersAndScriptsFragment : Fragment() {
 
     @Composable
     fun LazyFolderCatalog(
-        foldersList: MutableList<Folder>,
-        onClickListeners: FoldersAndScriptsViewModel.OnClickListeners,
         columns: Int,
         modifier: Modifier = Modifier,
         listState: LazyListState = rememberLazyListState(),
         contentPadding: PaddingValues = PaddingValues(0.dp)
     ) {
-        val chunkedItems = remember(
-            foldersList
-        ) { foldersList.chunked(columns) }
+        val foldersList by viewModel.foldersList.collectAsStateWithLifecycle()
+        foldersList?.let { foldersList ->
+            val chunkedItems = remember(
+                foldersList
+            ) { foldersList.chunked(columns) }
 
-        LazyColumn(
-            state = listState,
-            contentPadding = contentPadding,
-            modifier = modifier
-        ) {
-            chunkedItems.forEach { chunk ->
-                item {
-                    Row (
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .wrapContentHeight(),
-                    ) {
-                        chunk.forEach { folder ->
-                            FolderCard(
-                                folder = folder,
-                                modifier = Modifier
-                                    .padding(2.dp)
-                                    .weight(1f),
-                                onClickListeners
-                            )
-                        }
-                        val emptyCells = columns - chunk.size
-                        if (emptyCells > 0) {
-                            Spacer(modifier = Modifier.weight(emptyCells.toFloat()))
+            LazyColumn(
+                state = listState,
+                contentPadding = contentPadding,
+                modifier = modifier
+            ) {
+                chunkedItems.forEach { chunk ->
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentHeight(),
+                        ) {
+                            chunk.forEach { folder ->
+                                FolderCard(
+                                    folder = folder,
+                                    modifier = Modifier
+                                        .padding(2.dp)
+                                        .weight(1f)
+                                )
+                            }
+                            val emptyCells = columns - chunk.size
+                            if (emptyCells > 0) {
+                                Spacer(modifier = Modifier.weight(emptyCells.toFloat()))
+                            }
                         }
                     }
                 }
@@ -715,25 +708,25 @@ class FoldersAndScriptsFragment : Fragment() {
 
     @Composable
     fun LazyScriptCatalog(
-        scriptsList: MutableList<Script>,
-        onClickListeners: FoldersAndScriptsViewModel.OnClickListeners,
         modifier: Modifier = Modifier,
         listState: LazyListState = rememberLazyListState(),
         contentPadding: PaddingValues = PaddingValues(0.dp)
     ) {
-        LazyColumn(
-            state = listState,
-            contentPadding = contentPadding,
-            modifier = modifier
-        ) {
-            items(scriptsList, key = {it.scriptId?:Random.nextLong()}) { script ->
-                ScriptCard(
-                    script = script,
-                    modifier = Modifier
-                        .padding(2.dp)
-                        .fillMaxWidth(),
-                    onClickListeners
-                )
+        val list by viewModel.scriptsList.collectAsStateWithLifecycle()
+        list?.let { list ->
+            LazyColumn(
+                state = listState,
+                contentPadding = contentPadding,
+                modifier = modifier
+            ) {
+                items(items = list) { script ->
+                    ScriptCard(
+                        script = script,
+                        modifier = Modifier
+                            .padding(2.dp)
+                            .fillMaxWidth()
+                    )
+                }
             }
         }
     }
@@ -743,29 +736,45 @@ class FoldersAndScriptsFragment : Fragment() {
     fun FolderCard(
         folder: Folder,
         modifier: Modifier = Modifier,
-        onClickListeners: FoldersAndScriptsViewModel.OnClickListeners,
         clickable:Boolean = true
     ) {
+        val context = LocalContext.current
         val folderName by folder.folderName.collectAsStateWithLifecycle()
-        val folderUri by folder.getUri(LocalContext.current).collectAsStateWithLifecycle()
-        LaunchedEffect(Unit) {
-            onClickListeners.viewModel.getFolderContentPreview(folder)
+        var folderUriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
+
+        val numFolders by folder.numFolders.collectAsStateWithLifecycle(0)
+        val numScripts by folder.numScripts.collectAsStateWithLifecycle(0)
+        val numGoals by folder.numGoals.collectAsStateWithLifecycle(0)
+
+        viewModel.getFolderContentPreview(folder)
+
+        LaunchedEffect(folder) {
+            folderUriStateFlow = folder.getUri(context)
+        }
+
+        val folderUri by folderUriStateFlow.collectAsStateWithLifecycle()
+        var folderImage by remember { mutableStateOf(ImageBitmap(1,1)) }
+
+        LaunchedEffect(folderUri) {
+            folderImage = folderUri?.let { AppResources.getBitmapFromUri(context, it) }
+                ?.asImageBitmap()
+                ?: ImageBitmap(1, 1)
         }
         Card(
             modifier = modifier.aspectRatio(0.66f)
                 .combinedClickable(
                     onLongClick = {
-                        if (clickable && onClickListeners.setOnLongClick){
-                            onClickListeners.bottomSheetListeners.update {
-                                FoldersAndScriptsViewModel.OnClickListeners.BottomSheetListeners(
+                        if (clickable && viewModel.setOnLongClick()){
+                            viewModel.bottomSheetListeners.update {
+                                FoldersAndScriptsViewModel.BottomSheetListeners(
                                     displayView = {
-                                        FolderCard(folder, Modifier, onClickListeners,false)
+                                        FolderCard(folder, Modifier,false)
                                     },
                                     onEditClickListener = {
-                                        onClickListeners.folderOnEditClickListener(folder.folderId)
+                                        viewModel.onFolderEdit(folder.folderId)
                                     },
                                     onDeleteClickListener = {
-                                        onClickListeners.folderOnDeleteClickListener(folder.folderId)
+                                        viewModel.onDeleteFolder(folder.folderId)
                                     }
                                 )
                             }
@@ -773,7 +782,7 @@ class FoldersAndScriptsFragment : Fragment() {
                     },
                     onClick = {
                         if (clickable) {
-                            onClickListeners.folderClickListener(folder.folderId)
+                            viewModel.onFolderClick(folder.folderId)
                         }
                     }
                 ),
@@ -781,22 +790,20 @@ class FoldersAndScriptsFragment : Fragment() {
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Image(
-                    bitmap = folderUri?.let { AppResources.getBitmapFromUri(LocalContext.current, it) }
-                        ?.asImageBitmap()
-                        ?: ImageBitmap(1, 1),
+                    bitmap = folderImage,
                     contentDescription = folderName,
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier.fillMaxWidth()
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
                 if (folder.folderType == Folder.FolderType.SCRIPTS)
                     FolderTopBar(
-                        folders = folder.numFolders.collectAsStateWithLifecycle(0),
-                        scripts = folder.numScripts.collectAsStateWithLifecycle()
+                        folders = numFolders,
+                        scripts = numScripts
                     )
                 else if (folder.folderType == Folder.FolderType.GOALS)
                     FolderTopBar(
-                        folders = folder.numFolders.collectAsStateWithLifecycle(0),
-                        goals = folder.numGoals.collectAsStateWithLifecycle()
+                        folders = numFolders,
+                        goals = numGoals
                     )
                 BottomBar(folderName)
             }
@@ -804,64 +811,34 @@ class FoldersAndScriptsFragment : Fragment() {
     }
 
     @Composable
-    private fun BoxScope.FolderTopBar(folders: State<Int>, scripts: State<Int>? = null, goals: State<Int>? = null) {
+    private fun BoxScope.FolderTopBar(folders: Int, scripts: Int? = null, goals: Int? = null) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(topBarHeightFraction)
+                .wrapContentHeight()
                 .background(barColor)
                 .padding(horizontal = 8.dp, vertical = 2.dp)
                 .align(Alignment.TopCenter)
         ) {
             Row(
                 modifier = Modifier
-                    .height(IntrinsicSize.Max)
-                    .wrapContentWidth()
+                    .height(IntrinsicSize.Min)
+                    .fillMaxWidth()
                     .align(Alignment.CenterEnd),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(1f)
-                        .background(
-                            color = LocalContentColor.current.copy(alpha = 0.0f),
-                            shape = RectangleShape
-                        ),
                     imageVector = Icons.Default.Folder,
                     contentDescription = null
                 )
-                Text(folders.value.toString(),
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(1f)
-                        .background(
-                            color = LocalContentColor.current.copy(alpha = 0.0f),
-                            shape = RectangleShape
-                        )
-                )
+                Text(folders.toString())
                 Icon(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(1f)
-                        .background(
-                            color = LocalContentColor.current.copy(alpha = 0.0f),
-                            shape = RectangleShape
-                        ),
                     imageVector = scripts?.let { Icons.AutoMirrored.Filled.LibraryBooks }
                         ?: goals?.let { Icons.Default.Stars } ?: Icons.Default.Error,
                     contentDescription = null
                 )
-                Text(scripts?.value?.toString() ?: (goals?.value?.toString() ?: ""),
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(1f)
-                        .background(
-                            color = LocalContentColor.current.copy(alpha = 0.0f),
-                            shape = RectangleShape
-                        )
-                )
+                Text(scripts?.toString() ?: (goals?.toString() ?: ""))
             }
         }
     }
@@ -892,120 +869,139 @@ class FoldersAndScriptsFragment : Fragment() {
     fun ScriptCard(
         script: Script,
         modifier: Modifier = Modifier,
-        onClickListeners: FoldersAndScriptsViewModel.OnClickListeners,
         clickable:Boolean = true
     ) {
-        val scriptUri by script.getUri(LocalContext.current).collectAsStateWithLifecycle()
+        val context = LocalContext.current
+        var uriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
         var contentPreview by remember { mutableStateOf<AccountableRepository.ContentPreview?>(null) }
-
-        LaunchedEffect(Unit) {
-            contentPreview = script.scriptId?.let { onClickListeners.viewModel.getScriptContentPreview(it) }
+        var timeStateFlow by remember { mutableStateOf<StateFlow<String?>>(MutableStateFlow(null)) }
+        var dateStateFlow by remember { mutableStateOf<StateFlow<String?>>(MutableStateFlow(null)) }
+        LaunchedEffect(script) {
+            uriStateFlow = script.getUri(context)
+            timeStateFlow = script.scriptDateTime.getTimeStateFlow(context)
+            dateStateFlow = script.scriptDateTime.getFullDateStateFlow(context)
+            contentPreview = script.scriptId?.let { viewModel.getScriptContentPreview(it) }
             contentPreview?.init()
         }
+        val scriptUri by uriStateFlow.collectAsStateWithLifecycle()
+        val time by timeStateFlow.collectAsStateWithLifecycle()
+        val date by dateStateFlow.collectAsStateWithLifecycle()
 
-        contentPreview?.let { contentPreview ->
-            val time by script.scriptDateTime.getTimeStateFlow(LocalContext.current).collectAsStateWithLifecycle()
-            val date by script.scriptDateTime.getFullDateStateFlow(LocalContext.current).collectAsStateWithLifecycle()
+        val title by remember { script.scriptTitle }
+        val description by contentPreview?.getDescription()?.collectAsStateWithLifecycle("")
+            ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+        val displayImage by contentPreview?.getDisplayImage()?.collectAsStateWithLifecycle()
+            ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+        var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+        LaunchedEffect(scriptUri,displayImage) {
+            imageBitmap = (scriptUri?:displayImage)?.let { AppResources.getBitmapFromUri(context, it)?.asImageBitmap() }
+        }
 
-            val title by remember { script.scriptTitle }
-            val description by contentPreview.getDescription().collectAsStateWithLifecycle("")
-            val displayImage by contentPreview.getDisplayImage().collectAsStateWithLifecycle()
-
-            val numImages by contentPreview.getNumImages().collectAsStateWithLifecycle(0)
-            val numVideos by contentPreview.getNumVideos().collectAsStateWithLifecycle(0)
-            val numAudios by contentPreview.getNumAudios().collectAsStateWithLifecycle(0)
-            val numDocuments by contentPreview.getNumDocuments().collectAsStateWithLifecycle(0)
-            val numScript by contentPreview.getNumScripts().collectAsStateWithLifecycle(0)
-            Card(
-                modifier = modifier.fillMaxWidth().wrapContentHeight()
-                    .combinedClickable(
-                        onLongClick = {
-                            if (clickable && onClickListeners.setOnLongClick) {
-                                onClickListeners.bottomSheetListeners.update {
-                                    FoldersAndScriptsViewModel.OnClickListeners.BottomSheetListeners(
-                                        displayView = {
-                                            ScriptCard(script, Modifier, onClickListeners, false)
-                                        },
-                                        onEditClickListener = null,
-                                        onDeleteClickListener = {
-                                            onClickListeners.scriptOnDeleteClickListener(script.scriptId)
-                                        }
-                                    )
-                                }
-                            }
-                        },
-                        onClick = {
-                            if (clickable) {
-                                script.scriptId?.let { onClickListeners.scriptClickListener(it) }
+        val numImages by contentPreview?.getNumImages()?.collectAsStateWithLifecycle(0)
+            ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+        val numVideos by contentPreview?.getNumVideos()?.collectAsStateWithLifecycle(0)
+            ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+        val numAudios by contentPreview?.getNumAudios()?.collectAsStateWithLifecycle(0)
+            ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+        val numDocuments by contentPreview?.getNumDocuments()?.collectAsStateWithLifecycle(0)
+            ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+        val numScript by contentPreview?.getNumScripts()?.collectAsStateWithLifecycle(0)
+            ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+        Card(
+            modifier = modifier.fillMaxWidth().wrapContentHeight()
+                .combinedClickable(
+                    onLongClick = {
+                        if (clickable && viewModel.setOnLongClick()) {
+                            viewModel.bottomSheetListeners.update {
+                                FoldersAndScriptsViewModel.BottomSheetListeners(
+                                    displayView = {
+                                        ScriptCard(script, Modifier, false)
+                                    },
+                                    onEditClickListener = null,
+                                    onDeleteClickListener = {
+                                        viewModel.onDeleteScript(script.scriptId)
+                                    }
+                                )
                             }
                         }
-                    ),
-                shape = RectangleShape,
-                colors = CardColors(Color.White,
-                    Color.Black,
-                    Color.LightGray,
-                    Color.DarkGray)
-            ) {
-                Row {
-                    Card(modifier = Modifier.height(113.dp)
-                        .width(113.dp),
-                        colors = CardColors(Color.White,
-                            Color.White,
-                            Color.LightGray,
-                            Color.DarkGray),
-                    ) {
-                        scriptUri?:displayImage?.let {
-                            Image(
-                                bitmap = AppResources.getBitmapFromUri(LocalContext.current, it)
-                                    ?.asImageBitmap()
-                                    ?: ImageBitmap(1, 1),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.height(113.dp)
-                                    .width(113.dp),
-                                contentDescription = stringResource(R.string.script_display_image)
-                            )
+                    },
+                    onClick = {
+                        if (clickable) {
+                            script.scriptId?.let { viewModel.onScriptClick(it) }
                         }
                     }
-                    Column(modifier = Modifier.padding(end = 5.dp).height(113.dp),
-                        verticalArrangement = Arrangement.SpaceBetween
+                ),
+            shape = RectangleShape,
+            colors = CardColors(Color.White,
+                Color.Black,
+                Color.LightGray,
+                Color.DarkGray)
+        ) {
+            Row (modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                Card(modifier = Modifier.height(113.dp)
+                    .width(113.dp),
+                    colors = CardColors(Color.White,
+                        Color.White,
+                        Color.LightGray,
+                        Color.DarkGray),
+                ) {
+                    imageBitmap?.let { imageBitmap ->
+                        Image(
+                            bitmap = imageBitmap,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.height(113.dp)
+                                .width(113.dp),
+                            contentDescription = stringResource(R.string.script_display_image)
+                        )
+                    }
+                }
+                Column(modifier = Modifier.padding(end = 5.dp).fillMaxHeight().weight(1f),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.fillMaxWidth().padding(5.dp),
+                        textAlign = TextAlign.Start,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
+                        fontSize = 16.sp) // Title
+                    Text(text = description?:"",
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 5.dp),
+                        textAlign = TextAlign.Start,
+                        color = Color.Black,
+                        fontSize = 12.sp) // Description
+                    Row(
+                        modifier = Modifier.padding(5.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Text(text = title,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.fillMaxWidth().padding(5.dp),
-                            textAlign = TextAlign.Start,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black,
-                            fontSize = 16.sp) // Title
-                        Text(text = description,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth().padding(5.dp),
-                            textAlign = TextAlign.Start,
-                            color = Color.Black) // Description
-                        Row(modifier = Modifier
-                            .height(IntrinsicSize.Max).padding(5.dp)
-                            .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(time,
-                                modifier = Modifier.weight(1f),
+                        time?.let { time ->
+                            Text(
+                                text = time,
+                                modifier = Modifier.padding(end = 5.dp),
                                 textAlign = TextAlign.Start,
-                                fontSize = 12.sp) // Entry Time
-                            val modifier = Modifier.weight(0.1f)
-                            MediaIcon(numImages, Icons.Default.Image,modifier)
-                            MediaIcon(numVideos, Icons.Default.Videocam,modifier)
-                            MediaIcon(numAudios, Icons.Default.Mic,modifier)
-                            MediaIcon(numDocuments, Icons.Default.Book,modifier)
-                            MediaIcon(numScript, Icons.AutoMirrored.Filled.LibraryBooks,modifier)
-                            Text(date,
+                                fontSize = 12.sp
+                            ) // Entry Time
+                        }
+                        val modifier = Modifier
+                        numImages?.let { numImages -> MediaIcon(numImages, Icons.Default.Image,modifier) }
+                        numVideos?.let { numVideos -> MediaIcon(numVideos, Icons.Default.Videocam,modifier) }
+                        numAudios?.let { numAudios -> MediaIcon(numAudios, Icons.Default.Mic,modifier) }
+                        numDocuments?.let { numDocuments -> MediaIcon(numDocuments, Icons.Default.Book,modifier) }
+                        numScript?.let { numScript -> MediaIcon(numScript, Icons.AutoMirrored.Filled.LibraryBooks,modifier) }
+                        date?.let { date ->
+                            Text(
+                                text = date,
                                 modifier = Modifier.weight(1f),
                                 textAlign = TextAlign.End,
-                                fontSize = 12.sp) // Entry Date
+                                fontSize = 12.sp
+                            ) // Entry Date
                         }
-                        //Text() // Entry Size
                     }
+                    //Text() // Entry Size
                 }
             }
         }
@@ -1014,14 +1010,16 @@ class FoldersAndScriptsFragment : Fragment() {
     @Composable
     private fun MediaIcon(numMedia:Int, icon: ImageVector, modifier: Modifier = Modifier){
         if (numMedia>0) {
-            Row{
+            Row(modifier,
+                verticalAlignment = Alignment.CenterVertically){
                 Icon(
                     imageVector = icon,
+                    modifier = Modifier.size(10.dp),
                     contentDescription = null
                 )
                 Text(
-                    numMedia.toString(),
-                    fontSize = 12.sp
+                    text = numMedia.toString(),
+                    fontSize = 10.sp
                 )
             }
         }
@@ -1038,8 +1036,21 @@ class FoldersAndScriptsFragment : Fragment() {
         orderIcon:@Composable (Modifier)-> Unit,
         folderScriptSwitchIcon:@Composable (Modifier)-> Unit,
     ) {
+        val context = LocalContext.current
         val logoPadding = with(LocalDensity.current) {
             lerp(CollapsedPadding.toPx(), ExpandedPadding.toPx(), progress).toDp()
+        }
+        var image by remember { mutableStateOf<ImageBitmap?>(null) }
+        LaunchedEffect(imageUri) {
+            image = imageUri?.let { AppResources.getBitmapFromUri(context, imageUri) }
+                ?.asImageBitmap()
+                ?: AppResources.getBitmapFromUri(
+                    context,
+                    AppResources.getUriFromDrawable(
+                        context,
+                        R.drawable.ic_stars_black_24dp
+                    )
+                )?.asImageBitmap()
         }
 
         Surface(
@@ -1049,24 +1060,18 @@ class FoldersAndScriptsFragment : Fragment() {
         ) {
             Box (modifier = Modifier.fillMaxSize()) {
                 //#region Background Image
-                Image(
-                    bitmap = imageUri?.let { AppResources.getBitmapFromUri(LocalContext.current, imageUri) }
-                        ?.asImageBitmap()
-                        ?: AppResources.getBitmapFromUri(
-                            LocalContext.current,
-                            AppResources.getUriFromDrawable(
-                                LocalContext.current,
-                                R.drawable.ic_stars_black_24dp
-                            )
-                        )?.asImageBitmap()?:ImageBitmap(1, 1),
-                    contentDescription = stringResource(R.string.folder_image),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            alpha = progress * Alpha
-                        }
-                )
+                image?.let { image ->
+                    Image(
+                        bitmap = image,
+                        contentDescription = stringResource(R.string.folder_image),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = progress * Alpha
+                            }
+                    )
+                }
                 //#endregion
                 Box(
                     modifier = Modifier
@@ -1159,54 +1164,11 @@ class FoldersAndScriptsFragment : Fragment() {
         }
     }
 
-    companion object {
-        fun hideOption(menu: Menu?,id: Int) {
-            val item = menu?.findItem(id)
-            item?.isVisible = false
-        }
-
-        fun showOption(menu: Menu?,id: Int) {
-            val item = menu?.findItem(id)
-            item?.isVisible = true
-        }
-
-        fun enableOption(menu: Menu?,id: Int){
-            val item = menu?.findItem(id)
-            item?.isEnabled = true
-            setOptionColour(item,android.R.color.black)
-        }
-
-        fun disableOption(menu: Menu?,id: Int){
-            val item = menu?.findItem(id)
-            item?.isEnabled = false
-            setOptionColour(item,android.R.color.darker_gray)
-        }
-
-        private fun setOptionColour(item: MenuItem?, resInt: Int){
-            if (item != null) {
-                val grayIcon = DrawableCompat.wrap(item.icon!!)
-                val colorSelector = ResourcesCompat.getColorStateList(
-                    MainActivity.ResourceProvider.resources,
-                    resInt,
-                    null
-                )
-                DrawableCompat.setTintList(grayIcon, colorSelector)
-                item.icon = grayIcon
-            }
-        }
-    }
-
     private fun setScrollPosition(position: Int) {
         /*val layoutManager = binding.foldersAndScriptsList.layoutManager as LinearLayoutManager
         binding.foldersAndScriptsList.post {
             layoutManager.scrollToPosition(position)
         }*/
-    }
-
-    private fun getScrollPosition(): Int{
-        //val layoutManager = binding.foldersAndScriptsList.layoutManager as LinearLayoutManager
-        //return layoutManager.findLastCompletelyVisibleItemPosition()
-        return 0
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -1219,7 +1181,7 @@ class FoldersAndScriptsFragment : Fragment() {
     override fun onPause() {
         activity?.lifecycleScope?.launch {
             withContext(Dispatchers.IO) {
-                viewModel.prepareToClose(getScrollPosition()) {}
+                viewModel.prepareToClose() {}
             }
         }
         super.onPause()

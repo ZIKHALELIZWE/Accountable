@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AccountableRepository
+import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.recyclerviewadapters.GoalItemAdapter
 import com.thando.accountable.recyclerviewadapters.ScriptItemAdapter
@@ -47,15 +48,26 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
     val listLoaded = repository.getListLoaded()
     val listShown = repository.getListShown()
 
+    val bottomSheetListeners = MutableStateFlow<BottomSheetListeners?>(null)
+
+    data class BottomSheetListeners(
+        val displayView: @Composable () -> Unit,
+        val onEditClickListener: (() -> Unit)?,
+        val onDeleteClickListener: () -> Unit
+    )
+
     private fun MutableSharedFlow<Unit>.emit() = run { viewModelScope.launch { emit(Unit) } }
 
     fun getScriptContentPreview(scriptId: Long): AccountableRepository.ContentPreview{
         return repository.ContentPreview(scriptId)
     }
 
-    suspend fun getFolderContentPreview(folder: Folder) {
-        repository.getFolderContentPreview(folder)
+    fun getFolderContentPreview(folder: Folder) {
+        repository.getFolderFolderNum(folder)
+        repository.getFolderScriptGoalNum(folder)
     }
+
+    fun setOnLongClick():Boolean = repository.intentString==null
 
     fun getScriptAdapter(viewModelLifecycleOwner: LifecycleOwner,childFragmentManager: FragmentManager): ScriptItemAdapter{
         return ScriptItemAdapter(
@@ -66,24 +78,6 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
             { script -> onDeleteScript(script) },
             this
         )
-    }
-
-    data class OnClickListeners(val viewModel: FoldersAndScriptsViewModel) {
-        val folderClickListener: (folderId:Long?) -> Unit = { folder -> viewModel.onFolderClick(folder) }
-        val folderOnEditClickListener: (folderId:Long?) -> Unit = { folderId -> viewModel.onFolderEdit(folderId) }
-        val folderOnDeleteClickListener: (folderId:Long?) -> Unit = { folderId -> viewModel.onDeleteFolder(folderId) }
-        val scriptClickListener: (scriptId: Long) -> Unit = { script -> viewModel.onScriptClick(script) }
-        val scriptOnDeleteClickListener: (scriptId: Long?) -> Unit = { script -> viewModel.onDeleteScript(script) }
-        val goalClickListener: (goalId:Long) -> Unit = { goalId -> viewModel.onGoalClick(goalId) }
-        val goalOnEditClickListener: (goalId:Long) -> Unit = { goalId -> viewModel.onGoalEdit(goalId) }
-        val goalOnDeleteClickListener: (goalId:Long?) -> Unit = { goalId -> viewModel.onDeleteGoal(goalId) }
-        var setOnLongClick: Boolean = viewModel.repository.intentString==null
-        val bottomSheetListeners = MutableStateFlow<BottomSheetListeners?>(null)
-        data class BottomSheetListeners(
-            val displayView: @Composable () -> Unit,
-            val onEditClickListener: (() -> Unit)?,
-            val onDeleteClickListener: () -> Unit
-            )
     }
 
     fun getGoalAdapter(
@@ -100,10 +94,10 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
         )
     }
 
-    private fun onFolderClick(folderId: Long?) {
+    fun onFolderClick(folderId: Long?) {
         viewModelScope.launch {
             folderId?.let { id ->
-                updateFolderScrollPosition(0/*getScrollPosition()*/){
+                updateFolderScrollPosition(scrollStateParent.value?.firstVisibleItemIndex?:0){
                     updateFolderShowScripts {
                         loadFolder(id)
                     }
@@ -112,11 +106,11 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
         }
     }
 
-    private fun onFolderEdit(folderId: Long?) {
+    fun onFolderEdit(folderId: Long?) {
         repository.loadEditFolder(folderId)
     }
 
-    private fun onDeleteFolder(folderId: Long?){
+    fun onDeleteFolder(folderId: Long?){
         repository.deleteFolder(folderId)
     }
 
@@ -124,7 +118,7 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
         repository.deleteGoal(goalId)
     }
 
-    private fun onDeleteScript(scriptId:Long?){
+    fun onDeleteScript(scriptId:Long?){
         repository.deleteScript(scriptId)
     }
 
@@ -132,9 +126,9 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
         repository.loadEditGoal(goalId)
     }
 
-    private fun onScriptClick(scriptId: Long) {
+    fun onScriptClick(scriptId: Long) {
         viewModelScope.launch {
-            updateFolderScrollPosition(0/*getScrollPosition()*/){
+            updateFolderScrollPosition(scrollStateParent.value?.firstVisibleItemIndex?:0){
                 updateFolderShowScripts {
                     loadAndOpenScript(scriptId,null/*activity*/)
                 }
@@ -144,7 +138,7 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
 
     private fun onGoalClick(goalId: Long) {
         viewModelScope.launch {
-            updateFolderScrollPosition(0/*getScrollPosition()*/){
+            updateFolderScrollPosition(scrollStateParent.value?.firstVisibleItemIndex?:0){
                 updateFolderShowScripts {
                     repository.loadAndOpenGoal(goalId)
                 }
@@ -161,14 +155,14 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
         }
     }
 
-    fun search(scrollPosition: Int){
-        prepareToClose(scrollPosition){
+    fun search(){
+        prepareToClose{
             repository.changeFragment(AccountableNavigationController.AccountableFragment.SearchFragment)
         }
     }
 
-    fun switchFolderScript(scrollPosition: Int){
-        repository.saveScrollPosition = scrollPosition
+    fun switchFolderScript(){
+        repository.saveScrollPosition = scrollStateParent.value?.firstVisibleItemIndex?:0
         if (showScripts.value!=null){
             showScripts.value!!.update { showScripts.value!!.value.not() }
             updateFolderShowScripts()
@@ -216,11 +210,11 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
     private suspend fun resetScrollPosition(){
         if (folder.value ==null) {
             // Reset the settings table
-            appSettings.value?.scrollPosition?.scrollTo(0)
+            appSettings.value?.scrollPosition?.scrollToItem(0,0)
         }
         else{
             // Resets the folders table
-            folder.value?.folderScrollPosition?.scrollTo(0)
+            folder.value?.folderScrollPosition?.scrollToItem(0,0)
         }
     }
 
@@ -240,9 +234,9 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
         repository.updateFolderShowScripts(appendedUnit)
     }
 
-    fun prepareToClose(scrollPosition: Int, appendedUnit: () -> Unit?){
+    fun prepareToClose( appendedUnit: () -> Unit?){
         updateFolderShowScripts()
-        updateFolderScrollPosition(scrollPosition)
+        updateFolderScrollPosition(scrollStateParent.value?.firstVisibleItemIndex?:0)
         appendedUnit()
     }
 

@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AppResources
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -21,7 +22,7 @@ data class AppSettings(
     private var mainPicture: String = "app_picture",
 
     @ColumnInfo (name = "scroll_position")
-    var scrollPosition: ScrollState = ScrollState(0),
+    var scrollPosition: LazyListState = LazyListState(),
 
     @ColumnInfo (name = "show_scripts")
     var showScripts: MutableStateFlow<Boolean> = MutableStateFlow(false),

@@ -39,7 +39,6 @@
 
         <EditText
             android:id="@+id/editText"
-            android:text="@={task.content}"
             android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:View.GONE}"
             android:textSize="@{textItemViewHolder.teleprompterSettings.textSize??contentItemAdapter.appSettings.textSize}"
             android:layout_width="match_parent"

@@ -53,10 +53,12 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +88,7 @@ import androidx.compose.ui.util.lerp
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.thando.accountable.AccountableRepository.Companion.accountablePlayer
@@ -121,9 +124,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.random.Random
-import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.text.input.TextFieldValue
 
 class ScriptFragment : Fragment() {
 
@@ -404,16 +404,12 @@ class ScriptFragment : Fragment() {
     @Composable
     fun ScriptFragmentView(modifier: Modifier = Modifier) {
         val script by viewModel.script.collectAsStateWithLifecycle()
-        val scriptContent by viewModel.scriptContentList.collectAsStateWithLifecycle()
-        val isEditingScript by viewModel.isEditingScript.collectAsStateWithLifecycle()
         val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
         val markupLanguage by viewModel.markupLanguage.collectAsStateWithLifecycle()
 
         script?.let { script ->
             ScriptFragmentCatalog(
                 script = script,
-                isEditingScript,
-                scriptContentList = scriptContent,
                 markupLanguage = markupLanguage,
                 appSettings = appSettings,
                 teleprompterSettings = null,
@@ -480,7 +476,7 @@ class ScriptFragment : Fragment() {
 
     enum class ContentPosition{ ABOVE, AT_CURSOR_POINT, BELOW }
 
-    private fun getAboveBelowContentType(scriptContentList: MutableList<Content>, content: Content):Pair<ContentType?, ContentType?>{
+    private fun getAboveBelowContentType(scriptContentList: List<Content>, content: Content):Pair<ContentType?, ContentType?>{
         var above: ContentType? = null
         var below: ContentType? = null
         if (scriptContentList.isNotEmpty()){
@@ -499,8 +495,6 @@ class ScriptFragment : Fragment() {
     @Composable
     fun ScriptFragmentCatalog(
         script: Script,
-        isEditingScript: Boolean,
-        scriptContentList: MutableList<Content>,
         markupLanguage: MarkupLanguage?,
         appSettings: AppSettings?,
         teleprompterSettings: TeleprompterSettings?,
@@ -515,7 +509,12 @@ class ScriptFragment : Fragment() {
             MinToolbarHeight.roundToPx()..MaxToolbarHeight.roundToPx()
         }
         val toolbarState = ToolbarState.rememberToolbarState( collapseType, toolbarHeightRange)
-        val listState = rememberLazyListState()
+        val listState: LazyListState = rememberSaveable(saver = LazyListState.Saver) {
+            LazyListState(
+                firstVisibleItemIndex = 0,
+                firstVisibleItemScrollOffset = 0
+            )
+        }
 
         val scope = rememberCoroutineScope()
         val nestedScrollConnection = remember {
@@ -578,6 +577,7 @@ class ScriptFragment : Fragment() {
             }
 
         val scriptUri by script.getUri(LocalContext.current).collectAsStateWithLifecycle()
+        val isEditingScript by viewModel.isEditingScript.collectAsStateWithLifecycle()
         val menuListOriginal = listOf(
             MenuItemData(
                 text = if (isEditingScript) stringResource(R.string.preview_script) else stringResource(R.string.edit_script),
@@ -622,8 +622,6 @@ class ScriptFragment : Fragment() {
         Box(modifier = modifier.nestedScroll(nestedScrollConnection)) {
             LazyScriptContentCatalog(
                 script = script,
-                isEditingScript = isEditingScript,
-                scriptContentList = scriptContentList,
                 markupLanguage = markupLanguage,
                 teleprompterSettings = teleprompterSettings,
                 appSettings = appSettings,
@@ -662,62 +660,159 @@ class ScriptFragment : Fragment() {
                 },
                 sheetState = sheetState
             ) {
-                var addType by remember { mutableStateOf<ContentType?>(null) }
-                var delete by remember { mutableStateOf(false) }
-                val aboveBelow by remember { mutableStateOf(bottomSheet?.let { getAboveBelowContentType(scriptContentList,it.second)}?:Pair(null,null))}
+                val scriptContentList by viewModel.scriptContentList.collectAsStateWithLifecycle()
+                scriptContentList?.let { scriptContentList ->
+                    var addType by remember { mutableStateOf<ContentType?>(null) }
+                    var delete by remember { mutableStateOf(false) }
 
-                addType?.let { type ->
-                    if(delete){
-                        bottomSheet?.let { bottomSheetNotNull ->
-                            val content = bottomSheetNotNull.second
-                            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                                GetContentCard(
-                                    content,
-                                    false,
-                                    {},
-                                    appSettings,
-                                    markupLanguage,
-                                    Modifier,
-                                    teleprompterSettings
-                                )
-                                Button(
-                                    modifier = Modifier
-                                        .fillMaxWidth(),
-                                    shape = RectangleShape,
-                                    colors = ButtonColors(
-                                        Color.Red,
-                                        Color.Black,
-                                        Color.LightGray,
-                                        Color.DarkGray
-                                    ),
-                                    onClick = {
-                                        accountablePlayer.close(content)
-                                        viewModel.deleteContent(content)
-                                        bottomSheet = null
-                                    }
-                                ) {
-                                    Text(
-                                        stringResource(
-                                            R.string.delete_content,
-                                            when (content.type) {
-                                                ContentType.TEXT -> stringResource(R.string.text)
-                                                ContentType.IMAGE -> stringResource(R.string.image)
-                                                ContentType.SCRIPT -> stringResource(R.string.script)
-                                                ContentType.VIDEO -> stringResource(R.string.video)
-                                                ContentType.DOCUMENT -> stringResource(R.string.document)
-                                                ContentType.AUDIO -> stringResource(R.string.audio)
-                                            }
-                                        )
+                    val aboveBelow by remember {
+                        mutableStateOf(bottomSheet?.let {
+                            getAboveBelowContentType(scriptContentList, it.second)
+                        } ?: Pair(null, null))
+                    }
+
+                    addType?.let { type ->
+                        if (delete) {
+                            bottomSheet?.let { bottomSheetNotNull ->
+                                val content = bottomSheetNotNull.second
+                                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                    GetContentCard(
+                                        content,
+                                        false,
+                                        {},
+                                        appSettings,
+                                        markupLanguage,
+                                        Modifier,
+                                        teleprompterSettings
                                     )
+                                    Button(
+                                        modifier = Modifier
+                                            .fillMaxWidth(),
+                                        shape = RectangleShape,
+                                        colors = ButtonColors(
+                                            Color.Red,
+                                            Color.Black,
+                                            Color.LightGray,
+                                            Color.DarkGray
+                                        ),
+                                        onClick = {
+                                            accountablePlayer.close(content)
+                                            viewModel.deleteContent(content)
+                                            bottomSheet = null
+                                        }
+                                    ) {
+                                        Text(
+                                            stringResource(
+                                                R.string.delete_content,
+                                                when (content.type) {
+                                                    ContentType.TEXT -> stringResource(R.string.text)
+                                                    ContentType.IMAGE -> stringResource(R.string.image)
+                                                    ContentType.SCRIPT -> stringResource(R.string.script)
+                                                    ContentType.VIDEO -> stringResource(R.string.video)
+                                                    ContentType.DOCUMENT -> stringResource(R.string.document)
+                                                    ContentType.AUDIO -> stringResource(R.string.audio)
+                                                }
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier.verticalScroll(rememberScrollState())
+                            ) {
+                                if (!(addType == ContentType.TEXT && aboveBelow.first == ContentType.TEXT)) {
+                                    Button(
+                                        modifier = Modifier
+                                            .fillMaxWidth(),
+                                        shape = RectangleShape,
+                                        colors = ButtonColors(
+                                            Color.Transparent,
+                                            Color.Black,
+                                            Color.LightGray,
+                                            Color.DarkGray
+                                        ),
+                                        onClick = {
+                                            val (accessor, nonMediaType) = addContentView(type)
+                                            bottomSheet?.let { bottomSheet ->
+                                                if (accessor != null || nonMediaType != null) getMultipleContent(
+                                                    accessor,
+                                                    type,
+                                                    ContentPosition.ABOVE,
+                                                    bottomSheet.second,
+                                                    bottomSheet.first
+                                                )
+                                            }
+                                            bottomSheet = null
+                                        }
+                                    ) {
+                                        Text(stringResource(R.string.add_above))
+                                    }
+                                }
+                                if (bottomSheet?.second?.type == ContentType.TEXT) {
+                                    Button(
+                                        modifier = Modifier
+                                            .fillMaxWidth(),
+                                        shape = RectangleShape,
+                                        colors = ButtonColors(
+                                            Color.Transparent,
+                                            Color.Black,
+                                            Color.LightGray,
+                                            Color.DarkGray
+                                        ),
+                                        onClick = {
+                                            val (accessor, nonMediaType) = addContentView(type)
+                                            bottomSheet?.let { bottomSheet ->
+                                                if (accessor != null || nonMediaType != null) getMultipleContent(
+                                                    accessor,
+                                                    type,
+                                                    ContentPosition.AT_CURSOR_POINT,
+                                                    bottomSheet.second,
+                                                    bottomSheet.first
+                                                )
+                                            }
+                                            bottomSheet = null
+                                        }
+                                    ) {
+                                        Text(stringResource(R.string.add_at_cursor_point))
+                                    }
+                                }
+                                if (!(addType == ContentType.TEXT && aboveBelow.second == ContentType.TEXT)) {
+                                    Button(
+                                        modifier = Modifier
+                                            .fillMaxWidth(),
+                                        shape = RectangleShape,
+                                        colors = ButtonColors(
+                                            Color.Transparent,
+                                            Color.Black,
+                                            Color.LightGray,
+                                            Color.DarkGray
+                                        ),
+                                        onClick = {
+                                            val (accessor, nonMediaType) = addContentView(type)
+                                            bottomSheet?.let { bottomSheet ->
+                                                if (accessor != null || nonMediaType != null) getMultipleContent(
+                                                    accessor,
+                                                    type,
+                                                    ContentPosition.BELOW,
+                                                    bottomSheet.second,
+                                                    bottomSheet.first
+                                                )
+                                            }
+                                            bottomSheet = null
+                                        }
+                                    ) {
+                                        Text(stringResource(R.string.add_below))
+                                    }
                                 }
                             }
                         }
                     }
-                    else {
+                    ?: run {
                         Column(
                             modifier = Modifier.verticalScroll(rememberScrollState())
                         ) {
-                            if (!(addType == ContentType.TEXT && aboveBelow.first == ContentType.TEXT)){
+                            if (textIndex == null && !(aboveBelow.first == ContentType.TEXT && aboveBelow.second == ContentType.TEXT)) {
                                 Button(
                                     modifier = Modifier
                                         .fillMaxWidth(),
@@ -729,86 +824,12 @@ class ScriptFragment : Fragment() {
                                         Color.DarkGray
                                     ),
                                     onClick = {
-                                        val (accessor, nonMediaType) = addContentView(type)
-                                        bottomSheet?.let { bottomSheet ->
-                                            if (accessor != null || nonMediaType != null) getMultipleContent(
-                                                accessor,
-                                                type,
-                                                ContentPosition.ABOVE,
-                                                bottomSheet.second,
-                                                bottomSheet.first
-                                            )
-                                        }
-                                        bottomSheet = null
+                                        addType = ContentType.TEXT
                                     }
                                 ) {
-                                    Text(stringResource(R.string.add_above))
+                                    Text(stringResource(R.string.add_text))
                                 }
                             }
-                            if (bottomSheet?.second?.type == ContentType.TEXT) {
-                                Button(
-                                    modifier = Modifier
-                                        .fillMaxWidth(),
-                                    shape = RectangleShape,
-                                    colors = ButtonColors(
-                                        Color.Transparent,
-                                        Color.Black,
-                                        Color.LightGray,
-                                        Color.DarkGray
-                                    ),
-                                    onClick = {
-                                        val (accessor, nonMediaType) = addContentView(type)
-                                        bottomSheet?.let { bottomSheet ->
-                                            if (accessor != null || nonMediaType != null) getMultipleContent(
-                                                accessor,
-                                                type,
-                                                ContentPosition.AT_CURSOR_POINT,
-                                                bottomSheet.second,
-                                                bottomSheet.first
-                                            )
-                                        }
-                                        bottomSheet = null
-                                    }
-                                ) {
-                                    Text(stringResource(R.string.add_at_cursor_point))
-                                }
-                            }
-                            if (!(addType == ContentType.TEXT && aboveBelow.second == ContentType.TEXT)){
-                                Button(
-                                    modifier = Modifier
-                                        .fillMaxWidth(),
-                                    shape = RectangleShape,
-                                    colors = ButtonColors(
-                                        Color.Transparent,
-                                        Color.Black,
-                                        Color.LightGray,
-                                        Color.DarkGray
-                                    ),
-                                    onClick = {
-                                        val (accessor, nonMediaType) = addContentView(type)
-                                        bottomSheet?.let { bottomSheet ->
-                                            if (accessor != null || nonMediaType != null) getMultipleContent(
-                                                accessor,
-                                                type,
-                                                ContentPosition.BELOW,
-                                                bottomSheet.second,
-                                                bottomSheet.first
-                                            )
-                                        }
-                                        bottomSheet = null
-                                    }
-                                ) {
-                                    Text(stringResource(R.string.add_below))
-                                }
-                            }
-                        }
-                    }
-                }
-                ?: run{
-                    Column(
-                        modifier = Modifier.verticalScroll(rememberScrollState())
-                    ) {
-                        if (textIndex == null && !(aboveBelow.first == ContentType.TEXT && aboveBelow.second == ContentType.TEXT)) {
                             Button(
                                 modifier = Modifier
                                     .fillMaxWidth(),
@@ -820,106 +841,95 @@ class ScriptFragment : Fragment() {
                                     Color.DarkGray
                                 ),
                                 onClick = {
+                                    addType = ContentType.IMAGE
+                                }
+                            ) {
+                                Text(stringResource(R.string.add_pictures))
+                            }
+                            Button(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                shape = RectangleShape,
+                                colors = ButtonColors(
+                                    Color.Transparent,
+                                    Color.Black,
+                                    Color.LightGray,
+                                    Color.DarkGray
+                                ),
+                                onClick = {
+                                    addType = ContentType.AUDIO
+                                }
+                            ) {
+                                Text(stringResource(R.string.add_audios))
+                            }
+                            Button(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                shape = RectangleShape,
+                                colors = ButtonColors(
+                                    Color.Transparent,
+                                    Color.Black,
+                                    Color.LightGray,
+                                    Color.DarkGray
+                                ),
+                                onClick = {
+                                    addType = ContentType.VIDEO
+                                }
+                            ) {
+                                Text(stringResource(R.string.add_videos))
+                            }
+                            Button(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                shape = RectangleShape,
+                                colors = ButtonColors(
+                                    Color.Transparent,
+                                    Color.Black,
+                                    Color.LightGray,
+                                    Color.DarkGray
+                                ),
+                                onClick = {
+                                    addType = ContentType.DOCUMENT
+                                }
+                            ) {
+                                Text(stringResource(R.string.add_documents))
+                            }
+                            Button(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                shape = RectangleShape,
+                                colors = ButtonColors(
+                                    Color.Transparent,
+                                    Color.Black,
+                                    Color.LightGray,
+                                    Color.DarkGray
+                                ),
+                                onClick = {
+                                    addType = ContentType.SCRIPT
+                                }
+                            ) {
+                                Text(stringResource(R.string.add_script))
+                            }
+                            Button(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                shape = RectangleShape,
+                                colors = ButtonColors(
+                                    Color.Red,
+                                    Color.Black,
+                                    Color.LightGray,
+                                    Color.DarkGray
+                                ),
+                                onClick = {
+                                    delete = true
                                     addType = ContentType.TEXT
                                 }
                             ) {
-                                Text(stringResource(R.string.add_text))
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.bottom_sheet_delete_button)
+                                )
                             }
-                        }
-                        Button(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            shape = RectangleShape,
-                            colors = ButtonColors(
-                                Color.Transparent,
-                                Color.Black,
-                                Color.LightGray,
-                                Color.DarkGray
-                            ),
-                            onClick = {
-                                addType = ContentType.IMAGE
-                            }
-                        ) {
-                            Text(stringResource(R.string.add_pictures))
-                        }
-                        Button(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            shape = RectangleShape,
-                            colors = ButtonColors(
-                                Color.Transparent,
-                                Color.Black,
-                                Color.LightGray,
-                                Color.DarkGray
-                            ),
-                            onClick = {
-                                addType = ContentType.AUDIO
-                            }
-                        ) {
-                            Text(stringResource(R.string.add_audios))
-                        }
-                        Button(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            shape = RectangleShape,
-                            colors = ButtonColors(
-                                Color.Transparent,
-                                Color.Black,
-                                Color.LightGray,
-                                Color.DarkGray
-                            ),
-                            onClick = {
-                                addType = ContentType.VIDEO
-                            }
-                        ) {
-                            Text(stringResource(R.string.add_videos))
-                        }
-                        Button(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            shape = RectangleShape,
-                            colors = ButtonColors(
-                                Color.Transparent,
-                                Color.Black,
-                                Color.LightGray,
-                                Color.DarkGray
-                            ),
-                            onClick = {
-                                addType = ContentType.DOCUMENT
-                            }
-                        ) {
-                            Text(stringResource(R.string.add_documents))
-                        }
-                        Button(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            shape = RectangleShape,
-                            colors = ButtonColors(
-                                Color.Transparent,
-                                Color.Black,
-                                Color.LightGray,
-                                Color.DarkGray
-                            ),
-                            onClick = {
-                                addType = ContentType.SCRIPT
-                            }
-                        ) {
-                            Text(stringResource(R.string.add_script))
-                        }
-                        Button(
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            shape = RectangleShape,
-                            colors = ButtonColors(Color.Red,Color.Black,Color.LightGray,Color.DarkGray),
-                            onClick = {
-                                delete = true
-                                addType = ContentType.TEXT
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.bottom_sheet_delete_button)
-                            )
                         }
                     }
                 }
@@ -974,8 +984,6 @@ class ScriptFragment : Fragment() {
     @Composable
     fun LazyScriptContentCatalog(
         script: Script,
-        isEditingScript: Boolean,
-        scriptContentList: MutableList<Content>,
         markupLanguage: MarkupLanguage?,
         teleprompterSettings: TeleprompterSettings?,
         appSettings: AppSettings?,
@@ -985,119 +993,132 @@ class ScriptFragment : Fragment() {
         listState: LazyListState = rememberLazyListState(),
         contentPadding: PaddingValues = PaddingValues(0.dp)
     ) {
+        val isEditingScript by viewModel.isEditingScript.collectAsStateWithLifecycle()
+
         var scriptTitle by remember { script.scriptTitle }
         val scriptTime by script.scriptDateTime.getTimeStateFlow(LocalContext.current).collectAsStateWithLifecycle()
         val scriptDayNum by script.scriptDateTime.getDayNumStateFlow(LocalContext.current).collectAsStateWithLifecycle()
         val scriptDayWord by script.scriptDateTime.getDayWordStateFlow(LocalContext.current).collectAsStateWithLifecycle()
         val scriptMonthYear by script.scriptDateTime.getMonthYearStateFlow(LocalContext.current).collectAsStateWithLifecycle()
 
-
-        LazyColumn(
-            state = listState,
-            contentPadding = contentPadding,
-            modifier = modifier
-        ) {
-            item(key = "The Top") {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                    elevation = CardDefaults.cardElevation(),
-                    colors = CardColors(
-                        Color.White,
-                        Color.Black,
-                        Color.LightGray,
-                        Color.DarkGray)
-                ) {
-                    Column(modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()) {
-                        Row(
+        val scriptContentList by viewModel.scriptContentList.collectAsStateWithLifecycle()
+        scriptContentList?.let { scriptContentList ->
+            LazyColumn(
+                state = listState,
+                contentPadding = contentPadding,
+                modifier = modifier
+            ) {
+                item(key = "The Top") {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight(),
+                        elevation = CardDefaults.cardElevation(),
+                        colors = CardColors(
+                            Color.White,
+                            Color.Black,
+                            Color.LightGray,
+                            Color.DarkGray
+                        )
+                    ) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .wrapContentHeight(),
-                            verticalAlignment = Alignment.CenterVertically
+                                .wrapContentHeight()
                         ) {
-                            Text(scriptTime,
-                                fontSize = 40.sp,
-                                modifier = Modifier.weight(1f),
-                                textAlign = TextAlign.Start)
-                            Row(modifier = Modifier, verticalAlignment = Alignment.CenterVertically) {
-                                Text(scriptDayNum,
-                                    fontSize = 40.sp
-                                )
-                                Column {
-                                    Text(
-                                        text = scriptDayWord,
-                                        color = Color.Cyan
-                                    )
-                                    Text(scriptMonthYear)
-                                }
-                            }
-                        }
-                        if (isEditingScript) {
-                            TextField(
-                                value = scriptTitle,
-                                onValueChange = { newTitle -> scriptTitle = newTitle },
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 15.dp, horizontal = 5.dp),
-                                textStyle = TextStyle(
+                                    .wrapContentHeight(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    scriptTime,
+                                    fontSize = 40.sp,
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.Start
+                                )
+                                Row(
+                                    modifier = Modifier,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        scriptDayNum,
+                                        fontSize = 40.sp
+                                    )
+                                    Column {
+                                        Text(
+                                            text = scriptDayWord,
+                                            color = Color.Cyan
+                                        )
+                                        Text(scriptMonthYear)
+                                    }
+                                }
+                            }
+                            if (isEditingScript) {
+                                TextField(
+                                    value = scriptTitle,
+                                    onValueChange = { newTitle -> scriptTitle = newTitle },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 15.dp, horizontal = 5.dp),
+                                    textStyle = TextStyle(
+                                        textAlign = TextAlign.Center,
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    placeholder = {
+                                        Text(
+                                            stringResource(R.string.enter_script_title),
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            fontSize = 24.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    },
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent, // Removes gray background
+                                        unfocusedContainerColor = Color.Transparent, // Removes gray background
+                                        unfocusedIndicatorColor = Color.Transparent, // Removes underline when unfocused
+                                        disabledIndicatorColor = Color.Transparent
+                                    )
+                                )
+                            } else {
+                                Text(
+                                    text = scriptTitle,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 15.dp, horizontal = 5.dp),
                                     textAlign = TextAlign.Center,
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold
-                                ),
-                                placeholder = {
-                                    Text(
-                                        stringResource(R.string.enter_script_title),
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        fontSize = 24.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                },
-                                colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent, // Removes gray background
-                                    unfocusedContainerColor = Color.Transparent, // Removes gray background
-                                    unfocusedIndicatorColor = Color.Transparent, // Removes underline when unfocused
-                                    disabledIndicatorColor = Color.Transparent
                                 )
-                            )
-                        } else {
-                            Text(
-                                text = scriptTitle,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 15.dp, horizontal = 5.dp),
-                                textAlign = TextAlign.Center,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            }
                         }
                     }
                 }
-            }
-            items(items = scriptContentList, key = {listContent-> listContent.id?:Random.nextLong()}) { content ->
-                Row (
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                ) {
-                    val mod = Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onLongPress = { onLongClickListener(null to content) }
+                items(items = scriptContentList) { content ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight(),
+                    ) {
+                        val mod = Modifier.pointerInput(Unit) {
+                            detectTapGestures(
+                                onLongPress = { onLongClickListener(null to content) }
+                            )
+                        }
+                        // Add Content Cards
+                        GetContentCard(
+                            content,
+                            isEditingScript,
+                            textIndex,
+                            appSettings,
+                            markupLanguage,
+                            mod,
+                            teleprompterSettings
                         )
                     }
-                    // Add Content Cards
-                    GetContentCard(
-                        content,
-                        isEditingScript,
-                        textIndex,
-                        appSettings,
-                        markupLanguage,
-                        mod,
-                        teleprompterSettings
-                    )
                 }
             }
         }
