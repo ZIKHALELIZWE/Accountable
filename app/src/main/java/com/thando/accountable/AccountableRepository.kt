@@ -81,7 +81,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val currentFragment = MutableStateFlow<AccountableFragment?>(null)
 
     private val script = MutableStateFlow<Script?>(null)
-    private val scriptContentList = MutableStateFlow<List<Content>?>(null)
+    private val scriptContentList = mutableStateListOf<Content>()
     private val scriptMarkupLanguage = MutableStateFlow<MarkupLanguage?>(null)
     private val isEditingScript = MutableStateFlow(false)
 
@@ -151,7 +151,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getCurrentFragment(): SharedFlow<AccountableFragment?>{ return currentFragment }
 
     fun getScript(): StateFlow<Script?>{ return script }
-    fun getScriptContentList(): StateFlow<List<Content>?>{ return scriptContentList }
+    fun getScriptContentList(): SnapshotStateList<Content>{ return scriptContentList }
     fun getScriptMarkupLanguage(): StateFlow<MarkupLanguage?>{ return scriptMarkupLanguage }
     fun getIsEditingScript(): MutableStateFlow<Boolean>{ return isEditingScript }
 
@@ -673,9 +673,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             }
                             tempScript
                         }
-                        scriptContentList.value = withContext(Dispatchers.IO) {
+                        scriptContentList.clear()
+                        scriptContentList.addAll( withContext(Dispatchers.IO) {
                             dao.getContentList(scriptId)
-                        }
+                        })
                     }
                 }
                 if (script.value == null) {
@@ -685,25 +686,23 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         Toast.LENGTH_LONG
                     ).show()
                 } else if (!intentString.isNullOrEmpty()) {
-                    scriptContentList.value?.let { scriptContentList ->
-                        if (scriptContentList.lastIndex == -1 || scriptContentList.last().type != ContentType.TEXT){
-                            // Make a new TextProcessor and add the content's content
-                            if (script.value != null && script.value!!.scriptId != null) {
-                                dao.insert(
-                                    Content(
-                                        type = ContentType.TEXT,
-                                        script = script.value!!.scriptId!!,
-                                        position = scriptContentList.size.toLong()
-                                    )
+                    if (scriptContentList.lastIndex == -1 || scriptContentList.last().type != ContentType.TEXT){
+                        // Make a new TextProcessor and add the content's content
+                        if (script.value != null && script.value!!.scriptId != null) {
+                            scriptContentList.add(
+                                Content(
+                                    type = ContentType.TEXT,
+                                    script = script.value!!.scriptId!!,
+                                    position = scriptContentList.size.toLong()
                                 )
-                            }
+                            )
                         }
-                        withContext(Dispatchers.Main) {
-                            scriptContentList.last().content.value += "\n$intentString"
-                        }
-                        saveScript {
-                            activity?.finishAndRemoveTask()
-                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        scriptContentList.last().content.value += "\n$intentString"
+                    }
+                    saveScript {
+                        activity?.finishAndRemoveTask()
                     }
                 }
                 intentString = null
@@ -748,14 +747,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             scriptDateTime = AppResources.CalendarResource(Calendar.getInstance()),
                             scriptPosition = scripts.size.toLong(),
                         )
+                        scriptContentList.clear()
                         appendTextFieldIfNeeded()
                         scriptMarkupLanguage.value = null
                         isEditingScript.value = true
                         script.value!!.scriptId = withContext(Dispatchers.IO) { dao.insert(script.value!!) }
-                        scriptContentList.value = dao.getContentList(script.value!!.scriptId)
-                        withContext(Dispatchers.IO) {
-                            appendTextFieldIfNeeded()
-                        }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
@@ -769,8 +765,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             }
                             tempScript
                         }
-                        scriptContentList.value = dao.getContentList(scriptId)
                         withContext(Dispatchers.IO) {
+                            scriptContentList.clear()
+                            scriptContentList.addAll(dao.getContentList(scriptId))
                             appendTextFieldIfNeeded()
                         }
                     }
@@ -790,20 +787,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     private fun appendTextFieldIfNeeded(){
         repositoryScope.launch {
-            scriptContentList.value?.let { scriptContentListTemp ->
-                if (scriptContentListTemp.lastIndex == -1 || scriptContentListTemp.last().type != ContentType.TEXT) {
-                    // Make a new TextProcessor and add the content's content
-                    if (script.value != null && script.value!!.scriptId != null) {
-                        val newText = Content(
+            if (scriptContentList.lastIndex == -1 || scriptContentList.last().type != ContentType.TEXT) {
+                // Make a new TextProcessor and add the content's content
+                if (script.value != null && script.value!!.scriptId != null) {
+                    scriptContentList.add(
+                        Content(
                             type = ContentType.TEXT,
                             script = script.value!!.scriptId!!,
-                            position = scriptContentListTemp.size.toLong()
+                            position = scriptContentList.size.toLong()
                         )
-                        newText.id = dao.insert(newText)
-                        val newList = scriptContentListTemp.toMutableList()
-                        newList.add(newText)
-                        scriptContentList.update { newList }
-                    }
+                    )
                 }
             }
         }
@@ -842,50 +835,48 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                 // save content in the list
                 var position = 1L
-                scriptContentList.value?.let {
-                    it.forEach { content ->
-                        when (content.type) {
-                            ContentType.TEXT -> {
-                                if (content.content.value.isNotEmpty()) {
-                                    position = saveContent(content, position)
-                                } else dao.delete(content)
-                            }
+                scriptContentList.forEach { content ->
+                    when (content.type) {
+                        ContentType.TEXT -> {
+                            if (content.content.value.isNotEmpty()) {
+                                position = saveContent(content, position)
+                            } else dao.delete(content)
+                        }
 
-                            ContentType.IMAGE -> {
-                                if (content.imageResource.getUriFromStorage(application) == null) {
-                                    content.deleteFile(application)
-                                    dao.delete(content)
-                                } else {
-                                    position = saveContent(content, position)
-                                }
+                        ContentType.IMAGE -> {
+                            if (content.imageResource.getUriFromStorage(application) == null) {
+                                content.deleteFile(application)
+                                dao.delete(content)
+                            } else {
+                                position = saveContent(content, position)
                             }
+                        }
 
-                            ContentType.SCRIPT -> TODO()
-                            ContentType.VIDEO -> {
-                                if (content.videoResource.getUriFromStorage(application) == null) {
-                                    content.deleteFile(application)
-                                    dao.delete(content)
-                                } else {
-                                    position = saveContent(content, position)
-                                }
+                        ContentType.SCRIPT -> TODO()
+                        ContentType.VIDEO -> {
+                            if (content.videoResource.getUriFromStorage(application) == null) {
+                                content.deleteFile(application)
+                                dao.delete(content)
+                            } else {
+                                position = saveContent(content, position)
                             }
+                        }
 
-                            ContentType.DOCUMENT -> {
-                                if (content.documentResource.getUriFromStorage(application) == null) {
-                                    content.deleteFile(application)
-                                    dao.delete(content)
-                                } else {
-                                    position = saveContent(content, position)
-                                }
+                        ContentType.DOCUMENT -> {
+                            if (content.documentResource.getUriFromStorage(application) == null) {
+                                content.deleteFile(application)
+                                dao.delete(content)
+                            } else {
+                                position = saveContent(content, position)
                             }
+                        }
 
-                            ContentType.AUDIO -> {
-                                if (content.audioResource.getUriFromStorage(application) == null) {
-                                    content.deleteFile(application)
-                                    dao.delete(content)
-                                } else {
-                                    position = saveContent(content, position)
-                                }
+                        ContentType.AUDIO -> {
+                            if (content.audioResource.getUriFromStorage(application) == null) {
+                                content.deleteFile(application)
+                                dao.delete(content)
+                            } else {
+                                position = saveContent(content, position)
                             }
                         }
                     }
@@ -907,73 +898,67 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ScriptFragment.ContentPosition, item: Content, cursorPosition:Int?){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
-                if (scriptContentList.value!=null) {
-                    scriptContentList.update {
-                        scriptContentList.value!!.toMutableList().apply {
-                            val inputIndex = when (contentPosition) {
-                                ScriptFragment.ContentPosition.ABOVE ->
-                                    indexOf(item)
+                val inputIndex = when (contentPosition) {
+                    ScriptFragment.ContentPosition.ABOVE ->
+                        scriptContentList.indexOf(item)
 
-                                ScriptFragment.ContentPosition.AT_CURSOR_POINT -> {
-                                    val inputIndex = indexOf(item) + 1
-                                    if (cursorPosition != null) {
-                                        // split the string
-                                        val text = item.content.value
+                    ScriptFragment.ContentPosition.AT_CURSOR_POINT -> {
+                        val inputIndex = scriptContentList.indexOf(item) + 1
+                        if (cursorPosition != null) {
+                            // split the string
+                            val text = item.content.value
 
-                                        // Split the string
-                                        val topString = text.take(cursorPosition)
-                                        val bottomString =
-                                            text.substring(cursorPosition, text.length)
+                            // Split the string
+                            val topString = text.take(cursorPosition)
+                            val bottomString =
+                                text.substring(cursorPosition, text.length)
 
-                                        item.content.value = topString
-                                        val newContent = Content(
-                                            type = ContentType.TEXT,
-                                            script = script.value!!.scriptId!!,
-                                            position = inputIndex.toLong(),
-                                            content = MutableStateFlow(bottomString)
-                                        )
-                                        add(inputIndex, newContent)
-                                        newContent.id = dao.insert(newContent)
-                                    } else return@withContext
-                                    inputIndex
-                                }
+                            item.content.value = topString
+                            val newContent = Content(
+                                type = ContentType.TEXT,
+                                script = script.value!!.scriptId!!,
+                                position = inputIndex.toLong(),
+                                content = MutableStateFlow(bottomString)
+                            )
+                            scriptContentList.add(inputIndex, newContent)
+                            newContent.id = dao.insert(newContent)
+                        } else return@withContext
+                        inputIndex
+                    }
 
-                                ScriptFragment.ContentPosition.BELOW -> indexOf(item) + 1
-                            }
-                            multipleContentList?.forEach {
-                                val newContent = Content(
-                                    type = contentType,
-                                    script = script.value!!.scriptId!!,
-                                    position = inputIndex.toLong(),
-                                    filename = MutableStateFlow(it.lastPathSegment ?: "")
-                                )
-                                add(inputIndex, newContent)
-                                newContent.id = dao.insert(newContent)
-                                when (contentType) {
-                                    ContentType.TEXT,
-                                    ContentType.SCRIPT -> {
-                                    }
-
-                                    ContentType.IMAGE,
-                                    ContentType.VIDEO,
-                                    ContentType.DOCUMENT,
-                                    ContentType.AUDIO -> newContent.saveFile(application, it)
-                                }
-                            }
-                            if (multipleContentList == null && (contentType == ContentType.TEXT || contentType == ContentType.SCRIPT)) {
-                                val newContent = Content(
-                                    type = contentType,
-                                    script = script.value!!.scriptId!!,
-                                    position = inputIndex.toLong()
-                                )
-                                add(inputIndex, newContent)
-                                newContent.id = dao.insert(newContent)
-                            }
+                    ScriptFragment.ContentPosition.BELOW -> scriptContentList.indexOf(item) + 1
+                }
+                multipleContentList?.forEach {
+                    val newContent = Content(
+                        type = contentType,
+                        script = script.value!!.scriptId!!,
+                        position = inputIndex.toLong(),
+                        filename = MutableStateFlow(it.lastPathSegment ?: "")
+                    )
+                    scriptContentList.add(inputIndex, newContent)
+                    newContent.id = dao.insert(newContent)
+                    when (contentType) {
+                        ContentType.TEXT,
+                        ContentType.SCRIPT -> {
                         }
+
+                        ContentType.IMAGE,
+                        ContentType.VIDEO,
+                        ContentType.DOCUMENT,
+                        ContentType.AUDIO -> newContent.saveFile(application, it)
                     }
-                    withContext(Dispatchers.Main) {
-                        appendTextFieldIfNeeded()
-                    }
+                }
+                if (multipleContentList == null && (contentType == ContentType.TEXT || contentType == ContentType.SCRIPT)) {
+                    val newContent = Content(
+                        type = contentType,
+                        script = script.value!!.scriptId!!,
+                        position = inputIndex.toLong()
+                    )
+                    scriptContentList.add(inputIndex, newContent)
+                    newContent.id = dao.insert(newContent)
+                }
+                withContext(Dispatchers.Main) {
+                    appendTextFieldIfNeeded()
                 }
             }
         }
@@ -982,13 +967,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun deleteContent(content: Content){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
+                if (accountablePlayer.contains(content)) accountablePlayer.close(content)
+                scriptContentList.remove(content)
                 content.deleteFile(application)
                 dao.delete(content)
-                scriptContentList.value?.let { contents ->
-                    val list = contents.toMutableList()
-                    list.remove(content)
-                    scriptContentList.update { list }
-                }
                 withContext(Dispatchers.Main) {
                     appendTextFieldIfNeeded()
                 }

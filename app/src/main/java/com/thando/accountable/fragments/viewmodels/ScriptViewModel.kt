@@ -178,10 +178,6 @@ class ScriptViewModel(
         }
     }
 
-    fun setScriptLoadedToFalse(){
-        //scriptLoaded.value = false
-    }
-
     fun openTeleprompter(){
         viewModelScope.launch {
             _navigateToTeleprompter.emit(true)
@@ -247,38 +243,36 @@ class ScriptViewModel(
                 } else ""
 
             val imageUris = arrayListOf<Uri>()
-            scriptContentList.value?.let { contentList ->
-                contentList.forEach {
-                    if (it.type == ContentType.TEXT) {
-                        if (it.content.value.isNotEmpty()) {
-                            sharedText =
-                                (if (sharedText.isNotEmpty()) "$sharedText\n\n" else "") + it.content.value
-                            hasContent = true
-                        }
-                    } else if (it.type == ContentType.IMAGE) {
-                        val uri = it.imageResource.fileFromContentUri(context)
-                        if (uri != null) {
-                            val newUri = if (imageUris.isEmpty()) {
-                                uri.buildUpon()
-                                    .appendQueryParameter("caption", sharedText)
-                                    .build()
-                            } else {
-                                val caption = imageUris.last().getQueryParameter("caption")
-                                val queryText =
-                                    caption + (if (!caption.isNullOrEmpty() && sharedText.isNotEmpty()) "\n\n" else "") + sharedText.ifEmpty { "" }
-                                val newUri = imageUris.last().buildUpon().clearQuery()
-                                    .appendQueryParameter("caption", queryText)
-                                    .build()
-                                imageUris.remove(imageUris.last())
-                                imageUris.add(newUri)
-                                uri.buildUpon()
-                                    .appendQueryParameter("caption", "")
-                                    .build()
-                            }
-
+            scriptContentList.forEach {
+                if (it.type == ContentType.TEXT) {
+                    if (it.content.value.isNotEmpty()) {
+                        sharedText =
+                            (if (sharedText.isNotEmpty()) "$sharedText\n\n" else "") + it.content.value
+                        hasContent = true
+                    }
+                } else if (it.type == ContentType.IMAGE) {
+                    val uri = it.imageResource.fileFromContentUri(context)
+                    if (uri != null) {
+                        val newUri = if (imageUris.isEmpty()) {
+                            uri.buildUpon()
+                                .appendQueryParameter("caption", sharedText)
+                                .build()
+                        } else {
+                            val caption = imageUris.last().getQueryParameter("caption")
+                            val queryText =
+                                caption + (if (!caption.isNullOrEmpty() && sharedText.isNotEmpty()) "\n\n" else "") + sharedText.ifEmpty { "" }
+                            val newUri = imageUris.last().buildUpon().clearQuery()
+                                .appendQueryParameter("caption", queryText)
+                                .build()
+                            imageUris.remove(imageUris.last())
                             imageUris.add(newUri)
-                            sharedText = ""
+                            uri.buildUpon()
+                                .appendQueryParameter("caption", "")
+                                .build()
                         }
+
+                        imageUris.add(newUri)
+                        sharedText = ""
                     }
                 }
             }
