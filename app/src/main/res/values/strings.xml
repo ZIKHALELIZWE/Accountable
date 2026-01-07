@@ -242,4 +242,6 @@
     <string name="scripts_navigate_back_button">Scripts Navigate Back Button</string>
     <string name="more_options">More Options</string>
     <string name="add_content">Add Content</string>
+    <string name="search_navigate_back_button">Search Navigate Back Button</string>
+    <string name="open_search_input_view">Open Search Input View</string>
 </resources>

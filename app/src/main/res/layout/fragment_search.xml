@@ -23,7 +23,7 @@
             android:autofillHints="@null"
             android:hint="@string/search"
             android:inputType="textMultiLine"
-            android:text="@={viewModel.searchString}"
+            android:text="Hello"
             app:layout_constraintEnd_toStartOf="@id/match_case_check_textview"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -34,7 +34,7 @@
             android:layout_width="wrap_content"
             android:layout_height="0dp"
             android:checkable="true"
-            android:checked="@={viewModel.matchCaseCheck}"
+            android:checked="false"
             android:gravity="center"
             android:text="@string/case_string"
             app:layout_constraintBottom_toBottomOf="@id/search_edit_text"
@@ -47,7 +47,7 @@
             android:layout_width="wrap_content"
             android:layout_height="0dp"
             android:checkable="true"
-            android:checked="@={viewModel.wordCheck}"
+            android:checked="false"
             android:gravity="center"
             android:text="@string/word"
             app:layout_constraintBottom_toBottomOf="@id/search_edit_text"
@@ -76,7 +76,6 @@
             android:paddingHorizontal="5dp"
             android:text="@{@string/scripts_and_occurrences(String.valueOf(viewModel.numScripts),String.valueOf(viewModel.occurrences))}"
             android:textColor="@color/black"
-            android:visibility="@{viewModel.searchString.length()==0?View.GONE:View.VISIBLE}"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@id/barrier"/>
 

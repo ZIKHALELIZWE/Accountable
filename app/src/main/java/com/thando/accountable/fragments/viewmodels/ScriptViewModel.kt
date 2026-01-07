@@ -47,15 +47,12 @@ class ScriptViewModel(
     // Data
     val appSettings = repository.getAppSettings()
     val script = repository.getScript()
-    /*private var _scriptContentList: MutableStateFlow<List<Content>?> = MutableStateFlow(null)
-    val scriptContentList: StateFlow<List<Content>?> = _scriptContentList.asStateFlow()*/
     val scriptContentList = repository.getScriptContentList()
     val markupLanguage = repository.getScriptMarkupLanguage()
     val isEditingScript = repository.getIsEditingScript()
 
     // Information Set To Views
     val menuAddTimeStampTitle = mutableStateOf("")
-    var addTimeStampFunction: MutableStateFlow<((String)->Unit)?> = MutableStateFlow(null)
 
     // Click Events
     private val _chooseContent = MutableStateFlow<AppResources.ContentType?>(null)
@@ -74,11 +71,6 @@ class ScriptViewModel(
 
     fun scriptViewVisibility(uri:Uri?,context: Context):Int{
         return if (uri == null) View.INVISIBLE else View.VISIBLE
-    }
-
-    fun editOrSaveScript(){
-        isEditingScript.update { isEditingScript.value.not() }
-        if (!isEditingScript.value) repository.saveScript()
     }
 
     fun chooseTopImage(chooseImage:()->Unit) {
@@ -208,12 +200,19 @@ class ScriptViewModel(
         }
     }
 
+    fun editOrSaveScript(){
+        isEditingScript.update { isEditingScript.value.not() }
+        if (!isEditingScript.value) repository.saveScript()
+    }
+
     fun onBackPressed(){
         if (isEditingScript.value) editOrSaveScript()
         else closeScript()
     }
 
     fun closeScript(){
+        script.value?.scrollPosition?.requestScrollToItem(0,0)
+        repository.saveScript()
         if (repository.isFromSearchFragment()){
             repository.changeFragment(AccountableNavigationController.AccountableFragment.SearchFragment)
         }
@@ -223,11 +222,9 @@ class ScriptViewModel(
         }
     }
 
-    fun setScrollPosition(scrollPosition: Int, appendedUnit: () -> Unit?){
-        script.value?.scrollPosition = scrollPosition
-        repository.saveScript {
-            appendedUnit()
-        }
+    fun prepareToClose( appendedUnit: () -> Unit?){
+        repository.saveScript()
+        appendedUnit()
     }
 
     fun printEntry(contentItemAdapter: ContentItemAdapter){

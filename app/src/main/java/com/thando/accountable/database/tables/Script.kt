@@ -2,6 +2,7 @@ package com.thando.accountable.database.tables
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.room.ColumnInfo
@@ -36,7 +37,7 @@ data class Script (
     var scriptPosition: Long,
 
     @ColumnInfo (name = "script_scroll_position")
-    var scrollPosition: Int = 0,
+    var scrollPosition: LazyListState = LazyListState(),
 
     @ColumnInfo (name = "script_import_script")
     var scriptImportScript: String? = null,

@@ -7,7 +7,9 @@ import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.FragmentActivity
@@ -58,13 +60,12 @@ class AccountableRepository(val application: Application): AutoCloseable {
     val folderOrder = MutableStateFlow<MutableStateFlow<Boolean>?>(null)
     val listLoaded = MutableStateFlow( false)
     val scrollStateParent = MutableStateFlow<LazyListState?>(null)
-    var saveScrollPosition: Int? = null
     val listShown = MutableStateFlow(getListShown(false))
 
     private val appSettings = MutableStateFlow<AppSettings?>(null)
-    private val foldersList = MutableStateFlow<List<Folder>?>(null)
-    private val scriptsList = MutableStateFlow<List<Script>?>(null)
-    private val goalsList = MutableStateFlow<List<Goal>?>(null)
+    private val foldersList = mutableStateListOf<Folder>()
+    private val scriptsList = mutableStateListOf<Script>()
+    private val goalsList = mutableStateListOf<Goal>()
     var intentString: String? = null
 
     private val editFolder = MutableStateFlow<Folder?>(null)
@@ -94,14 +95,15 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val teleprompterSettingsSelectedIndex = MutableStateFlow(-1)
     private val specialCharactersList: MutableStateFlow<MutableList<SpecialCharacters>> = MutableStateFlow(mutableListOf())
 
-    private val searchScrollPosition: MutableStateFlow<Int> = MutableStateFlow(0)
-    private val searchString: MutableStateFlow<String> = MutableStateFlow("")
-    private val matchCaseCheck: MutableStateFlow<Boolean> = MutableStateFlow(false)
-    private val wordCheck: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    private val searchScrollPosition: LazyListState = LazyListState()
+    private val searchString: MutableState<String> = mutableStateOf("")
+    private val matchCaseCheck: MutableState<Boolean> = mutableStateOf(false)
+    private val wordCheck: MutableState<Boolean> = mutableStateOf(false)
     private val searchJob: MutableStateFlow<Job?> = MutableStateFlow(null)
     private val searchOccurrences: MutableStateFlow<Int> = MutableStateFlow(0)
     private val searchNumScripts: MutableStateFlow<Int> = MutableStateFlow(0)
-    private val searchScriptsList: MutableList<SearchViewModel.ScriptSearch> = mutableListOf()
+    private val searchMenuOpen: MutableState<Boolean> = mutableStateOf(true)
+    private val searchScriptsList: SnapshotStateList<SearchViewModel.ScriptSearch> = mutableStateListOf()
     private var isFromSearchFolder: Boolean = false
 
 
@@ -138,9 +140,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getListShown() : StateFlow<Folder.FolderListType>{ return listShown }
 
     fun getAppSettings(): StateFlow<AppSettings?> { return appSettings }
-    fun getFoldersList(): StateFlow<List<Folder>?> { return foldersList }
-    fun getScriptsList(): StateFlow<List<Script>?> { return scriptsList }
-    fun getGoalsList(): StateFlow<List<Goal>?> { return goalsList }
+    fun getFoldersList(): SnapshotStateList<Folder> { return foldersList }
+    fun getScriptsList(): SnapshotStateList<Script> { return scriptsList }
+    fun getGoalsList(): SnapshotStateList<Goal> { return goalsList }
     fun getEditFolder(): StateFlow<Folder?>{ return editFolder }
     fun getNewEditFolder(): StateFlow<Folder?>{ return newEditFolder }
     fun getNewGoal():MutableState<Goal?> { return newGoal }
@@ -163,19 +165,20 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getTeleprompterSettingsSelectedIndex(): StateFlow<Int> { return teleprompterSettingsSelectedIndex }
     fun getSpecialCharactersList(): StateFlow<MutableList<SpecialCharacters>> { return specialCharactersList }
 
-    fun getSearchScrollPosition(): StateFlow<Int> { return searchScrollPosition }
-    fun getSearchString(): MutableStateFlow<String> { return searchString }
-    fun getMatchCaseCheck(): MutableStateFlow<Boolean> { return matchCaseCheck }
-    fun getWordCheck(): MutableStateFlow<Boolean> { return wordCheck }
+    fun getSearchScrollPosition(): LazyListState { return searchScrollPosition }
+    fun getSearchString(): MutableState<String> { return searchString }
+    fun getMatchCaseCheck(): MutableState<Boolean> { return matchCaseCheck }
+    fun getWordCheck(): MutableState<Boolean> { return wordCheck }
     fun getSearchJob(): StateFlow<Job?> { return searchJob }
     fun getSearchOccurrences(): StateFlow<Int> { return searchOccurrences }
     fun getSearchNumScripts(): StateFlow<Int> { return searchNumScripts }
-    fun getSearchScriptsList(): MutableList<SearchViewModel.ScriptSearch> { return searchScriptsList }
+    fun getSearchMenuOpen(): MutableState<Boolean> { return searchMenuOpen }
+    fun getSearchScriptsList(): SnapshotStateList<SearchViewModel.ScriptSearch> { return searchScriptsList }
 
     fun clearFolderLists(){
-        scriptsList.value = null
-        foldersList.value = null
-        goalsList.value = null
+        scriptsList.clear()
+        foldersList.clear()
+        goalsList.clear()
     }
 
     fun loadScriptsList(ascendingOrder:Boolean, folderNotAppSettings:Boolean,
@@ -185,15 +188,21 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
                 if (id != null) {
                     withContext(Dispatchers.Main) {
-                        if (ascendingOrder) scriptsList.update {
-                            withContext(Dispatchers.IO) {
-                                dao.getScriptsNow(id)
-                            }
+                        if (ascendingOrder) {
+                            scriptsList.clear()
+                            scriptsList.addAll(
+                                withContext(Dispatchers.IO) {
+                                    dao.getScriptsNow(id)
+                                }
+                            )
                         }
-                        else scriptsList.update {
-                            withContext(Dispatchers.IO) {
-                                dao.getScriptsNowDESC(id)
-                            }
+                        else {
+                            scriptsList.clear()
+                            scriptsList.addAll(
+                                withContext(Dispatchers.IO) {
+                                    dao.getScriptsNowDESC(id)
+                                }
+                            )
                         }
                     }
                 }
@@ -210,18 +219,20 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 if (id != null) {
                     withContext(Dispatchers.Main) {
                         if (ascendingOrder) {
-                            goalsList.update {
+                            goalsList.clear()
+                            goalsList.addAll(
                                 withContext(Dispatchers.IO) {
                                     dao.getGoalsNow(id)
                                 }
-                            }
+                            )
                         }
                         else {
-                            goalsList.update {
+                            goalsList.clear()
+                            goalsList.addAll(
                                 withContext(Dispatchers.IO) {
                                     dao.getGoalsNowDESC(id)
                                 }
-                            }
+                            )
                         }
                     }
                 }
@@ -241,20 +252,22 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     if (folderTypeScriptsNotGoals) Folder.FolderType.SCRIPTS else Folder.FolderType.GOALS
                 withContext(Dispatchers.Main) {
                     if (ascendingOrder){
-                        foldersList.update {
+                        foldersList.clear()
+                        foldersList.addAll(
                             withContext(Dispatchers.IO) {
                                 val list = dao.getFoldersNow(id, type)
                                 list
                             }
-                        }
+                        )
                     }
                     else{
-                        foldersList.update {
+                        foldersList.clear()
+                        foldersList.addAll(
                             withContext(Dispatchers.IO) {
                                 val list = dao.getFoldersNowDESC(id, type)
                                 list
                             }
-                        }
+                        )
                     }
                 }
                 withContext(Dispatchers.Main){ appendedUnit?.invoke() }
@@ -272,10 +285,12 @@ class AccountableRepository(val application: Application): AutoCloseable {
             }
             if (folder.value!=null){
                 showScripts.update { folder.value!!.folderShowScripts }
+                scrollStateParent.update { folder.value!!.folderScrollPosition }
             }
             else{
                 if (scriptsOrGoalsFolderType.value == Folder.FolderType.SCRIPTS) showScripts.update { appSettings.value?.showScripts }
                 else if (scriptsOrGoalsFolderType.value == Folder.FolderType.GOALS) showScripts.update { appSettings.value?.showGoals }
+                scrollStateParent.update { appSettings.value?.scrollPosition }
             }
             loadFolderData()
         }
@@ -336,17 +351,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 loadScriptsList(
                     ascendingOrder = ascendingOrder,
                     folderNotAppSettings = folderNotAppSettings
-                ){
-                    scroll()
-                }
+                )
             }
             else {
                 loadGoalsList(
                     ascendingOrder = ascendingOrder,
                     folderNotAppSettings = folderNotAppSettings
-                ){
-                    scroll()
-                }
+                )
             }
         }
         else{
@@ -354,27 +365,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 ascendingOrder = ascendingOrder,
                 folderNotAppSettings = folderNotAppSettings,
                 folderTypeScriptsNotGoals = folderTypeScriptsNotGoals
-            ){
-                scroll()
-            }
-        }
-    }
-
-    private fun scroll() {
-        repositoryScope.launch {
-            val returnScrollPosition = if (folder.value == null) {
-                // Get from settings table
-                appSettings.value?.scrollPosition ?: LazyListState()
-            } else {
-                // Get from folder table
-                folder.value?.folderScrollPosition ?: LazyListState()
-            }
-            saveScrollPosition?.let {
-                updateScriptsOrGoalsFolderScrollPosition(it) {
-                    saveScrollPosition = null
-                }
-            }
-            scrollStateParent.update { returnScrollPosition }
+            )
         }
     }
 
@@ -438,16 +429,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun updateScriptsOrGoalsFolderScrollPosition(scrollPosition: Int,appendedUnit:(()->Unit)?){
+    fun updateScriptsOrGoalsFolderScrollPosition(index: Int, offset: Int,appendedUnit:(()->Unit)?){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 if (folder.value == null) {
                     // Save to settings table
-                    appSettings.value?.scrollPosition?.requestScrollToItem(scrollPosition)
+                    appSettings.value?.scrollPosition?.requestScrollToItem(index, offset)
                     appSettings.value?.let { dao.update(it) }
                 } else {
                     // Saved in Folders table
-                    folder.value?.folderScrollPosition?.requestScrollToItem(scrollPosition)
+                    folder.value?.folderScrollPosition?.requestScrollToItem(index, offset)
                     appSettings.value?.let { dao.update(it) }
                 }
                 withContext(Dispatchers.Main){
@@ -532,12 +523,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
             withContext(Dispatchers.IO) {
                 id?.let {
                     dao.deleteFolder(it, application)
-                    foldersList.value?.let { list ->
-                        val mutableList = list.toMutableList()
-                        mutableList.removeIf { folder ->
-                            folder.folderId == id
-                        }
-                        foldersList.update { mutableList }
+                    foldersList.removeIf { folder ->
+                        folder.folderId == id
                     }
                 }
             }
@@ -549,12 +536,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
             withContext(Dispatchers.IO){
                 id?.let {
                     dao.deleteGoal(it, application)
-                    goalsList.value?.let { list ->
-                        val mutableList = list.toMutableList()
-                        mutableList.removeIf { goal ->
-                            goal.id == id
-                        }
-                        goalsList.update { mutableList }
+                    goalsList.removeIf { goal ->
+                        goal.id == id
                     }
                 }
             }
@@ -566,12 +549,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
             withContext(Dispatchers.IO) {
                 id?.let {
                     dao.deleteScript(it, application)
-                    scriptsList.value?.let { list ->
-                        val mutableList = list.toMutableList()
-                        mutableList.removeIf { script ->
-                            script.scriptId == id
-                        }
-                        scriptsList.update { mutableList }
+                    scriptsList.removeIf { script ->
+                        script.scriptId == id
                     }
                 }
             }
@@ -1492,8 +1471,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun setSearchScrollPosition(inputScrollPosition:Int){
-        searchScrollPosition.value = inputScrollPosition
+    fun setSearchScrollPosition(index:Int=0,offset:Int=0){
+        searchScrollPosition.requestScrollToItem(index,offset)
     }
 
     suspend fun getContentListNow(scriptId: Long?): List<Content> {
@@ -1594,36 +1573,31 @@ class AccountableRepository(val application: Application): AutoCloseable {
         fun getDisplayImage(): StateFlow<Uri?> { return displayImage }
     }
 
-    fun getFolderFolderNum(
+    suspend fun getFolderFolderNum(
         folder:Folder
     ) {
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                dao.getFoldersNow(folder.folderId, folder.folderType).let { folders ->
-                    folder.numFolders.update { folders.size }
-                }
-
+        withContext(Dispatchers.IO) {
+            dao.getFoldersNow(folder.folderId, folder.folderType).let { folders ->
+                folder.numFolders.update { folders.size }
             }
+
         }
     }
 
-    fun getFolderScriptGoalNum(
+    suspend fun getFolderScriptGoalNum(
         folder:Folder
     ){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                when (folder.folderType) {
-                    Folder.FolderType.SCRIPTS -> {
-                        dao.getScriptsNow(folder.folderId).let { scripts ->
-                            folder.numScripts.update { scripts.size }
-                        }
+        withContext(Dispatchers.IO) {
+            when (folder.folderType) {
+                Folder.FolderType.SCRIPTS -> {
+                    dao.getScriptsNow(folder.folderId).let { scripts ->
+                        folder.numScripts.update { scripts.size }
                     }
+                }
 
-                    Folder.FolderType.GOALS -> {
-                        /*val goals = dao.getGoalsNow(folder.folderId)
-                    withContext(Dispatchers.Main) {
+                Folder.FolderType.GOALS -> {
+                    dao.getGoalsNow(folder.folderId).let { goals ->
                         folder.numGoals.update { goals.size }
-                    }*/
                     }
                 }
             }
@@ -1631,14 +1605,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     fun searchFragmentSearch(
-        onScriptClick:(scriptId:Long)->Unit,
-        notifyListCleared:MutableSharedFlow<Unit>,
         searchComplete:(()->Unit)?=null
     ){
         searchJob.value?.cancel()
         searchScriptsList.clear()
         searchJob.value = repositoryScope.launch {
-            notifyListCleared.emit(Unit)
             if (searchString.value.isEmpty()) {
                 searchJob.value?.cancel()
                 searchJob.value = null
@@ -1661,8 +1632,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     wordCheck.value,
                     searchScriptsList,
                     searchOccurrences,
-                    searchNumScripts,
-                    onScriptClick
+                    searchNumScripts
                 ){
                     searchJob.value = null
                     searchComplete?.invoke()
@@ -1683,7 +1653,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     fun resetSearchData(appendedUnit: (() -> Unit)?=null){
-        searchScrollPosition.value = 0
+        searchMenuOpen.value = true
+        searchScrollPosition.requestScrollToItem(0,0)
         searchString.value = ""
         matchCaseCheck.value = false
         wordCheck.value = false

@@ -1,13 +1,14 @@
 package com.thando.accountable.fragments.viewmodels
 
-import android.text.SpannableString
-import android.text.style.BackgroundColorSpan
-import android.view.View
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AccountableRepository
@@ -15,10 +16,7 @@ import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Script
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 
@@ -26,8 +24,10 @@ class SearchViewModel(
     private val repository: AccountableRepository
 ): ViewModel() {
 
+    val appSettings = repository.getAppSettings()
+
     val intentString = repository.intentString
-    private val searchScrollPosition = repository.getSearchScrollPosition()
+    val searchScrollPosition = repository.getSearchScrollPosition()
     val searchString = repository.getSearchString()
     val matchCaseCheck = repository.getMatchCaseCheck()
     val wordCheck = repository.getWordCheck()
@@ -35,29 +35,22 @@ class SearchViewModel(
     val occurrences = repository.getSearchOccurrences()
     val numScripts = repository.getSearchNumScripts()
     val scriptsList = repository.getSearchScriptsList()
+    val searchMenuOpen = repository.getSearchMenuOpen()
 
-    private val _openScript = MutableSharedFlow<Long>()
-    val openScript = _openScript.asSharedFlow()
-    private val _notifyListCleared = MutableSharedFlow<Unit>()
-    val notifyListCleared = _notifyListCleared.asSharedFlow()
+    val initialized = mutableStateOf(false)
 
     data class ScriptSearch(
         val folderId : Long,
         val folderTitle: String,
-        val script : Script,
-        val onScriptClick:(scriptId:Long)->Unit
+        val script : Script
     ){
         private val characters = 200
         val searchOccurrences = MutableStateFlow(0)
         private val ranges = arrayListOf<Triple<String,MutableList<IntRange>,Content?>>()
-        val leftButtonVisibility = MutableStateFlow(View.GONE)
-        val rightButtonVisibility = MutableStateFlow(View.GONE)
-        val snippets = arrayListOf<SpannableString>()
+        val leftButtonVisibility = MutableStateFlow(false)
+        val rightButtonVisibility = MutableStateFlow(false)
+        val snippets = arrayListOf<AnnotatedString>()
         val snippetIndex = MutableStateFlow(0)
-
-        fun openScript(){
-            script.scriptId?.let { onScriptClick(it) }
-        }
 
         fun addRanges(list:ArrayList<Triple<String,MutableList<IntRange>,Content?>>){
             ranges.addAll(list)
@@ -83,9 +76,18 @@ class SearchViewModel(
                     }
                     if (endIndex!=it.first.length) snippet = "$snippet..."
 
-                    val snippetHighlight = SpannableString(snippet)
-                    snippetHighlight.setSpan(BackgroundColorSpan(MainActivity.ResourceProvider.resources.getColor(
-                        R.color.purple_200,null)), rangeFirst, rangeLast, 0)
+                    val snippetHighlight = buildAnnotatedString {
+                        append(snippet)
+                        addStyle(
+                            SpanStyle(
+                                background = Color(MainActivity.ResourceProvider.resources.getColor(
+                                    R.color.purple_200, null
+                                ))
+                            ),
+                            rangeFirst,
+                            rangeLast
+                        )
+                    }
                     snippets.add(snippetHighlight)
                 }
             }
@@ -93,14 +95,8 @@ class SearchViewModel(
         }
 
         private fun setButtonVisibility(){
-            if (snippetIndex.value>0) leftButtonVisibility.value = View.VISIBLE
-            else leftButtonVisibility.value = View.GONE
-            if (snippetIndex.value<snippets.size-1) rightButtonVisibility.value = View.VISIBLE
-            else rightButtonVisibility.value = View.GONE
-        }
-
-        fun addRanges(item:Triple<String,MutableList<IntRange>,Content?>){
-            addRanges(arrayListOf(item))
+            leftButtonVisibility.value = snippetIndex.value>0
+            rightButtonVisibility.value = snippetIndex.value<snippets.size-1
         }
 
         fun moveRight(){
@@ -114,17 +110,24 @@ class SearchViewModel(
         }
     }
 
-    fun search(searchComplete:(()->Unit)?=null){
-        repository.searchFragmentSearch(
-            {scriptId:Long->onScriptClick(scriptId)},
-            _notifyListCleared,
-            searchComplete)
+    fun toggleMenuOpen(){
+        searchMenuOpen.value = searchMenuOpen.value.not()
     }
 
-    private fun onScriptClick(scriptId: Long) {
-        viewModelScope.launch {
-            _openScript.emit(scriptId)
-        }
+    fun toggleMatchCaseCheck(){
+        matchCaseCheck.value = matchCaseCheck.value.not()
+    }
+
+    fun toggleWordCheck(){
+        wordCheck.value = wordCheck.value.not()
+    }
+
+    fun initialized(){
+        initialized.value = true
+    }
+
+    fun search(searchComplete:(()->Unit)?=null){
+        repository.searchFragmentSearch(searchComplete)
     }
 
     fun loadAndOpenScript(scriptId: Long, activity: FragmentActivity?) {
@@ -148,12 +151,8 @@ class SearchViewModel(
         }
     }
 
-    fun setScrollPosition(inputScrollPosition:Int){
-        repository.setSearchScrollPosition(inputScrollPosition)
-    }
-
-    fun getScrollPosition(): Int{
-        return searchScrollPosition.value
+    fun setScrollPosition(index:Int=0, offset:Int=0){
+        repository.setSearchScrollPosition(index,offset)
     }
 
     companion object{

@@ -1,6 +1,7 @@
 package com.thando.accountable.database.dataaccessobjects
 
 import android.content.Context
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Delete
@@ -409,10 +410,9 @@ interface RepositoryDao {
         searchString:String,
         matchCaseCheck:Boolean,
         wordCheck:Boolean,
-        searchScriptsList: MutableList<SearchViewModel.ScriptSearch>,
+        searchScriptsList: SnapshotStateList<SearchViewModel.ScriptSearch>,
         searchOccurrences: MutableStateFlow<Int>,
         searchNumScripts: MutableStateFlow<Int>,
-        onScriptClick:(scriptId:Long)->Unit,
         appendedUnit:(()->Unit)?=null
     ){
         searchOccurrences.value = 0
@@ -420,7 +420,7 @@ interface RepositoryDao {
         val scriptsList = getScriptsNow(id)
         for (script in scriptsList) {
             if (script.scriptId == null) continue
-            val scriptSearch = SearchViewModel.ScriptSearch(id, title, script, onScriptClick)
+            val scriptSearch = SearchViewModel.ScriptSearch(id, title, script)
             val list = searchScriptForString(
                 script.scriptId!!,
                 searchString,

@@ -161,6 +161,8 @@ class ScriptFragment : Fragment() {
     private val multipleContentsStateFlow: MutableStateFlow<List<@JvmSuppressWildcards Uri>?> = MutableStateFlow(null)
     private val multipleContentsJob = AtomicReference<Job?>(null)
 
+    enum class ContentPosition{ ABOVE, AT_CURSOR_POINT, BELOW }
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -469,13 +471,6 @@ class ScriptFragment : Fragment() {
         }
     }
 
-    /*private fun getScrollPosition(): Int{
-        val layoutManager = binding.scriptRecyclerView.layoutManager as LinearLayoutManager
-        return layoutManager.findLastCompletelyVisibleItemPosition()
-    }*/
-
-    enum class ContentPosition{ ABOVE, AT_CURSOR_POINT, BELOW }
-
     private fun getAboveBelowContentType(scriptContentList: List<Content>, content: Content):Pair<ContentType?, ContentType?>{
         var above: ContentType? = null
         var below: ContentType? = null
@@ -509,12 +504,7 @@ class ScriptFragment : Fragment() {
             MinToolbarHeight.roundToPx()..MaxToolbarHeight.roundToPx()
         }
         val toolbarState = ToolbarState.rememberToolbarState( collapseType, toolbarHeightRange)
-        val listState: LazyListState = rememberSaveable(saver = LazyListState.Saver) {
-            LazyListState(
-                firstVisibleItemIndex = 0,
-                firstVisibleItemScrollOffset = 0
-            )
-        }
+        val listState = rememberLazyListState()//script.scrollPosition
 
         val scope = rememberCoroutineScope()
         val nestedScrollConnection = remember {
@@ -1098,27 +1088,21 @@ class ScriptFragment : Fragment() {
                     }
                 }
                 items(items = scriptContentList) { content ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .wrapContentHeight(),
-                    ) {
-                        val mod = Modifier.pointerInput(Unit) {
-                            detectTapGestures(
-                                onLongPress = { onLongClickListener(null to content) }
-                            )
-                        }
-                        // Add Content Cards
-                        GetContentCard(
-                            content,
-                            isEditingScript,
-                            textIndex,
-                            appSettings,
-                            markupLanguage,
-                            mod,
-                            teleprompterSettings
+                    val mod = Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = { onLongClickListener(null to content) }
                         )
                     }
+                    // Add Content Cards
+                    GetContentCard(
+                        content,
+                        isEditingScript,
+                        textIndex,
+                        appSettings,
+                        markupLanguage,
+                        mod,
+                        teleprompterSettings
+                    )
                 }
             }
         }
@@ -1280,5 +1264,14 @@ class ScriptFragment : Fragment() {
                 )
             }
         }
+    }
+
+    override fun onPause() {
+        activity?.lifecycleScope?.launch {
+            withContext(Dispatchers.IO) {
+                viewModel.prepareToClose {}
+            }
+        }
+        super.onPause()
     }
 }
