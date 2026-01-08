@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -28,6 +29,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -61,6 +64,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -101,7 +105,6 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.ScriptViewModel
-import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
 import com.thando.accountable.ui.cards.GetContentCard
 import com.thando.accountable.ui.management.states.toolbar.FixedScrollFlagState
 import com.thando.accountable.ui.management.states.toolbar.ToolbarState
@@ -125,9 +128,6 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
 
 class ScriptFragment : Fragment() {
-
-    private lateinit var contentAdapter: ContentItemAdapter
-
     val viewModel : ScriptViewModel by viewModels { ScriptViewModel.Factory }
     private val galleryLauncherMultiple = registerForActivityResult(
         ActivityResultContracts.GetMultipleContents()
@@ -137,14 +137,14 @@ class ScriptFragment : Fragment() {
     private val galleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { galleryUri ->
         try{
             if (galleryUri!=null){
-                when (viewModel.chooseContent.value) {
+                when (viewModel.chooseContent) {
                     AppResources.ContentType.IMAGE -> {
                         viewModel.contentRetrieved()
                         viewModel.setTopImage(galleryUri)
                     }
                     AppResources.ContentType.DOCUMENT -> {
                         viewModel.contentRetrieved()
-                        contentAdapter.appendFile(galleryUri)
+                        viewModel.appendFile(galleryUri)
                     }
                     else -> {
                         viewModel.contentRetrieved()
@@ -458,7 +458,7 @@ class ScriptFragment : Fragment() {
                 teleprompterIcon = { modifier ->
                     IconButton(
                         modifier = modifier,
-                        onClick = { viewModel.openTeleprompter() })
+                        onClick = { viewModel.saveScriptAndOpenTeleprompter() })
                     {
                         Icon(
                             imageVector = Icons.Filled.PlayArrow,
@@ -574,10 +574,8 @@ class ScriptFragment : Fragment() {
             ),
             MenuItemData(
                 text = scriptUri?.let { stringResource(R.string.remove_image)}?:stringResource(R.string.choose_image),
-                onClick = { viewModel.chooseTopImage {
-                    AppResources.ContentTypeAccessor[AppResources.ContentType.IMAGE]?.let {
-                        galleryLauncher.launch(it)
-                    }
+                onClick = { viewModel.chooseTopImage { accessorString ->
+                        galleryLauncher.launch(accessorString)
                 } }
             ),
             MenuItemData(
@@ -593,15 +591,17 @@ class ScriptFragment : Fragment() {
             ),
             MenuItemData(
                 text = stringResource(R.string.choose_markup_language),
-                onClick = { viewModel.chooseMarkupLanguage() }
+                onClick = { viewModel.saveScriptAndOpenMarkupLanguage() }
             ),
             MenuItemData(
                 text = stringResource(R.string.load_document),
-                onClick = { viewModel.loadText() }
+                onClick = { viewModel.loadText { accessorString ->
+                    galleryLauncher.launch(accessorString)
+                } }
             ),
             MenuItemData(
                 text = stringResource(R.string.print_to_text_file),
-                onClick = { viewModel.printToTextFile() }
+                onClick = { viewModel.printEntry() }
             )
         )
         val menuListNoTimeStamp = menuListOriginal.toMutableList().apply { removeAt(2) }.toList()
@@ -989,10 +989,12 @@ class ScriptFragment : Fragment() {
         val scriptMonthYear by script.scriptDateTime.getMonthYearStateFlow(LocalContext.current).collectAsStateWithLifecycle()
 
         val scriptContentList = remember { viewModel.scriptContentList }
+        val bringIntoViewRequester = remember { BringIntoViewRequester() }
+        val scope = rememberCoroutineScope()
         LazyColumn(
             state = listState,
             contentPadding = contentPadding,
-            modifier = modifier
+            modifier = modifier.imePadding()
         ) {
             item(key = "The Top") {
                 Card(
@@ -1045,7 +1047,14 @@ class ScriptFragment : Fragment() {
                             TextField(
                                 value = scriptTitle,
                                 onValueChange = { newTitle -> scriptTitle = newTitle },
-                                modifier = Modifier
+                                modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
+                                    .onFocusEvent { focusState ->
+                                        if (focusState.isFocused) {
+                                            scope.launch {
+                                                bringIntoViewRequester.bringIntoView()
+                                            }
+                                        }
+                                    }
                                     .fillMaxWidth()
                                     .padding(vertical = 15.dp, horizontal = 5.dp),
                                 textStyle = TextStyle(
@@ -1097,7 +1106,7 @@ class ScriptFragment : Fragment() {
                     appSettings,
                     markupLanguage,
                     mod,
-                    teleprompterSettings
+                    teleprompterSettings,
                 )
             }
         }

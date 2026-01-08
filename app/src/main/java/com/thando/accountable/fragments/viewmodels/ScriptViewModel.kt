@@ -3,47 +3,26 @@ package com.thando.accountable.fragments.viewmodels
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.view.View
-import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.fragment.app.FragmentManager
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AccountableRepository
 import com.thando.accountable.AppResources
-import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Content.ContentType
-import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.fragments.ScriptFragment
-import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 class ScriptViewModel(
     private val repository: AccountableRepository
 ): ViewModel() {
-    private val viewModelJob = Job()
-    private val viewModelScope = CoroutineScope(Dispatchers.Main + viewModelJob)
-
     // Data
     val appSettings = repository.getAppSettings()
     val script = repository.getScript()
@@ -55,58 +34,41 @@ class ScriptViewModel(
     val menuAddTimeStampTitle = mutableStateOf("")
 
     // Click Events
-    private val _chooseContent = MutableStateFlow<AppResources.ContentType?>(null)
-    val chooseContent: StateFlow<AppResources.ContentType?> get() = _chooseContent
-    private val _chooseMarkupLanguage = MutableSharedFlow<Boolean>()
-    val chooseMarkupLanguage: SharedFlow<Boolean> get() = _chooseMarkupLanguage
-    private val _printEntryToTextFile = MutableSharedFlow<Boolean>()
-    val printEntryToTextFile : SharedFlow<Boolean> get() = _printEntryToTextFile
-    private val _navigateToTeleprompter = MutableSharedFlow<Boolean>()
-    val navigateToTeleprompter: SharedFlow<Boolean> get() = _navigateToTeleprompter
+    var chooseContent: AppResources.ContentType? = null
 
-    override fun onCleared() {
-        super.onCleared()
-        viewModelJob.cancel()
-    }
-
-    fun scriptViewVisibility(uri:Uri?,context: Context):Int{
-        return if (uri == null) View.INVISIBLE else View.VISIBLE
-    }
-
-    fun chooseTopImage(chooseImage:()->Unit) {
+    fun chooseTopImage(chooseImage:(String)->Unit) {
         if (!(script.value?.scriptPicture.isNullOrEmpty())){
             repository.deleteScriptImage()
         }
         else{
-            _chooseContent.value = AppResources.ContentType.IMAGE
-            chooseImage.invoke()
+            chooseContent = AppResources.ContentType.IMAGE
+            AppResources.ContentTypeAccessor[chooseContent]?.let {
+                chooseImage(it)
+            }?:{
+                contentRetrieved()
+            }
         }
     }
 
     fun contentRetrieved(){
-        _chooseContent.value = null
+        chooseContent = null
     }
 
     fun setTopImage(inputUri: Uri?){
         repository.saveScriptImage(inputUri)
     }
 
-    fun chooseMarkupLanguage(){
-        viewModelScope.launch {
-            _chooseMarkupLanguage.emit(true)
+    fun loadText(loadTextUnit: (String)->Unit){
+        chooseContent = AppResources.ContentType.DOCUMENT
+        AppResources.ContentTypeAccessor[chooseContent]?.let {
+            loadTextUnit(it)
+        }?:{
+            contentRetrieved()
         }
     }
 
-    fun printToTextFile(){
-        viewModelScope.launch {
-            _printEntryToTextFile.emit(true)
-        }
-    }
-
-    fun loadText(){
-        viewModelScope.launch {
-            _chooseContent.emit(AppResources.ContentType.DOCUMENT)
-        }
+    fun appendFile(uri: Uri){
+        repository.appendFileToScript(uri)
     }
 
     fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ScriptFragment.ContentPosition, item: Content, cursorPosition:Int?){
@@ -178,12 +140,6 @@ class ScriptViewModel(
         }
     }
 
-    fun openTeleprompter(){
-        viewModelScope.launch {
-            _navigateToTeleprompter.emit(true)
-        }
-    }
-
     fun saveScriptAndOpenTeleprompter(){
         repository.saveScript(true) {
             repository.changeFragment(AccountableNavigationController.AccountableFragment.TeleprompterFragment)
@@ -223,8 +179,8 @@ class ScriptViewModel(
         appendedUnit()
     }
 
-    fun printEntry(contentItemAdapter: ContentItemAdapter){
-        script.value?.scriptTitle?.value?.let { contentItemAdapter.printEntry(it) }
+    fun printEntry(){
+        repository.printScriptEntry()
     }
 
     suspend fun getShareContent(context: Context): Triple<Boolean,ArrayList<Uri>,String>{

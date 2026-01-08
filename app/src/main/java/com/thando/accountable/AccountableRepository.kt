@@ -1,8 +1,11 @@
 package com.thando.accountable
 
 import android.app.Application
+import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.lazy.LazyListState
@@ -42,6 +45,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -913,7 +917,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             val bottomString =
                                 text.substring(cursorPosition, text.length)
 
-                            item.content.value = topString
+                            item.content.update { topString }
                             val newContent = Content(
                                 type = ContentType.TEXT,
                                 script = script.value!!.scriptId!!,
@@ -976,6 +980,74 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 }
             }
         }
+    }
+
+    fun printScriptEntry(){
+        repositoryScope.launch {
+            withContext(Dispatchers.IO) {
+                script.value?.scriptTitle?.value?.let { title ->
+                    val outputStringBuilder = StringBuilder()
+                    scriptContentList.forEach { content ->
+                        if (content.type == ContentType.TEXT) {
+                            content.content.value.let { outputStringBuilder.append(it) }
+                        }
+                    }
+
+                    val contentValues = ContentValues().apply {
+                        put(
+                            MediaStore.Files.FileColumns.DISPLAY_NAME,
+                            title
+                        )
+                        put(
+                            MediaStore.Files.FileColumns.MIME_TYPE,
+                            "text/plain"
+                        )
+                        put(
+                            MediaStore.Files.FileColumns.RELATIVE_PATH,
+                            createFolderInDocuments(application.getString(R.string.app_name))
+                        )
+                    }
+
+                    val resolver = application.contentResolver
+                    val uri: Uri? = resolver.insert(
+                        MediaStore.Files.getContentUri("external"),
+                        contentValues
+                    )
+                    uri?.let {
+                        val outputStream: OutputStream? = resolver.openOutputStream(it)
+                        outputStream?.use { stream ->
+                            stream.write(outputStringBuilder.toString().toByteArray())
+                            stream.flush()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun appendFileToScript(uri: Uri){
+        repositoryScope.launch {
+            withContext(Dispatchers.IO) {
+                script.value?.let {
+                    appendTextFieldIfNeeded()
+                    scriptContentList.last().appendFile(uri, application.contentResolver)
+                }
+            }
+        }
+    }
+
+    private fun createFolderInDocuments(folderName: String): String {
+        // Get the Documents directory
+        val documentsDir = Environment.DIRECTORY_DOCUMENTS
+
+        // Create the new folder
+        val newFolder = File(documentsDir, folderName)
+
+        // Check if the folder already exists, if not, create it
+        if (!newFolder.exists()) {
+            newFolder.mkdirs()
+        }
+        return documentsDir + File.separator + folderName
     }
 
     fun makeAccountableBackup(data: Intent?,

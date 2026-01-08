@@ -11,9 +11,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
@@ -21,14 +26,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -38,6 +46,7 @@ import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.EditFolderViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 class EditFolderFragment : Fragment() {
@@ -76,13 +85,15 @@ class EditFolderFragment : Fragment() {
         }
         val newEditFolder by viewModel.newEditFolder.collectAsStateWithLifecycle()
         val updateButtonTextResId by viewModel.updateButtonText.collectAsStateWithLifecycle()
+        val bringIntoViewRequester = remember { BringIntoViewRequester() }
 
         if (newEditFolder != null) {
             val uri by newEditFolder!!.getUri(requireContext()).collectAsStateWithLifecycle()
             val folderName by newEditFolder!!.folderName.collectAsStateWithLifecycle()
             val scope = rememberCoroutineScope()
+            val listState = rememberScrollState()
             Column(
-                modifier = modifier.verticalScroll(rememberScrollState()),
+                modifier = modifier.imePadding().verticalScroll(listState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // folder image
@@ -100,7 +111,15 @@ class EditFolderFragment : Fragment() {
                     value = folderName,
                     onValueChange = { scope.launch { newEditFolder!!.updateFolderName(it) } },
                     label = { Text(stringResource(R.string.enter_folder_name)) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 3.dp)
+                    modifier = Modifier
+                        .bringIntoViewRequester(bringIntoViewRequester).onFocusEvent { focusState ->
+                            if (focusState.isFocused) {
+                                scope.launch {
+                                    bringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        }
+                        .fillMaxWidth().padding(horizontal = 3.dp)
                 )
                 Spacer(modifier = Modifier.width(2.dp))
                 // choose image button

@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowLeft
@@ -53,6 +55,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -206,6 +209,9 @@ class SearchFragment : Fragment() {
             viewModel.searchScrollPosition.firstVisibleItemScrollOffset
         )) }
 
+        val bringIntoViewRequester = remember { BringIntoViewRequester() }
+        val scope = rememberCoroutineScope()
+
         LaunchedEffect(searchString, matchCaseCheck, wordCheck) {
             viewModel.search {
                 if (initialized){
@@ -229,7 +235,14 @@ class SearchFragment : Fragment() {
                 TextField(
                     value = searchString,
                     onValueChange = { searchString = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoViewRequester)
+                        .onFocusEvent { focusState ->
+                            if (focusState.isFocused) {
+                                scope.launch {
+                                    bringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        },
                     placeholder = { Text(
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center,

@@ -19,10 +19,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -58,10 +61,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -85,6 +90,7 @@ import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.temporal.TemporalAdjusters
@@ -146,16 +152,25 @@ class EditGoalFragment: Fragment() {
             var colour by remember { newGoal.colour }
             var location by remember { newGoal.location }
             val times = remember { newGoal.times }
+            val bringIntoViewRequester = remember { BringIntoViewRequester() }
+            val scope = rememberCoroutineScope()
 
             Column(
-                modifier = modifier.verticalScroll(scrollState),
+                modifier = modifier.imePadding().verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 OutlinedTextField(
                     value = goal,
                     onValueChange = { goal = it },
                     label = { Text(stringResource(R.string.goal)) },
-                    modifier = Modifier
+                    modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
+                        .onFocusEvent { focusState ->
+                            if (focusState.isFocused) {
+                                scope.launch {
+                                    bringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        }
                         .fillMaxWidth()
                         .padding(horizontal = 3.dp)
                 )
@@ -196,7 +211,14 @@ class EditGoalFragment: Fragment() {
                     value = location,
                     onValueChange = { location = it },
                     label = { Text(stringResource(R.string.location)) },
-                    modifier = Modifier
+                    modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
+                        .onFocusEvent { focusState ->
+                            if (focusState.isFocused) {
+                                scope.launch {
+                                    bringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        }
                         .fillMaxWidth()
                         .padding(horizontal = 3.dp)
                 )
