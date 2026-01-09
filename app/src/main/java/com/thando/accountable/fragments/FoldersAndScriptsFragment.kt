@@ -35,6 +35,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
@@ -73,13 +74,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -120,7 +118,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 import kotlin.random.Random
 
 class FoldersAndScriptsFragment : Fragment() {
@@ -185,13 +182,15 @@ class FoldersAndScriptsFragment : Fragment() {
                     }
                 }
 
+                val booksString = stringResource(R.string.books)
+                val goalsString = stringResource(R.string.goals)
                 AccountableTheme {
                     val folder by viewModel.folder.collectAsStateWithLifecycle()
-                    val folderName by folder?.folderName?.collectAsStateWithLifecycle()
-                        ?:MutableStateFlow(
-                            if (viewModel.folderIsScripts()) stringResource(R.string.books)
-                            else stringResource(R.string.goals)
-                        ).collectAsStateWithLifecycle()
+                    val folderName = folder?.folderName?.let { remember { it } }
+                        ?: remember {  TextFieldState(
+                            if (viewModel.folderIsScripts()) booksString
+                            else goalsString
+                        )}
 
                     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -260,7 +259,7 @@ class FoldersAndScriptsFragment : Fragment() {
                                     expandedHeight = imageHeight,
                                     title = {
                                         Text(
-                                            folderName,
+                                            folderName.text.toString(),
                                             modifier = Modifier.padding(16.dp),
                                             style = MaterialTheme.typography.titleLarge
                                         )
@@ -714,7 +713,7 @@ class FoldersAndScriptsFragment : Fragment() {
         clickable:Boolean = true
     ) {
         val context = LocalContext.current
-        val folderName by folder.folderName.collectAsStateWithLifecycle()
+        val folderName = remember { folder.folderName }
         var folderUriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
 
         val numFolders by folder.numFolders.collectAsStateWithLifecycle(0)
@@ -767,7 +766,7 @@ class FoldersAndScriptsFragment : Fragment() {
             Box(modifier = Modifier.fillMaxSize()) {
                 Image(
                     bitmap = folderImage,
-                    contentDescription = folderName,
+                    contentDescription = folderName.text.toString(),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -781,7 +780,7 @@ class FoldersAndScriptsFragment : Fragment() {
                         folders = numFolders,
                         goals = numGoals
                     )
-                BottomBar(folderName)
+                BottomBar(folderName.text.toString())
             }
         }
     }
@@ -892,7 +891,7 @@ fun ScriptCard(
     val time by timeStateFlow.collectAsStateWithLifecycle()
     val date by dateStateFlow.collectAsStateWithLifecycle()
 
-    val title by remember { script.scriptTitle }
+    val title = remember { script.scriptTitle }
     val description by contentPreview?.getDescription()?.collectAsStateWithLifecycle("")
         ?:MutableStateFlow(null).collectAsStateWithLifecycle()
     val displayImage by contentPreview?.getDisplayImage()?.collectAsStateWithLifecycle()
@@ -962,7 +961,7 @@ fun ScriptCard(
                 .weight(1f),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = title,
+                Text(text = title.text.toString(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleLarge,

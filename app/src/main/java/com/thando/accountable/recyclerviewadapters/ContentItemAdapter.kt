@@ -14,12 +14,10 @@ import android.widget.EditText
 import androidx.activity.result.ActivityResultLauncher
 import androidx.annotation.OptIn
 import androidx.appcompat.content.res.AppCompatResources
-import androidx.core.net.toFile
-import androidx.documentfile.provider.DocumentFile
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.extractor.mp4.Track
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
@@ -27,7 +25,6 @@ import com.thando.accountable.AccountableRepository
 import com.thando.accountable.AccountableRepository.Companion.accountablePlayer
 import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity.Companion.collectFlow
-import com.thando.accountable.MainActivity.Companion.log
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
@@ -180,7 +177,7 @@ class ContentItemAdapter(
         val outputStringBuilder = StringBuilder()
         scriptContentList.value.forEach { content ->
             if (content.type == ContentType.TEXT){
-                content.content.value.let { outputStringBuilder.append(it) }
+                outputStringBuilder.append(content.content.text.toString())
             }
         }
 
@@ -436,7 +433,7 @@ class ContentItemAdapter(
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
                 item.getText(markupLanguage.value,context)
-                binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.value)
+                binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.text.toString())
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
@@ -484,7 +481,7 @@ class ContentItemAdapter(
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
                 item.getText(markupLanguage.value,context)
-                binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.value)
+                binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.text.toString())
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
@@ -562,7 +559,7 @@ class ContentItemAdapter(
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
                 item.getText(markupLanguage.value,context)
-                binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.value)
+                binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.text.toString())
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
@@ -657,7 +654,7 @@ class ContentItemAdapter(
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
                 item.getText(markupLanguage.value,context)
-                binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.value)
+                binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.text.toString())
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
@@ -718,12 +715,12 @@ class ContentItemAdapter(
                             val bottomString =
                                 text.substring(selectionStart, text.length)
 
-                            item.content.value = topString
+                            item.content.edit { replace(0,length, topString) }
                             val newContent = Content(
                                 type = ContentType.TEXT,
                                 script = script.value!!.scriptId!!,
                                 position = inputIndex.toLong(),
-                                content = MutableStateFlow(bottomString)
+                                content = TextFieldState(bottomString)
                             )
                             scriptContentList.value.add(inputIndex, newContent)
                             newContent.id = repository.dao.insert(newContent)
@@ -739,7 +736,7 @@ class ContentItemAdapter(
                         type = contentType,
                         script = script.value!!.scriptId!!,
                         position = inputIndex.toLong(),
-                        filename = MutableStateFlow(it.lastPathSegment?:"")
+                        filename = TextFieldState(it.lastPathSegment?:"")
                     )
                     scriptContentList.value.add(inputIndex, newContent)
                     newContent.id = repository.dao.insert(newContent)

@@ -43,7 +43,6 @@
                     android:layout_height="wrap_content"
                     android:minHeight="48dp"
                     android:textSize="@{documentItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
-                    android:text="@{task.description}"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.GONE:View.VISIBLE}"
                     android:textColor="@{documentItemViewHolder.teleprompterSettings.textColour??@color/black}"
                     android:textAlignment="center"
@@ -53,7 +52,6 @@
 
                 <EditText
                     android:id="@+id/document_description_editText"
-                    android:text="@={task.description}"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:View.GONE}"
                     android:textSize="@{documentItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
                     android:onFocusChange="@{documentItemViewHolder.editTextListener}"
@@ -82,7 +80,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardCornerRadius="10dp"
-            android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:task.description.length()==0?View.GONE:View.VISIBLE}"
+            android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:task.description.text.length()==0?View.GONE:View.VISIBLE}"
             android:layout_marginHorizontal="6dp"
             android:layout_marginVertical="4dp"
             app:cardElevation="30dp"
@@ -112,7 +110,6 @@
 
                 <EditText
                     android:id="@+id/editText"
-                    android:text="@={task.description}"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:View.GONE}"
                     android:textSize="@{documentItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
                     android:onFocusChange="@{documentItemViewHolder.editTextListener}"

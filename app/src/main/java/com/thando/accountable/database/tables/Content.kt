@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.util.Range
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
@@ -35,16 +36,16 @@ data class Content(
     var position: Long,
 
     @ColumnInfo (name = "content_content")
-    var content: MutableStateFlow<String> = MutableStateFlow(""),
+    var content: TextFieldState = TextFieldState(""),
 
     @ColumnInfo (name = "content_size")
     var size: Float = 0F,
 
     @ColumnInfo (name = "content_file_name")
-    var filename: MutableStateFlow<String> = MutableStateFlow(""),
+    var filename: TextFieldState = TextFieldState(""),
 
     @ColumnInfo (name = "content_description")
-    var description: MutableStateFlow<String> = MutableStateFlow(""),
+    var description: TextFieldState = TextFieldState(""),
 
     @ColumnInfo (name = "content_efficiency")
     var efficiency: MutableStateFlow<Int> = MutableStateFlow(-1)
@@ -82,12 +83,12 @@ data class Content(
 
     @Ignore
     var spannedString: SpannedString = SpannedString(when(type){
-        ContentType.TEXT -> content.value
+        ContentType.TEXT -> content.text.toString()
         ContentType.IMAGE,
         ContentType.SCRIPT,
         ContentType.VIDEO,
         ContentType.DOCUMENT,
-        ContentType.AUDIO -> description.value
+        ContentType.AUDIO -> description.text.toString()
     })
 
     @Ignore
@@ -107,7 +108,7 @@ data class Content(
                 ContentType.IMAGE ,
                 ContentType.VIDEO,
                 ContentType.DOCUMENT,
-                ContentType.AUDIO -> content.value
+                ContentType.AUDIO -> content.text.toString()
             }
         }
         return ""
@@ -116,37 +117,46 @@ data class Content(
     suspend fun saveFile(context: Context, inputUri:Uri?){
         withContext(Dispatchers.Main) {
             when (mediaType) {
-                AppResources.ContentType.IMAGE -> content.value =
-                    withContext(Dispatchers.IO) {imageResource.saveFile(
-                        context,
-                        inputUri,
-                        contentPrefix,
-                        id
-                    )?:""}
+                AppResources.ContentType.IMAGE -> content.edit {
+                    replace(
+                        0, length,
+                        withContext(Dispatchers.IO) {
+                            imageResource.saveFile(
+                                context,
+                                inputUri,
+                                contentPrefix,
+                                id
+                            ) ?: ""
+                        }
+                    )
+                }
 
-                AppResources.ContentType.DOCUMENT -> content.value =
+                AppResources.ContentType.DOCUMENT -> content.edit { replace(0,length,
                     withContext(Dispatchers.IO) {documentResource.saveFile(
                         context,
                         inputUri,
                         contentPrefix,
                         id
                     )?:""}
+                ) }
 
-                AppResources.ContentType.AUDIO -> content.value =
+                AppResources.ContentType.AUDIO -> content.edit { replace(0,length,
                     withContext(Dispatchers.IO) {audioResource.saveFile(
                         context,
                         inputUri,
                         contentPrefix,
                         id
                     )?:""}
+                )}
 
-                AppResources.ContentType.VIDEO -> content.value =
+                AppResources.ContentType.VIDEO -> content.edit { replace(0,length,
                     withContext(Dispatchers.IO) {videoResource.saveFile(
                         context,
                         inputUri,
                         contentPrefix,
                         id
                     )?:""}
+                )}
 
                 null -> {}
             }
@@ -176,12 +186,12 @@ data class Content(
     fun getText(markupLanguage: MarkupLanguage?, context: Context){
         spannedString.setText(
             when(type){
-                ContentType.TEXT -> content.value
+                ContentType.TEXT -> content.text.toString()
                 ContentType.IMAGE,
                 ContentType.SCRIPT,
                 ContentType.VIDEO,
                 ContentType.DOCUMENT,
-                ContentType.AUDIO -> description.value
+                ContentType.AUDIO -> description.text.toString()
             }, context, markupLanguage
         )
     }
@@ -205,12 +215,12 @@ data class Content(
                     // Perform an asynchronous operation
                     replaceAsync = async {
                         var newString = when(type){
-                            ContentType.TEXT -> content.value
+                            ContentType.TEXT -> content.text.toString()
                             ContentType.IMAGE,
                             ContentType.SCRIPT,
                             ContentType.VIDEO,
                             ContentType.DOCUMENT,
-                            ContentType.AUDIO -> description.value
+                            ContentType.AUDIO -> description.text.toString()
                         }
 
                         // Find markup ranges
@@ -225,7 +235,7 @@ data class Content(
                                 if (specialCharacters.canUpdateList() &&
                                     !(
                                             specialCharacters.character.value.isEmpty() ||
-                                                    content.value.isEmpty() ||
+                                                    content.text.isEmpty() ||
                                                     specialCharacters.editingAfterChar.value.isEmpty()
                                             )
                                 ) {
@@ -233,7 +243,7 @@ data class Content(
                                         Pair(
                                             specialCharacters,
                                             findAllOccurrences(
-                                                content.value,
+                                                content.text.toString(),
                                                 specialCharacters.character.value
                                             )
                                         )
@@ -345,8 +355,8 @@ data class Content(
             }
             inputStream?.close()
 
-            if (content.value.isNotEmpty()) content.value += '\n'
-            content.value += inputArray.joinToString("")
+            if (content.text.isNotEmpty()) content.edit { append('\n') }
+            content.edit { append(inputArray.joinToString("")) }
         }
     }
 }

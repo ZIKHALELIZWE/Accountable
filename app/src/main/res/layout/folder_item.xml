@@ -50,7 +50,6 @@
                 android:id="@+id/folderName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@{task.folderName}"
                 android:autoSizeTextType="none"
                 android:gravity="start|center"
                 android:textAlignment="textStart"

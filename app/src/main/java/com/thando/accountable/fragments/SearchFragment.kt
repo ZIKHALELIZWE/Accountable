@@ -43,7 +43,6 @@ import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,6 +74,7 @@ import com.thando.accountable.IntentActivity
 import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
+import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -194,7 +194,7 @@ class SearchFragment : Fragment() {
 
     @Composable
     fun SearchFragmentView(modifier: Modifier = Modifier, menuOpen: Boolean){
-        var searchString by remember { viewModel.searchString }
+        val searchString = remember { viewModel.searchString }
         val matchCaseCheck by remember { viewModel.matchCaseCheck }
         val wordCheck by remember { viewModel.wordCheck }
         val searchJob by viewModel.searchJob.collectAsStateWithLifecycle()
@@ -212,7 +212,7 @@ class SearchFragment : Fragment() {
         val bringIntoViewRequester = remember { BringIntoViewRequester() }
         val scope = rememberCoroutineScope()
 
-        LaunchedEffect(searchString, matchCaseCheck, wordCheck) {
+        LaunchedEffect(searchString.selection, matchCaseCheck, wordCheck) {
             viewModel.search {
                 if (initialized){
                     if (viewModel.searchScrollPosition.firstVisibleItemIndex!=0 ||
@@ -232,9 +232,8 @@ class SearchFragment : Fragment() {
 
         Column(modifier = modifier.fillMaxWidth()) {
             if (menuOpen) {
-                TextField(
-                    value = searchString,
-                    onValueChange = { searchString = it },
+                TextFieldAccountable(
+                    state = searchString,
                     modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoViewRequester)
                         .onFocusEvent { focusState ->
                             if (focusState.isFocused) {
@@ -273,7 +272,7 @@ class SearchFragment : Fragment() {
             }
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                 var stringHeightPx by remember { mutableIntStateOf(0) }
-                if (searchString.isNotEmpty()){
+                if (searchString.text.isNotEmpty()){
                     Text(
                         textAlign = TextAlign.End,
                         modifier = Modifier.weight(1f)

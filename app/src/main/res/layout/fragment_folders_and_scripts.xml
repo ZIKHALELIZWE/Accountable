@@ -34,7 +34,7 @@
                 android:id="@+id/collapsingToolbar"
                 android:layout_width="match_parent"
                 android:layout_height="300dp"
-                app:title="@{viewModel.folder.folderName?? viewModel.folderIsScripts()?@string/books:@string/goals}"
+                app:title="@{viewModel.folder.folderName.text?? viewModel.folderIsScripts()?@string/books:@string/goals}"
                 app:layout_scrollFlags="scroll|exitUntilCollapsed">
 
                 <ImageView

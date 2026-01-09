@@ -115,8 +115,8 @@ class TeleprompterFragment : Fragment() {
         }
 
         collectFlow(this,viewModel.script){ script ->
-            script?.scriptTitle?.value?.let { title ->
-                viewModel.setScriptTitleEdited(title)
+            script?.scriptTitle?.let { title ->
+                viewModel.setScriptTitleEdited(title.text.toString())
             }
         }
 

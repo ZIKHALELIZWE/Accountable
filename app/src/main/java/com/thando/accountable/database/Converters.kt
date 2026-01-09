@@ -2,6 +2,7 @@ package com.thando.accountable.database
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -92,6 +93,16 @@ class Converters {
     @TypeConverter
     fun fromStateString(string: String): MutableState<String> {
         return mutableStateOf(string)
+    }
+
+    @TypeConverter
+    fun toTextFieldState(textFieldState: TextFieldState): String {
+        return textFieldState.text.toString()
+    }
+
+    @TypeConverter
+    fun fromTextFieldState(string: String): TextFieldState {
+        return TextFieldState(string)
     }
 
     @TypeConverter
@@ -210,6 +221,26 @@ class Converters {
         else StringBuilder(pair.first.value)
             .append(MarkupLanguage.VALUE_OPENING)
             .append(pair.second.value)
+            .append(MarkupLanguage.VALUE_CLOSING)
+            .toString()
+    }
+
+    @TypeConverter
+    fun toStateTextPairs(string: String): Pair<TextFieldState,TextFieldState> {
+        val index = string.indexOf(MarkupLanguage.VALUE_OPENING)
+        return if (index==-1) {
+            Pair(TextFieldState(string), TextFieldState(""))
+        } else{
+            Pair(TextFieldState(string.substring(0, index)),TextFieldState(string.substring(index + 2, string.length - 1)))
+        }
+    }
+
+    @TypeConverter
+    fun fromStateTextPairs(pair: Pair<TextFieldState,TextFieldState>): String {
+        return if (pair.second.text.isEmpty()) pair.first.text.toString()
+        else StringBuilder(pair.first.text.toString())
+            .append(MarkupLanguage.VALUE_OPENING)
+            .append(pair.second.text.toString())
             .append(MarkupLanguage.VALUE_CLOSING)
             .toString()
     }

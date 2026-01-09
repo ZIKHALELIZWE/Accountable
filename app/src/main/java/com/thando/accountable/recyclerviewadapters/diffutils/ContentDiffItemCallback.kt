@@ -11,7 +11,7 @@ class ContentDiffItemCallback: DiffUtil.ItemCallback<Content>() {
                 oldItem.type == newItem.type &&
                 oldItem.position == newItem.position &&
                 oldItem.content == newItem.content &&
-                oldItem.content.value == newItem.content.value
+                oldItem.content.text.toString() == newItem.content.text.toString()
         )
     }
 

@@ -36,6 +36,8 @@ import android.util.Range
 import android.view.MenuItem
 import android.view.View
 import android.widget.PopupMenu
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.ui.text.AnnotatedString
 import androidx.core.text.set
 import androidx.room.ColumnInfo
@@ -60,85 +62,85 @@ data class MarkupLanguage(
     var name: MutableStateFlow<String> = MutableStateFlow(MainActivity.ResourceProvider.getString(R.string.new_markup_language)),
 
     @ColumnInfo(name = "opening")
-    var opening: MutableStateFlow<String> = MutableStateFlow(""),
+    var opening: TextFieldState = TextFieldState(""),
 
     @ColumnInfo(name = "closing")
-    var closing: MutableStateFlow<String> = MutableStateFlow(""),
+    var closing: TextFieldState = TextFieldState(""),
 
     @ColumnInfo(name = "relative_size")
-    var relativeSize: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var relativeSize: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "absolute_size")
-    var absoluteSize: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var absoluteSize: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "scale_x")
-    var scaleX: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var scaleX: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "bold")
-    var bold: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var bold: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "italic")
-    var italic: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var italic: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "underline")
-    var underline: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var underline: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "strikethrough")
-    var strikethrough: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var strikethrough: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "superscript")
-    var superscript: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var superscript: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "subscript")
-    var subscript: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var subscript: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "colour_text")
-    var colourText: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var colourText: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "highlight")
-    var highlight: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var highlight: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "url")
-    var url: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var url: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "clickable")
-    var clickable: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var clickable: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "dynamic_drawable")
-    var dynamicDrawable: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var dynamicDrawable: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "image")
-    var image: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var image: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "alignment")
-    var alignment: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var alignment: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "quote")
-    var quote: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var quote: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "bullet_point")
-    var bulletPoint: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var bulletPoint: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "bullet_point_colour")
-    var bulletPointColour: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var bulletPointColour: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "line_height")
-    var lineHeight: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var lineHeight: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "drawable_margin")
-    var drawableMargin: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var drawableMargin: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "icon_margin")
-    var iconMargin: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var iconMargin: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "leading_margin")
-    var leadingMargin: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var leadingMargin: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "tab_stop")
-    var tabStop: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow("")),
+    var tabStop: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState("")),
 
     @ColumnInfo(name = "line_background")
-    var lineBackground: Pair<MutableStateFlow<String>,MutableStateFlow<String>> = Pair(MutableStateFlow(""),MutableStateFlow(""))
+    var lineBackground: Pair<TextFieldState,TextFieldState> = Pair(TextFieldState(""),TextFieldState(""))
 )
 {
     companion object{
@@ -180,15 +182,15 @@ data class MarkupLanguage(
             }
         }
 
-        fun getFloat(inputFloat: MutableStateFlow<String>): Float? {
-            return inputFloat.value.toFloatOrNull()
+        fun getFloat(inputFloat: TextFieldState): Float? {
+            return inputFloat.text.toString().toFloatOrNull()
         }
 
-        fun getInt(inputInt: MutableStateFlow<String>): Int? {
-            return inputInt.value.toIntOrNull()
+        fun getInt(inputInt: TextFieldState): Int? {
+            return inputInt.text.toString().toIntOrNull()
         }
 
-        fun getColour(inputColour: MutableStateFlow<String>): Color? {
+        fun getColour(inputColour: TextFieldState): Color? {
             val colourInt = getInt(inputColour) ?: return null
             return Color.valueOf(colourInt)
         }
@@ -247,9 +249,9 @@ data class MarkupLanguage(
         val spanName: String,
         val isParagraph: Boolean,
         val spanType: TagType,
-        var spanCharValue: Pair<MutableStateFlow<String>,MutableStateFlow<String>>,
-        var openingChar:MutableStateFlow<String>,
-        var closingChar:MutableStateFlow<String>,
+        var spanCharValue: Pair<TextFieldState, TextFieldState>,
+        var openingChar: TextFieldState,
+        var closingChar:TextFieldState,
         var function: KFunction2<SpannableStringBuilder, IntRange, SpannableStringBuilder>? = null,
         var functionInt: KFunction3<SpannableStringBuilder, Int, IntRange, SpannableStringBuilder>? = null,
         var functionFloat: KFunction3<SpannableStringBuilder, Float, IntRange, SpannableStringBuilder>? = null,
@@ -287,24 +289,24 @@ data class MarkupLanguage(
                     && functionClickable!=null
                     && functionString!=null) throw IllegalArgumentException("Too many functions passed")
             }
-            if (spanCharValue.first.value.isEmpty().not()) {
-                openingTag = openingChar.value + spanCharValue.first.value
+            if (spanCharValue.first.text.isEmpty().not()) {
+                openingTag = openingChar.text.toString() + spanCharValue.first.text.toString()
                 if (spanType != TagType.FUNCTION) {
                     openingTag += VALUE_OPENING
-                    valueClosing = VALUE_CLOSING + closingChar.value
-                } else openingTag += closingChar.value
-                closingTag = openingChar.value + CLOSING_INDICATOR + spanCharValue.first.value + closingChar.value
+                    valueClosing = VALUE_CLOSING + closingChar.text.toString()
+                } else openingTag += closingChar.text.toString()
+                closingTag = openingChar.text.toString() + CLOSING_INDICATOR + spanCharValue.first.text.toString() + closingChar.text.toString()
             }
             hasValue = function==null
-            if (spanType == TagType.FUNCTION_IMAGE_URI && spanCharValue.second.value.isEmpty()) spanCharValue.second.value = "app_picture"
-            else if (spanType == TagType.FUNCTION_COLOUR && spanCharValue.second.value.isEmpty()) spanCharValue.second.value = Color.YELLOW.toString()
-            else if (spanType == TagType.FUNCTION_STRING && spanCharValue.second.value.isEmpty()) spanCharValue.second.value = "ALIGN_NORMAL"
+            if (spanType == TagType.FUNCTION_IMAGE_URI && spanCharValue.second.text.isEmpty()) spanCharValue.second.setTextAndPlaceCursorAtEnd("app_picture")
+            else if (spanType == TagType.FUNCTION_COLOUR && spanCharValue.second.text.isEmpty()) spanCharValue.second.setTextAndPlaceCursorAtEnd(Color.YELLOW.toString())
+            else if (spanType == TagType.FUNCTION_STRING && spanCharValue.second.text.isEmpty()) spanCharValue.second.setTextAndPlaceCursorAtEnd("ALIGN_NORMAL")
         }
 
         fun spanIsValid():Boolean{
-            return spanCharValue.first.value.isEmpty().not() &&
-                    openingChar.value.isEmpty().not() &&
-                    closingChar.value.isEmpty().not()
+            return spanCharValue.first.text.isEmpty().not() &&
+                    openingChar.text.isEmpty().not() &&
+                    closingChar.text.isEmpty().not()
         }
 
         fun setOpeningRange(range: Range<Int>){
@@ -477,7 +479,7 @@ data class MarkupLanguage(
                         return functionImageUri!!(
                             spannableStringBuilder,
                             context,
-                            AppResources.ImageResource(spanCharValue.second.value).getAbsoluteUri(
+                            AppResources.ImageResource(spanCharValue.second.text.toString()).getAbsoluteUri(
                                 context
                             ),
                             contentRange!!
@@ -485,7 +487,7 @@ data class MarkupLanguage(
                     }
                     TagType.FUNCTION_URL -> return functionUrl!!(
                         spannableStringBuilder,
-                        spanCharValue.second.value,
+                        spanCharValue.second.text.toString(),
                         contentRange!!
                     )
 
@@ -497,7 +499,7 @@ data class MarkupLanguage(
 
                     TagType.FUNCTION_STRING -> return functionString!!(
                         spannableStringBuilder,
-                        spanCharValue.second.value,
+                        spanCharValue.second.text.toString(),
                         contentRange!!
                     )
                 }

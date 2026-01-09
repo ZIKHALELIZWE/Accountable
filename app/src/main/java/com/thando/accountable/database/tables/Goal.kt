@@ -3,6 +3,7 @@ package com.thando.accountable.database.tables
 import android.content.Context
 import android.net.Uri
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -71,7 +72,7 @@ data class Goal(
     val colour: MutableState<Int> = mutableIntStateOf(-1),
 
     @ColumnInfo (name = "goal_location")
-    val location: MutableState<String> = mutableStateOf("")
+    val location: TextFieldState = TextFieldState("")
 
 ) {
     companion object {

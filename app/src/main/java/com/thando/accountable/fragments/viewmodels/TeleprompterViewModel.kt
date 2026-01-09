@@ -190,7 +190,7 @@ class TeleprompterViewModel(
 
     fun emitUpdateContentAdapterSpecialCharacters(){
         viewModelScope.launch {
-            script.value?.scriptTitle?.value?.let { setScriptTitleEdited(it,specialCharactersList.value) }
+            script.value?.scriptTitle?.let { setScriptTitleEdited(it.text.toString(),specialCharactersList.value) }
             _updateContentAdapterSpecialCharacters.emit(specialCharactersList.value)
         }
     }

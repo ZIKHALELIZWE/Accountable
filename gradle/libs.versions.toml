@@ -36,6 +36,7 @@ junitJupiter = "5.8.1"
 appcompat = "1.7.1"
 constraintlayout = "2.2.1"
 coreTestingVersion = "2.2.0"
+foundation = "1.10.0"
 
 [libraries]
 accompanist-systemuicontroller = { module = "com.google.accompanist:accompanist-systemuicontroller", version.ref = "accompanistSystemuicontroller" }
@@ -84,6 +85,7 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 robolectric = { module = "org.robolectric:robolectric", version = "4.14.1" }
 core-testing = { module = "androidx.arch.core:core-testing", version.ref = "coreTestingVersion" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

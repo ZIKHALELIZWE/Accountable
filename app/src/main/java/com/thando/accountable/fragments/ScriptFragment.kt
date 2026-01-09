@@ -106,6 +106,7 @@ import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.ScriptViewModel
 import com.thando.accountable.ui.cards.GetContentCard
+import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.management.states.toolbar.FixedScrollFlagState
 import com.thando.accountable.ui.management.states.toolbar.ToolbarState
 import com.thando.accountable.ui.screens.CollapsedPadding
@@ -982,15 +983,13 @@ class ScriptFragment : Fragment() {
     ) {
         val isEditingScript by viewModel.isEditingScript.collectAsStateWithLifecycle()
 
-        var scriptTitle by remember { script.scriptTitle }
+        val scriptTitle = remember { script.scriptTitle }
         val scriptTime by script.scriptDateTime.getTimeStateFlow(LocalContext.current).collectAsStateWithLifecycle()
         val scriptDayNum by script.scriptDateTime.getDayNumStateFlow(LocalContext.current).collectAsStateWithLifecycle()
         val scriptDayWord by script.scriptDateTime.getDayWordStateFlow(LocalContext.current).collectAsStateWithLifecycle()
         val scriptMonthYear by script.scriptDateTime.getMonthYearStateFlow(LocalContext.current).collectAsStateWithLifecycle()
 
         val scriptContentList = remember { viewModel.scriptContentList }
-        val bringIntoViewRequester = remember { BringIntoViewRequester() }
-        val scope = rememberCoroutineScope()
         LazyColumn(
             state = listState,
             contentPadding = contentPadding,
@@ -1044,17 +1043,9 @@ class ScriptFragment : Fragment() {
                             }
                         }
                         if (isEditingScript) {
-                            TextField(
-                                value = scriptTitle,
-                                onValueChange = { newTitle -> scriptTitle = newTitle },
-                                modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
-                                    .onFocusEvent { focusState ->
-                                        if (focusState.isFocused) {
-                                            scope.launch {
-                                                bringIntoViewRequester.bringIntoView()
-                                            }
-                                        }
-                                    }
+                            TextFieldAccountable(
+                                state = scriptTitle,
+                                modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 15.dp, horizontal = 5.dp),
                                 textStyle = TextStyle(
@@ -1080,7 +1071,7 @@ class ScriptFragment : Fragment() {
                             )
                         } else {
                             Text(
-                                text = scriptTitle,
+                                text = scriptTitle.text.toString(),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 15.dp, horizontal = 5.dp),

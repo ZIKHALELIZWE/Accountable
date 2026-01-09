@@ -244,4 +244,5 @@
     <string name="add_content">Add Content</string>
     <string name="search_navigate_back_button">Search Navigate Back Button</string>
     <string name="open_search_input_view">Open Search Input View</string>
+    <string name="navigate_back_to_script_fragment_button">Navigate back to script fragment button.</string>
 </resources>

@@ -212,40 +212,40 @@ interface RepositoryDao {
             }
 
             Content.ContentType.IMAGE -> {
-                if (content.content.value.isNotEmpty()) {
-                    val image = AppResources.ImageResource(content.content.value)
+                if (content.content.text.isNotEmpty()) {
+                    val image = AppResources.ImageResource(content.content.text.toString())
                     image.deleteFile(context)
                 }
                 delete(content)
             }
 
             Content.ContentType.AUDIO -> {
-                if (content.content.value.isNotEmpty()) {
-                    val audio = AppResources.AudioResource(content.content.value)
+                if (content.content.text.isNotEmpty()) {
+                    val audio = AppResources.AudioResource(content.content.text.toString())
                     audio.deleteFile(context)
                 }
                 delete(content)
             }
 
             Content.ContentType.VIDEO -> {
-                if (content.content.value.isNotEmpty()) {
-                    val video = AppResources.VideoResource(content.content.value)
+                if (content.content.text.isNotEmpty()) {
+                    val video = AppResources.VideoResource(content.content.text.toString())
                     video.deleteFile(context)
                 }
                 delete(content)
             }
 
             Content.ContentType.DOCUMENT -> {
-                if (content.content.value.isNotEmpty()) {
-                    val document = AppResources.DocumentResource(content.content.value)
+                if (content.content.text.isNotEmpty()) {
+                    val document = AppResources.DocumentResource(content.content.text.toString())
                     document.deleteFile(context)
                 }
                 delete(content)
             }
 
             Content.ContentType.SCRIPT -> {
-                if (content.content.value.isNotEmpty()) {
-                    deleteScript(content.content.value.toLongOrNull(),context)
+                if (content.content.text.isNotEmpty()) {
+                    deleteScript(content.content.text.toString().toLongOrNull(),context)
                 }
                 delete(content)
             }
@@ -426,7 +426,7 @@ interface RepositoryDao {
                 searchString,
                 matchCaseCheck,
                 wordCheck,
-                script.scriptTitle.value
+                script.scriptTitle.text.toString()
             )
             var hasContent = false
             if (list.isNotEmpty()) {
@@ -499,10 +499,10 @@ interface RepositoryDao {
                         deferredList.add(Pair(
                             CoroutineScope(coroutineContext).async{
                                 val list: MutableList<IntRange>? = searchForStringInString(
-                                    searchString, content.content.value, matchCaseCheck, wordCheck
+                                    searchString, content.content.text.toString(), matchCaseCheck, wordCheck
                                 )
                                 if (list.isNullOrEmpty()) null
-                                else Triple(content.content.value, list, content)
+                                else Triple(content.content.text.toString(), list, content)
                             },
                             null
                         ))
@@ -514,17 +514,17 @@ interface RepositoryDao {
                         deferredList.add(Pair(
                             CoroutineScope(coroutineContext).async{
                                 val list: MutableList<IntRange>? = searchForStringInString(
-                                    searchString, content.description.value, matchCaseCheck, wordCheck
+                                    searchString, content.description.text.toString(), matchCaseCheck, wordCheck
                                 )
                                 if (list.isNullOrEmpty()) null
-                                else Triple(content.description.value, list, content)
+                                else Triple(content.description.text.toString(), list, content)
                             },
                             null
                         ))
                     }
 
                     Content.ContentType.SCRIPT -> {
-                        content.content.value.toLongOrNull()?.let {
+                        content.content.text.toString().toLongOrNull()?.let {
                             deferredList.add(Pair(
                                 null,
                                 CoroutineScope(coroutineContext).async{

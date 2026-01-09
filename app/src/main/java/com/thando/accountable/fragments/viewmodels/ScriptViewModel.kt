@@ -102,7 +102,7 @@ class ScriptViewModel(
                 "$time $date")
             }
             menuAddTimeStampTitle.value = title
-            val stringBuilder = StringBuilder(if(content.type != ContentType.TEXT) content.description.value else content.content.value)
+            val stringBuilder = StringBuilder(if(content.type != ContentType.TEXT) content.description.text.toString() else content.content.text.toString())
             stringBuilder.insert(index, stampString)
             updateTextFieldValue(stringBuilder.toString(),index+stampString.length)
         }
@@ -112,12 +112,12 @@ class ScriptViewModel(
         return withContext(Dispatchers.IO) {
             val intent = Intent()
 
-            if (script.value?.scriptTitle?.value != null
-                && script.value?.scriptTitle?.value.isNullOrEmpty()
+            if (script.value?.scriptTitle != null
+                && script.value?.scriptTitle?.text.isNullOrEmpty()
             ) {
                 intent.putExtra(
                     Intent.EXTRA_SUBJECT,
-                    script.value!!.scriptTitle.value
+                    script.value!!.scriptTitle.text.toString()
                 )
             }
 
@@ -187,23 +187,23 @@ class ScriptViewModel(
         return withContext(Dispatchers.IO) {
             var hasContent = false
             var sharedText =
-                if (script.value?.scriptTitle?.value != null && !script.value?.scriptTitle?.value.isNullOrEmpty()) {
+                if (script.value?.scriptTitle != null && !script.value?.scriptTitle?.text.isNullOrEmpty()) {
                     hasContent = true
                     "${
                         script.value!!.scriptDateTime.getTimeStateFlow(context).value
                     }\n${
                         script.value!!.scriptDateTime.getFullDateStateFlow(context).value
                     }\n\n*${
-                        script.value!!.scriptTitle.value
+                        script.value!!.scriptTitle.text
                     }*"
                 } else ""
 
             val imageUris = arrayListOf<Uri>()
             scriptContentList.forEach {
                 if (it.type == ContentType.TEXT) {
-                    if (it.content.value.isNotEmpty()) {
+                    if (it.content.text.isNotEmpty()) {
                         sharedText =
-                            (if (sharedText.isNotEmpty()) "$sharedText\n\n" else "") + it.content.value
+                            (if (sharedText.isNotEmpty()) "$sharedText\n\n" else "") + it.content.text.toString()
                         hasContent = true
                     }
                 } else if (it.type == ContentType.IMAGE) {

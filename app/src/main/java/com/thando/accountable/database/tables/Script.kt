@@ -3,6 +3,7 @@ package com.thando.accountable.database.tables
 import android.content.Context
 import android.net.Uri
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.room.ColumnInfo
@@ -28,7 +29,7 @@ data class Script (
     var scriptDateTime: AppResources.CalendarResource,
 
     @ColumnInfo (name = "script_title")
-    var scriptTitle: MutableState<String> = mutableStateOf(""),
+    var scriptTitle: TextFieldState = TextFieldState(""),
 
     @ColumnInfo (name = "script_picture")
     var scriptPicture: String? = null,

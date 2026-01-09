@@ -1,14 +1,21 @@
 package com.thando.accountable.fragments.viewmodels
 
 import android.content.Context
+import android.text.method.LinkMovementMethod
 import android.view.View
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.core.text.toSpanned
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
@@ -17,14 +24,15 @@ import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.SpannedString
 import com.thando.accountable.database.tables.MarkupLanguage
-import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter
 import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Companion.EXAMPLE_SPAN
 import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Companion.EXAMPLE_TEXT
+import com.thando.accountable.ui.cards.MarkupLanguageCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -40,6 +48,7 @@ class MarkupLanguageViewModel(
     val markupLanguagesList = repository.getMarkupLanguagesList()
 
     // Information Set To Views
+    val cardsList: SnapshotStateList<MarkupLanguageCard> = mutableStateListOf()
     val openingClosingExampleSpannedString = SpannedString("")
 
     private var changeNameFunction: ()->Unit = {}
@@ -48,40 +57,53 @@ class MarkupLanguageViewModel(
     private var deleteButtonFunction: ()->Unit = {}
     private val _showNameNotUniqueSnackBar = MutableSharedFlow<String>()
     val showNameNotUniqueSnackBar: SharedFlow<String> get() = _showNameNotUniqueSnackBar
-    private val _notifySpinnerDataChanged = MutableSharedFlow<Unit>()
-    val notifySpinnerDataChanged: SharedFlow<Unit> get() = _notifySpinnerDataChanged
 
     // Click Events
     private val _navigateToScript = MutableSharedFlow<Boolean>()
     val navigateToScript: SharedFlow<Boolean> get() = _navigateToScript
 
     // View States
-    private var scrollPosition = 0
     val selectedIndex = repository.getMarkupLanguageSelectedIndex()
-    var isShow = MutableStateFlow(true)
-    var scrollRange = MutableStateFlow(-1)
-    var addition = MutableStateFlow(0)
+    val menuOpen = MutableStateFlow(true)
+    var lazyListState = LazyListState()
+
+    fun toggleMenuOpen(){
+        menuOpen.update { menuOpen.value.not() }
+    }
+
+    fun spansNotSimilar(markupLanguage: MarkupLanguage?): List<String> {
+        val similarList = ArrayList<String>()
+        for ((index,card) in cardsList.withIndex()){
+            if (card.tag.spanCharValue.first.text.isEmpty()) continue
+            if (card.tag.spanCharValue.first.text.toString() == markupLanguage?.opening?.text.toString()) if (!similarList.contains("Opening")){
+                similarList.add("Opening")
+                if (!similarList.contains(card.tag.spanName)) similarList.add(card.tag.spanName)
+            }
+            if (card.tag.spanCharValue.first.text.toString() == markupLanguage?.closing?.text.toString()) if (!similarList.contains("Closing")){
+                similarList.add("Closing")
+                if (!similarList.contains(card.tag.spanName)) similarList.add(card.tag.spanName)
+            }
+            if (index == cardsList.size-1) continue
+            cardsList.forEachIndexed { innerIndex, innerCard ->
+                if (innerIndex>index && spanCharSimilar(card,innerCard)) {
+                    if (!similarList.contains(card.tag.spanName)) similarList.add(card.tag.spanName)
+                    if (!similarList.contains(innerCard.tag.spanName)) similarList.add(innerCard.tag.spanName)
+                }
+            }
+        }
+        return similarList
+    }
+
+    private fun spanCharSimilar(originalCard:MarkupLanguageCard, checkCard:MarkupLanguageCard):Boolean{
+        val original = originalCard.tag
+        val check = checkCard.tag
+        return original.spanName!=check.spanName && original.spanCharValue.first.text.isNotEmpty() && check.spanCharValue.first.text.isNotEmpty() && original.spanCharValue.first.text.toString() == check.spanCharValue.first.text.toString()
+    }
 
     fun getVisibility(opening:String?,closing:String?): Int{
         return if (opening.isNullOrEmpty() || closing.isNullOrEmpty())
             View.GONE
         else View.VISIBLE
-    }
-
-    fun getToolbarVisibility(addition: Int):Int{
-        return if (addition == 0) {
-            View.VISIBLE
-        } else{
-            View.GONE
-        }
-    }
-
-    fun getToolbarTitle(addition: Int, context: Context):String{
-        return if (addition == 0) {
-            context.getString(R.string.markup_language)
-        } else{
-            " "
-        }
     }
 
     fun setMarkupLanguageFunctions(
@@ -95,7 +117,7 @@ class MarkupLanguageViewModel(
                 context.getString(R.string.enter_markup_language_name)
             ) { name ->
                 var nameUnique = true
-                for ((i, mLanguage) in markupLanguagesList.value.withIndex()) {
+                for ((i, mLanguage) in markupLanguagesList.withIndex()) {
                     if (i != index && mLanguage.name.value == name) {
                         nameUnique = false
                         viewModelScope.launch {
@@ -105,14 +127,11 @@ class MarkupLanguageViewModel(
                 }
                 if (nameUnique) {
                     markupLanguage.name.value = name
-                    viewModelScope.launch {
-                        _notifySpinnerDataChanged.emit(Unit)
-                    }
                 }
             }
         }
 
-        if (markupLanguage == markupLanguagesList.value.last()) {
+        if (markupLanguage == markupLanguagesList.last()) {
             _deleteButtonText.value = context.getString(R.string.no_setting)
             deleteButtonFunction = {
                 // Close
@@ -140,31 +159,46 @@ class MarkupLanguageViewModel(
         repository.getMarkupLanguages()
     }
 
-    fun loadMarkupLanguage(index: Int,similarList: List<String>){
-        if (index<0 || markupLanguagesList.value.isEmpty()) return
+    fun loadMarkupLanguage(index: Int, markupLanguage: MarkupLanguage?){
+        val similarList = spansNotSimilar(markupLanguage)
+        if (index<0 || markupLanguagesList.isEmpty()) return
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 repository.saveMarkupLanguage(similarList){
-                    repository.setRepositoryMarkupLanguage(markupLanguagesList.value[index])
+                    repository.setRepositoryMarkupLanguage(markupLanguagesList[index])
                     repository.setMarkupLanguageToScript(true)
                 }
             }
         }
     }
 
-    fun setSelectedIndex(selection:Int,similarList:List<String>? = null){
-        if (similarList!=null && selection == selectedIndex.value){
-            loadMarkupLanguage(selection, similarList)
+    fun setSelectedIndex(selection:Int,markupLanguage: MarkupLanguage?, checkSimilarList: Boolean){
+        if (checkSimilarList && selection == selectedIndex.value){
+            loadMarkupLanguage(selection, markupLanguage)
         }
         else repository.setMarkupLanguageSelectedIndex(selection)
     }
 
-    fun setScrollPosition(inputScrollPosition:Int){
-        scrollPosition = inputScrollPosition
+    fun setMarkupLanguage(markupLanguage: MarkupLanguage){
+        val newList = markupLanguage.getCards()
+        cardsList.clear()
+        cardsList.addAll(newList)
+        updateStates()
     }
 
-    fun getScrollPosition(): Int{
-        return scrollPosition
+    fun updateStates(){
+        val charList = arrayListOf<Pair<String,String>>()
+        cardsList.forEach { specialCharacter -> specialCharacter.tag.spanCharValue.first.text.toString().let { charList.add(Pair(specialCharacter.tag.spanName,it)) } }
+        charList.forEachIndexed { index, pair ->
+            if (pair.second.isEmpty())  cardsList[index].setDuplicateIndexes(listOf())
+            else{
+                cardsList[index].setDuplicateIndexes(
+                    charList.mapIndexed { i, string -> i to string }
+                        .filter { it.second.second == pair.second }
+                        .map { it.second.first }
+                )
+            }
+        }
     }
 
     fun navigateToScript(save: Boolean){
@@ -181,12 +215,13 @@ class MarkupLanguageViewModel(
         deleteButtonFunction.invoke()
     }
 
-    fun closeMarkupLanguageFragment(save:Boolean,similarList: List<String>, context: Context){
-        if (save){
+    fun closeMarkupLanguageFragment(save:Boolean, markupLanguage: MarkupLanguage?, context: Context){
+        val similarList = spansNotSimilar(markupLanguage)
+        if (similarList.isNotEmpty() && save){
             repository.spansNotSimilarAndNameUnique(similarList) { isValid, innerSimilarList, nameUniqueErrorMessage ->
                 if (isValid) {
                     viewModelScope.launch {
-                        if (markupLanguage.value != defaultMarkupLanguage.value){
+                        if (markupLanguage != defaultMarkupLanguage.value){
                             repository.deleteDefaultMarkupLanguage()
                         }
                         repository.saveMarkupLanguage(innerSimilarList){
@@ -203,7 +238,7 @@ class MarkupLanguageViewModel(
 
                     }) {
                         // Close
-                        closeMarkupLanguageFragment(false,similarList,context)
+                        closeMarkupLanguageFragment(false, markupLanguage, context)
                     }
                 }
             }
@@ -219,23 +254,23 @@ class MarkupLanguageViewModel(
         }
     }
 
-    fun setOpeningClosingExample(context: Context, cardAdapter: MarkupLanguageCardAdapter){
+    fun setOpeningClosingExample(context: Context){
         markupLanguage.value?.let { markupLanguage ->
-            val openingIsNotEmpty = markupLanguage.opening.value.isNotEmpty()
-            val closingIsNotEmpty = markupLanguage.closing.value.isNotEmpty()
+            val openingIsNotEmpty = markupLanguage.opening.text.isNotEmpty()
+            val closingIsNotEmpty = markupLanguage.closing.text.isNotEmpty()
             val stringBuilder = StringBuilder("")
             val spanRange = IntRange(8,15)
-            getProcessedExampleString(stringBuilder, markupLanguage.opening.value,
-                markupLanguage.closing.value,openingIsNotEmpty,
+            getProcessedExampleString(stringBuilder, markupLanguage.opening.text.toString(),
+                markupLanguage.closing.text.toString(),openingIsNotEmpty,
                 closingIsNotEmpty,false,spanRange)
             stringBuilder.append('\n')
-            getProcessedExampleString(stringBuilder, markupLanguage.opening.value,
-                markupLanguage.closing.value,openingIsNotEmpty,
+            getProcessedExampleString(stringBuilder, markupLanguage.opening.text.toString(),
+                markupLanguage.closing.text.toString(),openingIsNotEmpty,
                 closingIsNotEmpty,true,spanRange)
             openingClosingExampleSpannedString.setText(stringBuilder.toString(), context)
 
             if (openingIsNotEmpty && closingIsNotEmpty) {
-                val spanAddition = EXAMPLE_TEXT.length + 1 + markupLanguage.opening.value.length * 2 + EXAMPLE_SPAN.length * 2 + markupLanguage.closing.value.length * 2 + MarkupLanguage.CLOSING_INDICATOR.length
+                val spanAddition = EXAMPLE_TEXT.length + 1 + markupLanguage.opening.text.length * 2 + EXAMPLE_SPAN.length * 2 + markupLanguage.closing.text.length * 2 + MarkupLanguage.CLOSING_INDICATOR.length
                 openingClosingExampleSpannedString.spannableStringBuilder.value = markupLanguage.boldSpan(
                     openingClosingExampleSpannedString.spannableStringBuilder.value,
                     IntRange(
@@ -250,8 +285,14 @@ class MarkupLanguageViewModel(
                         spanAddition + spanRange.last
                     )
                 )
-                cardAdapter.spanCharChanged()
+                spanCharChanged()
             }
+        }
+    }
+
+    fun spanCharChanged(){
+        cardsList.forEach {
+            it.tag.spanCharValue.first.setTextAndPlaceCursorAtEnd(it.tag.spanCharValue.first.text.toString())
         }
     }
 
@@ -264,7 +305,7 @@ class MarkupLanguageViewModel(
         isSpan:Boolean,
         spanRange:IntRange
     ){
-        stringBuilder.append(EXAMPLE_TEXT.substring(0,spanRange.first))
+        stringBuilder.append(EXAMPLE_TEXT.take(spanRange.first))
         if (if (isSpan) openingIsNotEmpty && !closingIsNotEmpty else openingIsNotEmpty) {
             stringBuilder.append(opening).append(EXAMPLE_SPAN)
         }

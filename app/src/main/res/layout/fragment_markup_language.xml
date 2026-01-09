@@ -28,7 +28,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:contentScrim="@color/white"
-                app:title="@{viewModel.getToolbarTitle(viewModel.addition,context)}"
+                app:title="@string/markup_language"
                 app:layout_scrollFlags="scroll|exitUntilCollapsed"
                 app:toolbarId="@id/markupLanguageToolbar"
                 app:collapsedTitleGravity="center">
@@ -112,7 +112,6 @@
                         android:maxLength="10"
                         android:minWidth="60dp"
                         android:minHeight="48dp"
-                        android:text="@={viewModel.markupLanguage.opening}"
                         android:textColor="@color/black"
                         android:textSize="26sp"
                         app:layout_constraintEnd_toStartOf="@+id/closing_character_textview"
@@ -144,7 +143,6 @@
                         android:maxLength="10"
                         android:minWidth="60dp"
                         android:minHeight="48dp"
-                        android:text="@={viewModel.markupLanguage.closing}"
                         android:textColor="@color/black"
                         android:textSize="26sp"
                         app:layout_constraintEnd_toEndOf="parent"
@@ -157,14 +155,12 @@
                         android:id="@+id/opening_closing_barrier"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:visibility="@{viewModel.getVisibility(viewModel.markupLanguage.opening,viewModel.markupLanguage.closing)}"
                         app:barrierDirection="bottom"
                         app:constraint_referenced_ids="opening_character_textview,opening_character_edit_view,closing_character_textview,closing_character_edit_view" />
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
                 <androidx.appcompat.widget.Toolbar
                     android:id="@+id/markupLanguageToolbar"
-                    android:visibility="@{viewModel.getToolbarVisibility(viewModel.addition)}"
                     android:layout_width="match_parent"
                     android:layout_height="?attr/actionBarSize"
                     android:theme="@style/ThemeOverlay.MaterialComponents.ActionBar"
@@ -179,7 +175,6 @@
             android:layout_height="match_parent"
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
             android:enabled="@{(viewModel.markupLanguage!=null)?true:false}"
-            android:visibility="@{viewModel.getVisibility(viewModel.markupLanguage.opening,viewModel.markupLanguage.closing)}"
             app:layout_behavior="@string/appbar_scrolling_view_behavior"/>
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 </layout>

@@ -63,7 +63,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardCornerRadius="10dp"
-            android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:task.description.length()==0?View.GONE:View.VISIBLE}"
+            android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:task.description.text.toString().length()==0?View.GONE:View.VISIBLE}"
             android:layout_marginHorizontal="6dp"
             android:layout_marginVertical="4dp"
             app:cardElevation="30dp"
@@ -93,7 +93,6 @@
 
                 <EditText
                     android:id="@+id/editText"
-                    android:text="@={task.description}"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:View.GONE}"
                     android:textSize="@{scriptContentItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
                     android:onFocusChange="@{scriptContentItemViewHolder.editTextListener}"

@@ -9,6 +9,9 @@ import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -89,7 +92,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val scriptMarkupLanguage = MutableStateFlow<MarkupLanguage?>(null)
     private val isEditingScript = MutableStateFlow(false)
 
-    private val markupLanguagesList: MutableStateFlow<List<MarkupLanguage>> = MutableStateFlow(listOf())
+    private val markupLanguagesList = mutableStateListOf<MarkupLanguage>()
     private val defaultMarkupLanguage = MutableStateFlow(MarkupLanguage())
     private val markupLanguageSelectedIndex = MutableStateFlow(-1)
 
@@ -100,7 +103,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val specialCharactersList: MutableStateFlow<MutableList<SpecialCharacters>> = MutableStateFlow(mutableListOf())
 
     private val searchScrollPosition: LazyListState = LazyListState()
-    private val searchString: MutableState<String> = mutableStateOf("")
+    private val searchString = TextFieldState("")
     private val matchCaseCheck: MutableState<Boolean> = mutableStateOf(false)
     private val wordCheck: MutableState<Boolean> = mutableStateOf(false)
     private val searchJob: MutableStateFlow<Job?> = MutableStateFlow(null)
@@ -159,7 +162,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getScriptMarkupLanguage(): StateFlow<MarkupLanguage?>{ return scriptMarkupLanguage }
     fun getIsEditingScript(): MutableStateFlow<Boolean>{ return isEditingScript }
 
-    fun getMarkupLanguagesList(): StateFlow<List<MarkupLanguage>> { return markupLanguagesList }
+    fun getMarkupLanguagesList(): SnapshotStateList<MarkupLanguage> { return markupLanguagesList }
     fun getDefaultMarkupLanguage(): StateFlow<MarkupLanguage> { return defaultMarkupLanguage }
     fun getMarkupLanguageSelectedIndex(): StateFlow<Int> { return markupLanguageSelectedIndex }
 
@@ -170,7 +173,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getSpecialCharactersList(): StateFlow<MutableList<SpecialCharacters>> { return specialCharactersList }
 
     fun getSearchScrollPosition(): LazyListState { return searchScrollPosition }
-    fun getSearchString(): MutableState<String> { return searchString }
+    fun getSearchString(): TextFieldState { return searchString }
     fun getMatchCaseCheck(): MutableState<Boolean> { return matchCaseCheck }
     fun getWordCheck(): MutableState<Boolean> { return wordCheck }
     fun getSearchJob(): StateFlow<Job?> { return searchJob }
@@ -598,9 +601,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     private suspend fun copyFolder(from:Folder,to:Folder){
         if (to.folderId == from.folderId) return
-        to.folderName.value = from.folderName.value
+        to.folderName.setTextAndPlaceCursorAtEnd(from.folderName.text.toString())
         to.folderPosition = from.folderPosition
-        to.folderScrollPosition.scrollToItem(from.folderScrollPosition.firstVisibleItemIndex)
+        to.folderScrollPosition.requestScrollToItem(from.folderScrollPosition.firstVisibleItemIndex)
         to.folderShowScripts.value = from.folderShowScripts.value
         to.saveImage(application, from.imageResource.getUriFromStorage(application))
         dao.update(to)
@@ -703,7 +706,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         }
                     }
                     withContext(Dispatchers.Main) {
-                        scriptContentList.last().content.value += "\n$intentString"
+                        scriptContentList.last().content.edit { append("\n$intentString") }
                     }
                     saveScript {
                         activity?.finishAndRemoveTask()
@@ -842,7 +845,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 scriptContentList.forEach { content ->
                     when (content.type) {
                         ContentType.TEXT -> {
-                            if (content.content.value.isNotEmpty()) {
+                            if (content.content.text.isNotEmpty()) {
                                 position = saveContent(content, position)
                             } else dao.delete(content)
                         }
@@ -910,19 +913,19 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         val inputIndex = scriptContentList.indexOf(item) + 1
                         if (cursorPosition != null) {
                             // split the string
-                            val text = item.content.value
+                            val text = item.content.text.toString()
 
                             // Split the string
                             val topString = text.take(cursorPosition)
                             val bottomString =
                                 text.substring(cursorPosition, text.length)
 
-                            item.content.update { topString }
+                            item.content.edit { replace(0,length,topString) }
                             val newContent = Content(
                                 type = ContentType.TEXT,
                                 script = script.value!!.scriptId!!,
                                 position = inputIndex.toLong(),
-                                content = MutableStateFlow(bottomString)
+                                content = TextFieldState(bottomString)
                             )
                             scriptContentList.add(inputIndex, newContent)
                             newContent.id = dao.insert(newContent)
@@ -937,7 +940,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         type = contentType,
                         script = script.value!!.scriptId!!,
                         position = inputIndex.toLong(),
-                        filename = MutableStateFlow(it.lastPathSegment ?: "")
+                        filename = TextFieldState(it.lastPathSegment ?: "")
                     )
                     scriptContentList.add(inputIndex, newContent)
                     newContent.id = dao.insert(newContent)
@@ -985,18 +988,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun printScriptEntry(){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
-                script.value?.scriptTitle?.value?.let { title ->
+                script.value?.scriptTitle?.let { title ->
                     val outputStringBuilder = StringBuilder()
                     scriptContentList.forEach { content ->
                         if (content.type == ContentType.TEXT) {
-                            content.content.value.let { outputStringBuilder.append(it) }
+                            outputStringBuilder.append(content.content.text.toString())
                         }
                     }
 
                     val contentValues = ContentValues().apply {
                         put(
                             MediaStore.Files.FileColumns.DISPLAY_NAME,
-                            title
+                            title.text.toString()
                         )
                         put(
                             MediaStore.Files.FileColumns.MIME_TYPE,
@@ -1241,7 +1244,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun getMarkupLanguages(){
         repositoryScope.launch{
-            markupLanguagesList.value = withContext(Dispatchers.IO){
+            markupLanguagesList.clear()
+            markupLanguagesList.addAll( withContext(Dispatchers.IO){
                 val arrayList = ArrayList<MarkupLanguage>(dao.getMarkupLanguages())
                 if (script.value != null && script.value!!.scriptMarkupLanguage == null){
                     var exist = false
@@ -1266,7 +1270,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 }
                 if (!exist) arrayList.add(defaultMarkupLanguage.value)
                 arrayList.toList()
-            }
+            })
         }
     }
 
@@ -1331,14 +1335,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun spansNotSimilarAndNameUnique(similarList: List<String>, process:(isValid:Boolean, similarList:List<String>, nameUniqueErrorMessage:String)->Unit){
         val index = markupLanguageSelectedIndex.value
-        if (index>=markupLanguagesList.value.size) return
-        val indexName = markupLanguagesList.value[index].name.value
+        if (index>=markupLanguagesList.size) return
+        val indexName = markupLanguagesList[index].name.value
         var nameUniqueErrorMessage = ""
         if (indexName.isEmpty() || indexName == MainActivity.ResourceProvider.getString(R.string.new_markup_language)) {
             nameUniqueErrorMessage = MainActivity.ResourceProvider.getString(R.string.name_is_not_allowed, indexName)
         }
         else {
-            for ((i, mLanguage) in markupLanguagesList.value.withIndex()) {
+            for ((i, mLanguage) in markupLanguagesList.withIndex()) {
                 if (i != index && mLanguage.name.value == indexName) {
                     nameUniqueErrorMessage = MainActivity.ResourceProvider.getString(
                         R.string.name_is_not_unique,
@@ -1352,7 +1356,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun resetDefaultMarkupLanguage(appendedUnit: (() -> Unit)? = null){
         defaultMarkupLanguage.value = MarkupLanguage()
-        markupLanguagesList.value = arrayListOf()
+        markupLanguagesList.clear()
         markupLanguageSelectedIndex.value = -1
         appendedUnit?.invoke()
     }
@@ -1552,16 +1556,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     contentList.forEach { content ->
                         when (content.type) {
                             ContentType.TEXT -> {
-                                if (content.content.value.isNotEmpty()) builder.append(content.content.value)
+                                if (content.content.text.isNotEmpty()) builder.append(content.content.text.toString())
                             }
 
                             ContentType.IMAGE -> {
                                 withContext(Dispatchers.Main) { numImages.value += 1 }
-                                if (content.description.value.isNotEmpty()) builder.append(content.description.value)
+                                if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                                 if (displayImage.value == null) {
                                     val file = File(
                                         application.filesDir.toString() + "/" + AppResources.ImageResource.DESTINATION_FOLDER,
-                                        content.content.value
+                                        content.content.text.toString()
                                     )
                                     withContext(Dispatchers.Main) {
                                         displayImage.value = if (file.exists()) {
@@ -1575,17 +1579,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                             ContentType.AUDIO -> {
                                 withContext(Dispatchers.Main) { numAudios.value += 1 }
-                                if (content.description.value.isNotEmpty()) builder.append(content.description.value)
+                                if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                             }
 
                             ContentType.VIDEO -> {
                                 withContext(Dispatchers.Main) { numVideos.value += 1 }
-                                if (content.description.value.isNotEmpty()) builder.append(content.description.value)
+                                if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                             }
 
                             ContentType.DOCUMENT -> {
                                 withContext(Dispatchers.Main) { numDocuments.value += 1 }
-                                if (content.description.value.isNotEmpty()) builder.append(content.description.value)
+                                if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                             }
 
                             ContentType.SCRIPT -> {
@@ -1664,7 +1668,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         searchJob.value?.cancel()
         searchScriptsList.clear()
         searchJob.value = repositoryScope.launch {
-            if (searchString.value.isEmpty()) {
+            if (searchString.text.isEmpty()) {
                 searchJob.value?.cancel()
                 searchJob.value = null
                 return@launch
@@ -1672,7 +1676,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
             withContext(Dispatchers.IO){
                 val title:String
                 val id: Long = if (folder.value != null) {
-                    title = folder.value!!.folderName.value
+                    title = folder.value!!.folderName.text.toString()
                     folder.value!!.folderId?:return@withContext
                 } else {
                     title = application.getString(R.string.books)
@@ -1681,7 +1685,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 dao.searchFolderScripts(
                     id,
                     title,
-                    searchString.value.trim(),
+                    searchString.text.toString().trim(),
                     matchCaseCheck.value,
                     wordCheck.value,
                     searchScriptsList,
@@ -1709,7 +1713,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun resetSearchData(appendedUnit: (() -> Unit)?=null){
         searchMenuOpen.value = true
         searchScrollPosition.requestScrollToItem(0,0)
-        searchString.value = ""
+        searchString.clearText()
         matchCaseCheck.value = false
         wordCheck.value = false
         searchJob.value?.cancel()
@@ -1764,7 +1768,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                                 newGoal.dateOfCompletion = editGoal.dateOfCompletion?.let{ AppResources.CalendarResource(it.getCalendar()) }
                                 newGoal.status.value = editGoal.status.value
                                 newGoal.colour.value = editGoal.colour.value
-                                newGoal.location.value = editGoal.location.value
+                                newGoal.location.setTextAndPlaceCursorAtEnd(editGoal.location.text.toString())
 
                                 newGoal.saveImage(application,editGoal.imageResource.getUriFromStorage(application))
                                 for (time in editGoal.times) {
@@ -1873,7 +1877,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         newGoal.dateOfCompletion?.let{ AppResources.CalendarResource(it.getCalendar()) }
                     editGoal.status.value = newGoal.status.value
                     editGoal.colour.value = newGoal.colour.value
-                    editGoal.location.value = newGoal.location.value
+                    editGoal.location.setTextAndPlaceCursorAtEnd(newGoal.location.text.toString())
 
                     editGoal.saveImage(
                         application,

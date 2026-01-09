@@ -181,11 +181,11 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
             viewModelScope.launch {
                 if (folder.value ==null) {
                     // Reset the settings table
-                    appSettings.value?.scrollPosition?.scrollToItem(0,0)
+                    appSettings.value?.scrollPosition?.requestScrollToItem(0,0)
                 }
                 else{
                     // Resets the folders table
-                    folder.value?.folderScrollPosition?.scrollToItem(0,0)
+                    folder.value?.folderScrollPosition?.requestScrollToItem(0,0)
                 }
             }
             updateFolderShowScripts {

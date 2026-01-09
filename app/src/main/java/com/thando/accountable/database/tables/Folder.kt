@@ -3,13 +3,13 @@ package com.thando.accountable.database.tables
 import android.content.Context
 import android.net.Uri
 import android.view.View
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.lazy.LazyListState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -25,7 +25,7 @@ open class Folder(
     var folderType: FolderType,
 
     @ColumnInfo(name = "folder_name")
-    var folderName: MutableStateFlow<String> = MutableStateFlow(""),
+    var folderName: TextFieldState = TextFieldState(""),
 
     @ColumnInfo (name = "folder_picture")
     private var folderPicture: String? = null,
@@ -89,10 +89,6 @@ open class Folder(
         if (imageResource.deleteFile(context)) {
             folderPicture = null
         }
-    }
-
-    suspend fun updateFolderName(newFolderName: String){
-        folderName.emit(newFolderName)
     }
 
     fun getUri(context: Context): StateFlow<Uri?> {

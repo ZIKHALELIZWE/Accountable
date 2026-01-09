@@ -45,6 +45,7 @@ import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.EditFolderViewModel
+import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -89,7 +90,7 @@ class EditFolderFragment : Fragment() {
 
         if (newEditFolder != null) {
             val uri by newEditFolder!!.getUri(requireContext()).collectAsStateWithLifecycle()
-            val folderName by newEditFolder!!.folderName.collectAsStateWithLifecycle()
+            val folderName = remember { newEditFolder!!.folderName }
             val scope = rememberCoroutineScope()
             val listState = rememberScrollState()
             Column(
@@ -107,9 +108,8 @@ class EditFolderFragment : Fragment() {
                     Spacer(modifier = Modifier.width(2.dp))
                 }
                 // folder name edit text
-                OutlinedTextField(
-                    value = folderName,
-                    onValueChange = { scope.launch { newEditFolder!!.updateFolderName(it) } },
+                TextFieldAccountable(
+                    state = folderName,
                     label = { Text(stringResource(R.string.enter_folder_name)) },
                     modifier = Modifier
                         .bringIntoViewRequester(bringIntoViewRequester).onFocusEvent { focusState ->
@@ -149,7 +149,7 @@ class EditFolderFragment : Fragment() {
                     onClick = {
                         viewModel.saveAndCloseFolder()
                     },
-                    enabled = viewModel.setUpdateFolderButtonEnabled(folderName)
+                    enabled = viewModel.setUpdateFolderButtonEnabled(if(folderName.text.isNotEmpty()) folderName.text.toString() else null)
                 ) {
                     Text(stringResource(updateButtonTextResId?.resId ?: R.string.add_folder))
                 }

@@ -97,7 +97,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="2dp"
-                    android:visibility="@{task.filename.length()!=0?View.GONE:View.VISIBLE}"
+                    android:visibility="@{task.filename.text.length()!=0?View.GONE:View.VISIBLE}"
                     android:text='@{@string/album(task.trackItem.album)}'
                     android:textColor="@{audioItemViewHolder.teleprompterSettings.textColour??@color/black}"
                     app:layout_constraintBottom_toBottomOf="parent"
@@ -110,7 +110,7 @@
                     android:layout_height="wrap_content"
                     android:minHeight="48dp"
                     android:textSize="@{audioItemViewHolder.teleprompterSettings.textSize??contentItemAdapter.appSettings.textSize}"
-                    android:text='@{task.filename.length()!=0?task.filename:task.trackItem.title + " : " + task.trackItem.artistName}'
+                    android:text='@{task.filename.text.toString().length()!=0?task.filename:task.trackItem.title + " : " + task.trackItem.artistName}'
                     android:visibility="@{contentItemAdapter.isEditingScript?View.GONE:View.VISIBLE}"
                     android:textColor="@{audioItemViewHolder.teleprompterSettings.textColour??@color/black}"
                     android:textAlignment="center"
@@ -121,7 +121,6 @@
 
                 <EditText
                     android:id="@+id/audio_name_editText"
-                    android:text="@={task.filename}"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:View.GONE}"
                     android:textSize="@{audioItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
                     android:onFocusChange="@{audioItemViewHolder.editTextListener}"
@@ -151,7 +150,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardCornerRadius="10dp"
-            android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:task.description.length()==0?View.GONE:View.VISIBLE}"
+            android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:task.description.text.toString().length()==0?View.GONE:View.VISIBLE}"
             android:layout_marginHorizontal="6dp"
             android:layout_marginVertical="4dp"
             app:cardElevation="30dp"
@@ -181,7 +180,6 @@
 
                 <EditText
                     android:id="@+id/editText"
-                    android:text="@={task.description}"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:View.GONE}"
                     android:textSize="@{audioItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
                     android:onFocusChange="@{audioItemViewHolder.editTextListener}"

@@ -89,6 +89,7 @@ import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
+import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -150,7 +151,7 @@ class EditGoalFragment: Fragment() {
             val uri by remember { newGoal.getStateUri(requireContext()) }
             var goal by remember { newGoal.goal }
             var colour by remember { newGoal.colour }
-            var location by remember { newGoal.location }
+            val location = remember { newGoal.location }
             val times = remember { newGoal.times }
             val bringIntoViewRequester = remember { BringIntoViewRequester() }
             val scope = rememberCoroutineScope()
@@ -207,9 +208,8 @@ class EditGoalFragment: Fragment() {
                     }
                 }
                 Spacer(modifier = Modifier.width(2.dp))
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
+                TextFieldAccountable(
+                    state = location,
                     label = { Text(stringResource(R.string.location)) },
                     modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
                         .onFocusEvent { focusState ->
