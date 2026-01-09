@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
@@ -51,11 +52,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -158,17 +161,20 @@ fun MarkupLanguageFragmentView(
     val selectedOptionName by markupLanguage?.name?.collectAsStateWithLifecycle()
         ?: remember { mutableStateOf("") }
 
-    val spinnerEnabled by remember { mutableStateOf(markupLanguagesList.isNotEmpty()) }
+    var spinnerEnabled by remember { mutableStateOf(false) }
 
     val deleteButtonText by viewModel.deleteButtonText.collectAsStateWithLifecycle()
 
     val example by viewModel.openingClosingExampleSpannedString.spannableAnnotatedString.collectAsStateWithLifecycle()
     val selectedIndex by viewModel.selectedIndex.collectAsStateWithLifecycle()
     var spinnerView by remember{ mutableStateOf<View?>(null) }
-    val opening = remember { markupLanguage?.opening }
-    val closing = remember { markupLanguage?.closing }
+    var opening by remember { mutableStateOf(markupLanguage?.opening) }
+    var closing by remember { mutableStateOf(markupLanguage?.closing) }
 
     val cardList = remember { viewModel.cardsList }
+
+    var nameNotUnique by remember { mutableStateOf("") }
+    val nameNotUniqueErrorMessage = stringResource(R.string.name_is_not_unique, nameNotUnique)
 
     LaunchedEffect(script) {
         if (script!=null) {
@@ -177,16 +183,20 @@ fun MarkupLanguageFragmentView(
     }
 
     LaunchedEffect(markupLanguagesList) {
-        if (markupLanguagesList.isEmpty()) return@LaunchedEffect
+        snapshotFlow { markupLanguagesList.toList() }.collect { markupLanguagesList ->
+            if (markupLanguagesList.isEmpty()) {
+                spinnerEnabled = false
+                return@collect
+            } else spinnerEnabled = true
 
-        if (viewModel.script.value?.scriptMarkupLanguage == null){
-            viewModel.setSelectedIndex(markupLanguagesList.size-1,markupLanguage, true)
-        }
-        else{
-            for ((index,language) in markupLanguagesList.withIndex()){
-                if (language.name.value == viewModel.script.value?.scriptMarkupLanguage){
-                    viewModel.setSelectedIndex(index,markupLanguage,true)
-                    break
+            if (viewModel.script.value?.scriptMarkupLanguage == null) {
+                viewModel.setSelectedIndex(markupLanguagesList.size - 1, markupLanguage, true)
+            } else {
+                for ((index, language) in markupLanguagesList.withIndex()) {
+                    if (language.name.value == viewModel.script.value?.scriptMarkupLanguage) {
+                        viewModel.setSelectedIndex(index, markupLanguage, true)
+                        break
+                    }
                 }
             }
         }
@@ -197,11 +207,16 @@ fun MarkupLanguageFragmentView(
     }
 
     LaunchedEffect(markupLanguage, markupLanguagesList){
-        if (markupLanguage!=null && markupLanguagesList.isNotEmpty()){
-            viewModel.setMarkupLanguageFunctions(markupLanguage!!, context)
-            viewModel.setMarkupLanguage(markupLanguage!!)
+        snapshotFlow { markupLanguagesList.toList() }.collect { markupLanguagesList ->
+            if (markupLanguage != null && markupLanguagesList.isNotEmpty()) {
+                opening = markupLanguage!!.opening
+                closing = markupLanguage!!.closing
+                viewModel.setMarkupLanguageFunctions(markupLanguage!!, context)
+                viewModel.setMarkupLanguage(markupLanguage!!)
+            }
         }
     }
+
 
     if (markupLanguage!=null && markupLanguagesList.isNotEmpty()){
         LaunchedEffect(opening?.selection, closing?.selection){
@@ -212,12 +227,10 @@ fun MarkupLanguageFragmentView(
     LaunchedEffect(viewModel.showNameNotUniqueSnackBar){
         if (spinnerView==null) return@LaunchedEffect
         viewModel.showNameNotUniqueSnackBar.collect { name ->
+            nameNotUnique = name
             Snackbar.make(
                 spinnerView!!,
-                context.getString(
-                    R.string.name_is_not_unique,
-                    name
-                ),
+                nameNotUniqueErrorMessage,
                 Snackbar.LENGTH_SHORT
             ).show()
         }
@@ -284,10 +297,11 @@ fun MarkupLanguageFragmentView(
                         onDismissRequest = { expanded = false }
                     ) {
                         markupLanguagesList.forEach { selectionOption ->
+                            val selectionOptionName by selectionOption.name.collectAsStateWithLifecycle()
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        selectionOption.name.value,
+                                        selectionOptionName,
                                         color = MaterialTheme.colorScheme.onPrimary
                                     )
                                 },
@@ -342,7 +356,11 @@ fun MarkupLanguageFragmentView(
                 fontSize = 26.sp
             )
 
-            Row(modifier = Modifier.height(IntrinsicSize.Min)){
+            Row(modifier = Modifier.fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .padding(bottom = 5.dp)
+                .background(MaterialTheme.colorScheme.primary)
+            ){
                 Text(
                     text = stringResource(R.string.opening),
                     modifier = Modifier.fillMaxHeight()
@@ -367,9 +385,10 @@ fun MarkupLanguageFragmentView(
                             unfocusedContainerColor = MaterialTheme.colorScheme.primary,
                             focusedTextColor = MaterialTheme.colorScheme.onPrimary,
                             unfocusedTextColor = MaterialTheme.colorScheme.onPrimary,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent
+                            focusedIndicatorColor = MaterialTheme.colorScheme.onPrimary,
+                            unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledIndicatorColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                            cursorColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         textStyle = TextStyle(
                             fontSize = 26.sp
@@ -400,9 +419,10 @@ fun MarkupLanguageFragmentView(
                             unfocusedContainerColor = MaterialTheme.colorScheme.primary,
                             focusedTextColor = MaterialTheme.colorScheme.onPrimary,
                             unfocusedTextColor = MaterialTheme.colorScheme.onPrimary,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent
+                            focusedIndicatorColor = MaterialTheme.colorScheme.onPrimary,
+                            unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledIndicatorColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                            cursorColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         textStyle = TextStyle(
                             fontSize = 26.sp
@@ -447,7 +467,7 @@ fun MarkupLanguageSpanCard(
     val duplicateErrorMessage by spanCard.duplicateErrorMessage.collectAsStateWithLifecycle()
     var exampleValueInputType by remember { mutableStateOf(KeyboardType.Text) }
     var buttonOnClick by remember { mutableStateOf({}) }
-    var buttonText by remember { mutableStateOf(context.getString(R.string.pick_colour)) }
+    var buttonText by remember { mutableStateOf("") }
     var buttonView by remember { mutableStateOf<View?>(null) }
 
     if (spanCard.hasValue()) {
@@ -458,8 +478,7 @@ fun MarkupLanguageSpanCard(
             exampleValueInputType = KeyboardType.Number
         }
         else if (spanCard.getSpanType() == MarkupLanguage.TagType.FUNCTION_COLOUR) {
-            buttonText =
-                context.getString(R.string.pick_colour)
+            buttonText = stringResource(R.string.pick_colour)
             buttonOnClick = {
                 Colour.showColorPickerDialog(context) { selectedColour: Int ->
                     spanCard.tag.spanCharValue.second.setTextAndPlaceCursorAtEnd(selectedColour.toString())
@@ -473,8 +492,7 @@ fun MarkupLanguageSpanCard(
                     .show()
             }
         } else if (spanCard.getSpanType() == MarkupLanguage.TagType.FUNCTION_STRING) {
-            buttonText =
-                context.getString(R.string.select_alignment)
+            buttonText = stringResource(R.string.select_alignment)
             buttonOnClick = {
                 buttonView?.let { buttonView ->
                     MarkupLanguage.getAlignmentMenuOnClick(
@@ -527,8 +545,10 @@ fun MarkupLanguageSpanCard(
             Text(
                 text = exampleText,
                 modifier = Modifier.fillMaxWidth(),
-                fontSize = 26.sp,
-                color = Color.Black
+                style = TextStyle(
+                    fontSize = 26.sp,
+                    color = Color.Black
+                )
             )
             Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                 Text(

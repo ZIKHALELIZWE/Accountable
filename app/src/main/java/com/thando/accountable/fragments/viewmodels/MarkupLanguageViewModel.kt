@@ -1,7 +1,6 @@
 package com.thando.accountable.fragments.viewmodels
 
 import android.content.Context
-import android.text.method.LinkMovementMethod
 import android.view.View
 import android.widget.EditText
 import android.widget.TextView
@@ -11,11 +10,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.core.text.toSpanned
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
@@ -39,7 +36,6 @@ import kotlinx.coroutines.withContext
 class MarkupLanguageViewModel(
     private val repository: AccountableRepository
 ): ViewModel() {
-
     // Data
     val script = repository.getScript()
     private val defaultMarkupLanguage = repository.getDefaultMarkupLanguage()

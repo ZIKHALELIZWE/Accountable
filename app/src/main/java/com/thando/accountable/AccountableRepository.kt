@@ -1246,8 +1246,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
         repositoryScope.launch{
             markupLanguagesList.clear()
             markupLanguagesList.addAll( withContext(Dispatchers.IO){
-                val arrayList = ArrayList<MarkupLanguage>(dao.getMarkupLanguages())
-                if (script.value != null && script.value!!.scriptMarkupLanguage == null){
+                val arrayList = dao.getMarkupLanguages().toMutableList()
+                if (script.value != null && script.value!!.scriptMarkupLanguage != null){
                     var exist = false
                     for (markupLanguage in arrayList) {
                         if (markupLanguage.name.value == script.value!!.scriptMarkupLanguage){
@@ -1269,7 +1269,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     }
                 }
                 if (!exist) arrayList.add(defaultMarkupLanguage.value)
-                arrayList.toList()
+                arrayList
             })
         }
     }
@@ -1355,7 +1355,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     fun resetDefaultMarkupLanguage(appendedUnit: (() -> Unit)? = null){
-        defaultMarkupLanguage.value = MarkupLanguage()
+        defaultMarkupLanguage.update { MarkupLanguage() }
         markupLanguagesList.clear()
         markupLanguageSelectedIndex.value = -1
         appendedUnit?.invoke()
