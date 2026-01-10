@@ -36,6 +36,17 @@ class ScriptViewModel(
     // Click Events
     var chooseContent: AppResources.ContentType? = null
 
+    // Script or Teleprompter
+    private var isScriptFragment = true
+
+    fun setIsScriptFragment(isScriptFragment: Boolean) {
+        this.isScriptFragment = isScriptFragment
+    }
+
+    fun getIsScriptFragment(): Boolean {
+        return isScriptFragment
+    }
+
     fun chooseTopImage(chooseImage:(String)->Unit) {
         if (!(script.value?.scriptPicture.isNullOrEmpty())){
             repository.deleteScriptImage()
@@ -141,6 +152,7 @@ class ScriptViewModel(
     }
 
     fun saveScriptAndOpenTeleprompter(){
+        if (isEditingScript.value) editOrSaveScript()
         repository.saveScript(true) {
             repository.changeFragment(AccountableNavigationController.AccountableFragment.TeleprompterFragment)
         }

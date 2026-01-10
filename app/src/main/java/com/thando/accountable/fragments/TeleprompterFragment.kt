@@ -1,11 +1,18 @@
 package com.thando.accountable.fragments
 
 import android.animation.ValueAnimator
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothHidDevice
+import android.bluetooth.BluetoothProfile
+import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
@@ -14,7 +21,42 @@ import android.view.WindowManager
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import androidx.activity.OnBackPressedCallback
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -25,69 +67,80 @@ import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.google.android.material.snackbar.Snackbar
 import com.thando.accountable.MainActivity
+import com.thando.accountable.MainActivity.Companion.REQUEST_BLUETOOTH_CONNECT
 import com.thando.accountable.MainActivity.Companion.collectFlow
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.databinding.FragmentTeleprompterBinding
+import com.thando.accountable.fragments.viewmodels.ScriptViewModel
 import com.thando.accountable.fragments.viewmodels.TeleprompterViewModel
 import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
 import com.thando.accountable.recyclerviewadapters.SpecialCharacterItemAdapter
+import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 
 class TeleprompterFragment : Fragment() {
 
-    private var _binding: FragmentTeleprompterBinding? = null
-    private val binding get() = _binding!!
     private val viewModel : TeleprompterViewModel by viewModels { TeleprompterViewModel.Factory }
+    private val scriptViewModel : ScriptViewModel by viewModels { ScriptViewModel.Factory }
     private lateinit var bindingController: WindowInsetsControllerCompat
+    private val handler = Handler(Looper.getMainLooper())
+
     private lateinit var contentAdapter: ContentItemAdapter
     private lateinit var specialCharactersAdapter: SpecialCharacterItemAdapter
-    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val textSize = 26
-        // Inflate the layout for this fragment
-        _binding = FragmentTeleprompterBinding.inflate(inflater, container, false)
-        binding.viewModel = viewModel
-        binding.lifecycleOwner = viewLifecycleOwner
+        val rootView = ComposeView(requireContext()).apply {
+            setContent {
+                val navigateToScript by viewModel.navigateToScript.collectAsStateWithLifecycle(false)
+                LaunchedEffect(navigateToScript) {
+                    if (navigateToScript){
+                        viewModel.viewModelScope.launch {
+                            withContext(Dispatchers.IO) {
+                                viewModel.closeTeleprompterFragment()
+                            }
+                        }
+                    }
+                }
 
-        contentAdapter = viewModel.getContentAdapter(
-            requireContext(),
-            viewLifecycleOwner,
-            childFragmentManager,
-            textSize.toFloat()
-        ) {
-            setScrollPosition(viewModel.getScrollPosition())
-            viewModel.loadTeleprompterSettings()
+                val mainActivity = (requireActivity() as MainActivity)
+                mainActivity.onBackPressedDispatcher.addCallback(
+                    viewLifecycleOwner,
+                    object : OnBackPressedCallback(true){
+                        override fun handleOnBackPressed() {
+                            viewModel.navigateToScript()
+                        }
+                    }
+                )
+
+                AccountableTheme {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize()
+                    ) { innerPadding ->
+                        TeleprompterFragmentView(
+                            modifier = Modifier.padding(innerPadding),
+                            scriptViewModel = scriptViewModel
+                        )
+                    }
+                }
+            }
         }
-        binding.teleprompterRecyclerView.adapter = contentAdapter
-
-        specialCharactersAdapter = SpecialCharacterItemAdapter(viewLifecycleOwner, viewModel)
-
-        binding.specialCharactersRecyclerView.adapter = specialCharactersAdapter
-
-        return binding.root
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        val textSize = 26
-        bindingController = WindowCompat.getInsetsController(requireActivity().window, binding.root)
-        // Configure the behavior of the hidden system bars.
-        bindingController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
         val touchListener = View.OnTouchListener { v, motionEvent ->
             if (motionEvent.action == MotionEvent.ACTION_DOWN){
@@ -105,9 +158,399 @@ class TeleprompterFragment : Fragment() {
             }
             false
         }
-        (binding.teleprompterCoordinatorLayout as View).setOnTouchListener(touchListener)
-        (binding.teleprompterRecyclerView as View).setOnTouchListener(touchListener)
-        (binding.titleTextView as View).setOnTouchListener(touchListener)
+
+        rootView.setOnTouchListener(touchListener)
+
+        bindingController = WindowCompat.getInsetsController(requireActivity().window, rootView)
+        // Configure the behavior of the hidden system bars.
+        bindingController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        return rootView
+    }
+
+    // Controller object to bridge Activity and Compose
+    object TeleprompterController {
+        private var skipBackHandler: (() -> Unit)? = null
+        fun registerSkipBack(handler: () -> Unit) {
+            skipBackHandler = handler
+        }
+        fun skipBack() {
+            skipBackHandler?.invoke()
+        }
+    }
+
+    class BluetoothHidChecker(private val context: Context) {
+
+        private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+
+        fun getConnectedHidDevices(onResult: (List<BluetoothDevice>) -> Unit) {
+            if (bluetoothAdapter == null) {
+                Log.e("BluetoothHidChecker", "Bluetooth not supported on this device")
+                onResult(emptyList())
+                return
+            }
+
+            // Get HID Host profile proxy
+            bluetoothAdapter.getProfileProxy(context, object : BluetoothProfile.ServiceListener {
+                override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                    if (profile == BluetoothProfile.HID_DEVICE) {
+                        val hidHost = proxy as BluetoothHidDevice
+                        val connectedDevices = hidHost.connectedDevices
+                        onResult(connectedDevices)
+                        bluetoothAdapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, proxy)
+                    }
+                }
+
+                override fun onServiceDisconnected(profile: Int) {
+                    // HID Host profile disconnected
+                }
+            }, BluetoothProfile.HID_DEVICE)
+        }
+    }
+
+    @Composable
+    fun TeleprompterScreen() {
+        val listState = rememberLazyListState()
+        val coroutineScope = rememberCoroutineScope()
+        val systemUiController = rememberSystemUiController()
+        var isPlaying by remember { mutableStateOf(false) }
+        var scrollSpeed by remember { mutableStateOf(50L) }
+        var skipDistance by remember { mutableStateOf(200) }
+        var controlsVisible by remember { mutableStateOf(true) }
+        var controlsAtTop by remember { mutableStateOf(false) }
+        var textSize by remember { mutableStateOf(18f) }
+        var textColor by remember { mutableStateOf(Color.Black) }
+        var backgroundColor by remember { mutableStateOf(Color.White) }
+        var isFullScreen by remember { mutableStateOf(false) }
+        var countdownDelay by remember { mutableStateOf(3) } // seconds
+        var remoteConnected by remember { mutableStateOf(false) }
+        val context = LocalContext.current
+
+        // Auto-scroll effect
+        LaunchedEffect(isPlaying, scrollSpeed, countdownDelay) {
+            if (isPlaying) {
+                // Wait for countdown before scrolling
+                repeat(countdownDelay) { delay(1000) }
+                while (isPlaying) {
+                    delay(scrollSpeed)
+                    val currentOffset = listState.firstVisibleItemScrollOffset
+                    listState.scrollToItem(
+                        listState.firstVisibleItemIndex,
+                        currentOffset + 2
+                    )
+                }
+            }
+        }
+
+        // Register skip back handler
+        LaunchedEffect(Unit) {
+            TeleprompterController.registerSkipBack {
+                coroutineScope.launch {
+                    val offset = listState.firstVisibleItemScrollOffset
+                    listState.scrollToItem(
+                        listState.firstVisibleItemIndex,
+                        (offset - 200).coerceAtLeast(0)
+                    )
+                }
+            }
+        }
+
+        // Hide/show system bars
+        LaunchedEffect(isFullScreen) {
+            systemUiController.isStatusBarVisible = !isFullScreen
+            systemUiController.isNavigationBarVisible = !isFullScreen
+        }
+
+        // Check Bluetooth connection when Composable starts
+        LaunchedEffect(Unit) {
+            // IF HAS BLUETOOTH CONNECT PERMISSION
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                MainActivity.log("Permission not granted")
+                // Permission not granted, request it
+                val mainActivity = (requireActivity() as MainActivity)
+                ActivityCompat.requestPermissions(
+                    mainActivity,
+                    arrayOf(android.Manifest.permission.BLUETOOTH_CONNECT),
+                    REQUEST_BLUETOOTH_CONNECT
+                )
+            }
+            else {
+                val checker = BluetoothHidChecker(context)
+                checker.getConnectedHidDevices { devices ->
+                    if (devices.isEmpty()) {
+                        MainActivity.log("BluetoothHID No HID devices connected")
+                        remoteConnected = false
+                        MainActivity.log("remoteConnected: $remoteConnected")
+                    } else {
+                        devices.forEach { device ->
+                            MainActivity.log("BluetoothHID Connected HID device: ${device.name} - ${device.address}")
+
+                            remoteConnected = true
+                            MainActivity.log("remoteConnected: $remoteConnected")
+                        }
+                    }
+                }
+            }
+        }
+
+        Column(modifier = Modifier.fillMaxSize()
+            .background(backgroundColor)) {
+            // Controls at top (only if not full screen)
+            if (controlsAtTop && controlsVisible && !isFullScreen) {
+                ControlsSection(
+                    isPlaying = isPlaying,
+                    remoteConnected = remoteConnected,
+                    onPlay = { isPlaying = true },
+                    onPause = { isPlaying = false },
+                    onSkipBack = {
+                        coroutineScope.launch {
+                            val currentOffset = listState.firstVisibleItemScrollOffset
+                            listState.scrollToItem(
+                                listState.firstVisibleItemIndex,
+                                (currentOffset - skipDistance).coerceAtLeast(0)
+                            )
+                        }
+                    },
+                    onSkipForward = {
+                        coroutineScope.launch {
+                            val currentOffset = listState.firstVisibleItemScrollOffset
+                            listState.scrollToItem(
+                                listState.firstVisibleItemIndex,
+                                currentOffset + skipDistance
+                            )
+                        }
+                    },
+                    scrollSpeed = scrollSpeed,
+                    onSpeedChange = { scrollSpeed = it },
+                    skipDistance = skipDistance,
+                    onSkipChange = { skipDistance = it },
+                    textSize = textSize,
+                    onTextSizeChange = { textSize = it },
+                    countDownDelay = countdownDelay,
+                    onCountDownDelayChanged = { countdownDelay = it },
+                    textColor = textColor,
+                    onTextColorChange = {
+                        textColor = when (textColor) {
+                            Color.Black -> Color.Red
+                            Color.Red -> Color.Blue
+                            Color.Blue -> Color.Green
+                            else -> Color.Black
+                        }
+                    },
+                    backgroundColor = backgroundColor,
+                    onBackgroundColorChange = {
+                        backgroundColor = when (backgroundColor) {
+                            Color.White -> Color.LightGray
+                            Color.LightGray -> Color.Yellow
+                            Color.Yellow -> Color.Black
+                            else -> Color.White
+                        }
+                    }
+                )
+            }
+            // Teleprompter text (click to toggle full screen)
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp)
+                    .clickable { isFullScreen = !isFullScreen }
+            ) {
+                items(10) {
+                    Text(
+                        text = """
+ Welcome to the teleprompter demo.
+ Tap the text area to toggle full screen mode.
+ In full screen, controls and status bar are hidden.
+ Tap again to exit full screen.
+ """.trimIndent(),
+                        fontSize = textSize.sp,
+                        color = textColor,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+            // Toggle buttons (only if not full screen)
+            if (!isFullScreen) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(onClick = { controlsVisible = !controlsVisible }) {
+                        Text(if (controlsVisible) "Hide Controls" else "Show Controls")
+                    }
+                    Button(onClick = { controlsAtTop = !controlsAtTop }) {
+                        Text(if (controlsAtTop) "Move Controls to Bottom" else "Move Controls to Top")
+                    }
+                }
+            }
+            // Controls at bottom (only if not full screen)
+            if (!controlsAtTop && controlsVisible && !isFullScreen) {
+                ControlsSection(
+                    isPlaying = isPlaying,
+                    remoteConnected = remoteConnected,
+                    onPlay = { isPlaying = true },
+                    onPause = { isPlaying = false },
+                    onSkipBack = {
+                        coroutineScope.launch {
+                            val currentOffset = listState.firstVisibleItemScrollOffset
+                            listState.scrollToItem(
+                                listState.firstVisibleItemIndex,
+                                (currentOffset - skipDistance).coerceAtLeast(0)
+                            )
+                        }
+                    },
+                    onSkipForward = {
+                        coroutineScope.launch {
+                            val currentOffset = listState.firstVisibleItemScrollOffset
+                            listState.scrollToItem(
+                                listState.firstVisibleItemIndex,
+                                currentOffset + skipDistance
+                            )
+                        }
+                    },
+                    scrollSpeed = scrollSpeed,
+                    onSpeedChange = { scrollSpeed = it },
+                    skipDistance = skipDistance,
+                    onSkipChange = { skipDistance = it },
+                    textSize = textSize,
+                    onTextSizeChange = { textSize = it },
+                    countDownDelay = countdownDelay,
+                    onCountDownDelayChanged = { countdownDelay = it },
+                    textColor = textColor,
+                    onTextColorChange = {
+                        textColor = when (textColor) {
+                            Color.Black -> Color.Red
+                            Color.Red -> Color.Blue
+                            Color.Blue -> Color.Green
+                            else -> Color.Black
+                        }
+                    },
+                    backgroundColor = backgroundColor,
+                    onBackgroundColorChange = {
+                        backgroundColor = when (backgroundColor) {
+                            Color.White -> Color.LightGray
+                            Color.LightGray -> Color.Yellow
+                            Color.Yellow -> Color.Black
+                            else -> Color.White
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun ControlsSection(
+        isPlaying: Boolean,
+        onPlay: () -> Unit,
+        onPause: () -> Unit,
+        onSkipBack: () -> Unit,
+        onSkipForward: () -> Unit,
+        scrollSpeed: Long,
+        onSpeedChange: (Long) -> Unit,
+        skipDistance: Int,
+        onSkipChange: (Int) -> Unit,
+        textSize: Float,
+        onTextSizeChange: (Float) -> Unit,
+        textColor: Color,
+        onTextColorChange: () -> Unit,
+        backgroundColor: Color,
+        onBackgroundColorChange: () -> Unit,
+        countDownDelay: Int,
+        onCountDownDelayChanged: (Int) -> Unit,
+        remoteConnected: Boolean
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button(onClick = onPlay) { Text("Play") }
+                Button(onClick = onPause) { Text("Pause") }
+                Button(onClick = onSkipBack) { Text("⏪ Back") }
+                Button(onClick = onSkipForward) { Text("⏩ Forward") }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Scroll Speed (ms delay): $scrollSpeed")
+            Slider(
+                value = scrollSpeed.toFloat(),
+                onValueChange = { onSpeedChange(it.toLong()) },
+                valueRange = 10f..200f
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Skip Distance (px): $skipDistance")
+            Slider(
+                value = skipDistance.toFloat(),
+                onValueChange = { onSkipChange(it.toInt()) },
+                valueRange = 50f..500f
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Text Size (sp): ${textSize.toInt()}")
+            Slider(
+                value = textSize,
+                onValueChange = { onTextSizeChange(it) },
+                valueRange = 12f..40f
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Countdown Delay (seconds): $countDownDelay")
+            Slider(
+                value = countDownDelay.toFloat(),
+                onValueChange = { onCountDownDelayChanged(it.toInt()) },
+                valueRange = 0f..10f
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onTextColorChange, modifier = Modifier.fillMaxWidth()) {
+                Text("Change Text Color (Current: ${colorName(textColor)})")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = onBackgroundColorChange, modifier = Modifier.fillMaxWidth()) {
+                Text("Change Background Color (Current: ${colorName(backgroundColor)})")
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            // Remote connection button
+            Button(
+                enabled = remoteConnected,
+                onClick = {
+                    // Change what the button does
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    if (remoteConnected) "Remote: Connected (Skip Back)"
+                    else "Remote: Not Connected"
+                )
+            }
+        }
+    }
+
+    // Helper to show color names
+    fun colorName(color: Color): String = when (color) {
+        Color.Black -> "Black"
+        Color.Red -> "Red"
+        Color.Blue -> "Blue"
+        Color.Green -> "Green"
+        Color.White -> "White"
+        Color.LightGray -> "Light Gray"
+        Color.Yellow -> "Yellow"
+        else -> "Custom"
+    }
+
+    @Composable
+    fun TeleprompterFragmentView(
+        modifier: Modifier = Modifier,
+        scriptViewModel: ScriptViewModel
+    ){
+        scriptViewModel.setIsScriptFragment(false)
+        TeleprompterScreen()
+        /*ScriptFragmentView(
+            modifier = modifier,
+            viewModel = scriptViewModel
+        )*/
+        /*val textSize = 26
 
         binding.appBarLayout.addOnOffsetChangedListener { _, verticalOffset ->
             scrollChangedListener(verticalOffset)
@@ -383,24 +826,23 @@ class TeleprompterFragment : Fragment() {
             }
         }
 
-        collectFlow(this,viewModel.navigateToScript) { navigate ->
-            if (navigate) {
-                context.let {
-                    viewModel.viewModelScope.launch {
-                        withContext(Dispatchers.IO) {
-                            viewModel.closeTeleprompterFragment()
-                        }
-                    }
-                }
-            }
+        contentAdapter = viewModel.getContentAdapter(
+            requireContext(),
+            viewLifecycleOwner,
+            childFragmentManager,
+            textSize.toFloat()
+        ) {
+            setScrollPosition(viewModel.getScrollPosition())
+            viewModel.loadTeleprompterSettings()
         }
+        specialCharactersAdapter = SpecialCharacterItemAdapter(viewLifecycleOwner, viewModel)*/
     }
 
     private fun scrollChangedListener(oldScrollY:Int){
         // Handle scroll event
         if (oldScrollY < 0) {
             // Scrolling down
-            if (isAtEndOfRecyclerView(binding.teleprompterRecyclerView)) viewModel.pause()
+            //           if (isAtEndOfRecyclerView(binding.teleprompterRecyclerView)) viewModel.pause()
         } else {
             // Scrolling up
         }
@@ -423,22 +865,8 @@ class TeleprompterFragment : Fragment() {
         return false
     }
 
-    override fun onResume() {
-        super.onResume()
-        val mainActivity = (requireActivity() as MainActivity)
-
-        mainActivity.onBackPressedDispatcher.addCallback(
-            viewLifecycleOwner,
-            object : OnBackPressedCallback(true){
-                override fun handleOnBackPressed() {
-                    viewModel.navigateToScript()
-                }
-            }
-        )
-    }
-
     inner class CustomCountDownTimer(millisInFuture:Long,
-                               countDownInterval:Long
+                                     countDownInterval:Long
     ):CountDownTimer(millisInFuture,countDownInterval){
         val millisUntilItIsFinished:MutableLiveData<Long?> = MutableLiveData()
         override fun onTick(millisUntilFinished: Long) {
@@ -462,11 +890,11 @@ class TeleprompterFragment : Fragment() {
         }
     }
 
-    private fun getControlsHeight():Int{
-        val peekHeight = binding.buttonsContainer.height + binding.contentSheetButton.height
-        return if (viewModel.contentSheetExpanded.value) binding.root.height / 2
-        else peekHeight
-    }
+    /*  private fun getControlsHeight():Int{
+          val peekHeight = binding.buttonsContainer.height + binding.contentSheetButton.height
+          return if (viewModel.contentSheetExpanded.value) binding.root.height / 2
+          else peekHeight
+      }*/
 
     private fun animateHeightChange(view: View, finalHeight:Int, duration: Long = 300) {
         val animator = ValueAnimator.ofInt( view.measuredHeight, finalHeight)
@@ -481,25 +909,25 @@ class TeleprompterFragment : Fragment() {
         view.setLayoutParams(layoutParams)
     }
 
-    private fun skip(shouldSkip:Boolean, skipForward:Boolean){
-        if (shouldSkip){
-            var skipSize = viewModel.getSkipSizeValue(binding.rootConstraintLayout.height)
-            if (!skipForward) skipSize*=-1
-            if (viewModel.getIsPlaying()) stopAutoScroll()
-            binding.teleprompterRecyclerView.smoothScrollBy(
-                0,
-                skipSize,
-                android.view.animation.AccelerateDecelerateInterpolator(),
-                0
-            )
-            if (viewModel.getIsPlaying()) startAutoScrollRunnable(true)
-        }
-    }
+    /*  private fun skip(shouldSkip:Boolean, skipForward:Boolean){
+          if (shouldSkip){
+              var skipSize = viewModel.getSkipSizeValue(binding.rootConstraintLayout.height)
+              if (!skipForward) skipSize*=-1
+              if (viewModel.getIsPlaying()) stopAutoScroll()
+              binding.teleprompterRecyclerView.smoothScrollBy(
+                  0,
+                  skipSize,
+                  android.view.animation.AccelerateDecelerateInterpolator(),
+                  0
+              )
+              if (viewModel.getIsPlaying()) startAutoScrollRunnable(true)
+          }
+      }*/
 
     private fun startAutoScroll() {
         val runnable = object : Runnable {
             override fun run() {
-                binding.teleprompterRecyclerView.nestedScrollBy(0,viewModel.getScrollSpeedValue())
+                //             binding.teleprompterRecyclerView.nestedScrollBy(0,viewModel.getScrollSpeedValue())
                 /*binding.teleprompterRecyclerView.smoothScrollBy(
                     0,
                     viewModel.getScrollSpeedValue(),
@@ -549,20 +977,16 @@ class TeleprompterFragment : Fragment() {
         super.onPause()
     }
 
-    private fun setScrollPosition(position: Int) {
-        val layoutManager = binding.teleprompterRecyclerView.layoutManager as LinearLayoutManager
-        binding.teleprompterRecyclerView.post {
-            layoutManager.scrollToPosition(position)
-        }
-    }
+    /* private fun setScrollPosition(position: Int) {
+         val layoutManager = binding.teleprompterRecyclerView.layoutManager as LinearLayoutManager
+         binding.teleprompterRecyclerView.post {
+             layoutManager.scrollToPosition(position)
+         }
+     }*/
 
     private fun getScrollPosition(): Int{
-        val layoutManager = binding.teleprompterRecyclerView.layoutManager as LinearLayoutManager
-        return layoutManager.findLastCompletelyVisibleItemPosition()
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        _binding = null
+        /*      val layoutManager = binding.teleprompterRecyclerView.layoutManager as LinearLayoutManager
+              return layoutManager.findLastCompletelyVisibleItemPosition()*/
+        return 0
     }
 }
