@@ -754,11 +754,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             scriptDateTime = AppResources.CalendarResource(Calendar.getInstance()),
                             scriptPosition = scripts.size.toLong(),
                         )
-                        scriptContentList.clear()
-                        appendTextFieldIfNeeded()
                         scriptMarkupLanguage.value = null
                         isEditingScript.value = true
                         script.value!!.scriptId = withContext(Dispatchers.IO) { dao.insert(script.value!!) }
+                        scriptContentList.clear()
+                        appendTextFieldIfNeeded()
                     }
                 } else {
                     withContext(Dispatchers.Main) {
@@ -1315,7 +1315,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         }
                     }
                     else{
-                        scriptMarkupLanguage.value = null
                         script.scriptMarkupLanguage = null
                         dao.update(script)
                     }
@@ -1335,7 +1334,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun spansNotSimilarAndNameUnique(similarList: List<String>, process:(isValid:Boolean, similarList:List<String>, nameUniqueErrorMessage:String)->Unit){
         val index = markupLanguageSelectedIndex.value
-        if (index>=markupLanguagesList.size) return
+        if (index == -1 || index>=markupLanguagesList.size) return
         val indexName = markupLanguagesList[index].name.value
         var nameUniqueErrorMessage = ""
         if (indexName.isEmpty() || indexName == MainActivity.ResourceProvider.getString(R.string.new_markup_language)) {
@@ -1358,6 +1357,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         defaultMarkupLanguage.update { MarkupLanguage() }
         markupLanguagesList.clear()
         markupLanguageSelectedIndex.value = -1
+        scriptMarkupLanguage.value = null
         appendedUnit?.invoke()
     }
 

@@ -91,6 +91,7 @@ class TeleprompterViewModel(
         context: Context,
         viewLifecycleOwner: LifecycleOwner,
         childFragmentManager: FragmentManager,
+        textSize: Float,
         markupLanguageInitializeScrollUnit:(()->Unit)
     ): ContentItemAdapter {
         return ContentItemAdapter(
@@ -105,7 +106,8 @@ class TeleprompterViewModel(
             MutableStateFlow(false),
             viewModelScope,
             repository,
-            MutableStateFlow(null)
+            MutableStateFlow(null),
+            textSize
         )
     }
 

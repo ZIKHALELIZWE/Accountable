@@ -39,6 +39,7 @@ class AddMediaDialog(
     private val contentItemAdapter: ContentItemAdapter,
     private val item: Content,
     private val aboveBelowContentType: Pair<Content.ContentType?,Content.ContentType?>,
+    private val textSize: Float,
     private val processResults: (List<Uri>?, Content.ContentType, ScriptFragment.ContentPosition) -> Unit
 ): BottomSheetDialogFragment() {
 
@@ -131,7 +132,7 @@ class AddMediaDialog(
 
         binding.deleteButton.setOnClickListener {
             val contentViewHolder = contentItemAdapter.onCreateViewHolder(binding.itemConfirmationPreview,contentItemAdapter.getOrdinal(item.type))
-            contentViewHolder.bind(item)
+            contentViewHolder.bind(item, textSize)
             binding.deleteConfirmationButton.text = getString(
                 R.string.delete_content,
                 when (item.type) {

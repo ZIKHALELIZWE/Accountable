@@ -67,7 +67,8 @@ class ContentItemAdapter(
     val isEditingScript: MutableStateFlow<Boolean>,
     private val viewModelScope: CoroutineScope,
     private val repository: AccountableRepository,
-    private val addTimeStampFunction: MutableStateFlow<((String) -> Unit)?>
+    private val addTimeStampFunction: MutableStateFlow<((String) -> Unit)?>,
+    private val textSize: Float
 ): ListAdapter<Content, ContentItemAdapter.ContentItemViewHolder>(ContentDiffItemCallback()) {
 
     private val scriptContentList: StateFlow<MutableList<Content>> = MutableStateFlow(mutableListOf())
@@ -132,7 +133,7 @@ class ContentItemAdapter(
 
     override fun onBindViewHolder(holder: ContentItemViewHolder, position: Int) {
         if (!viewHolders.contains(holder)) viewHolders.add(holder)
-        holder.bind(getItem(position))
+        holder.bind(getItem(position), textSize)
     }
 
     override fun onViewRecycled(holder: ContentItemViewHolder) {
@@ -298,7 +299,7 @@ class ContentItemAdapter(
             }
         }
 
-        abstract fun bind(item: Content)
+        abstract fun bind(item: Content,textSize: Float)
 
         fun setTeleprompterSettings(inputSettings: StateFlow<TeleprompterSettings?>){
             teleprompterSettings.value = inputSettings
@@ -311,7 +312,7 @@ class ContentItemAdapter(
 
         private val jobs: ArrayList<Job> = arrayListOf()
 
-        override fun bind(item: Content)
+        override fun bind(item: Content, textSize: Float)
         {
             binding.task = item
             binding.textItemViewHolder = this
@@ -319,11 +320,11 @@ class ContentItemAdapter(
             binding.lifecycleOwner = viewLifecycleOwner
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
-                item.getText(markupLanguage.value,context)
+                item.getText(markupLanguage.value,context,textSize)
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
-                item.getText(it,context)
+                item.getText(it,context,textSize)
             })
 
             binding.editText.setOnLongClickListener { view ->
@@ -342,7 +343,8 @@ class ContentItemAdapter(
         private val jobs: ArrayList<Job> = arrayListOf()
 
         override fun bind(
-            item: Content
+            item: Content,
+            textSize: Float
         ) {
             binding.task = item
             binding.imageItemViewHolder = this
@@ -350,11 +352,11 @@ class ContentItemAdapter(
             binding.lifecycleOwner = viewLifecycleOwner
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
-                item.getText(markupLanguage.value,context)
+                item.getText(markupLanguage.value,context, textSize)
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
-                item.getText(it,context)
+                item.getText(it,context, textSize)
             })
 
             binding.imageView.setOnLongClickListener { view ->
@@ -381,7 +383,8 @@ class ContentItemAdapter(
         private val jobs: ArrayList<Job> = arrayListOf()
 
         override fun bind(
-            item: Content
+            item: Content,
+            textSize: Float
         ) {
             binding.task = item
             binding.videoItemViewHolder = this
@@ -432,12 +435,12 @@ class ContentItemAdapter(
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
-                item.getText(markupLanguage.value,context)
+                item.getText(markupLanguage.value,context,textSize)
                 binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.text.toString())
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
-                item.getText(it,context)
+                item.getText(it,context,textSize)
             })
 
             binding.root.setOnLongClickListener { view ->
@@ -472,7 +475,8 @@ class ContentItemAdapter(
         private val jobs: ArrayList<Job> = arrayListOf()
 
         override fun bind(
-            item: Content
+            item: Content,
+            textSize: Float
         ) {
             binding.task = item
             binding.documentItemViewHolder = this
@@ -480,12 +484,12 @@ class ContentItemAdapter(
             binding.lifecycleOwner = viewLifecycleOwner
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
-                item.getText(markupLanguage.value,context)
+                item.getText(markupLanguage.value,context,textSize)
                 binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.text.toString())
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
-                item.getText(it,context)
+                item.getText(it,context,textSize)
             })
 
             binding.documentCardView.setOnLongClickListener { view ->
@@ -505,7 +509,8 @@ class ContentItemAdapter(
 
         @OptIn(UnstableApi::class)
         override fun bind(
-            item: Content
+            item: Content,
+            textSize: Float
         ) {
             binding.task = item
             binding.audioItemViewHolder = this
@@ -558,12 +563,12 @@ class ContentItemAdapter(
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
-                item.getText(markupLanguage.value,context)
+                item.getText(markupLanguage.value,context, textSize)
                 binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.text.toString())
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
-                item.getText(it,context)
+                item.getText(it,context, textSize)
             })
 
             binding.root.setOnLongClickListener { view ->
@@ -645,7 +650,8 @@ class ContentItemAdapter(
         private val jobs: ArrayList<Job> = arrayListOf()
 
         override fun bind(
-            item: Content
+            item: Content,
+            textSize: Float
         ) {
             binding.task = item
             binding.scriptContentItemViewHolder = this
@@ -653,12 +659,12 @@ class ContentItemAdapter(
             binding.lifecycleOwner = viewLifecycleOwner
 
             jobs.add(collectFlow(viewLifecycleOwner,isEditingScript){
-                item.getText(markupLanguage.value,context)
+                item.getText(markupLanguage.value,context, textSize)
                 binding.cardView.visibility = cardViewVisibility(it,binding.task?.description?.text.toString())
             })
 
             jobs.add(collectFlow(viewLifecycleOwner,markupLanguage){
-                item.getText(it,context)
+                item.getText(it,context,textSize)
             })
 
             binding.scriptConstraintLayout.setOnLongClickListener { view ->
@@ -683,7 +689,8 @@ class ContentItemAdapter(
                 viewLifecycleOwner,
                 this,
                 item,
-                getAboveBelowContentType(scriptContentList.value.indexOf(item))
+                getAboveBelowContentType(scriptContentList.value.indexOf(item)),
+                textSize
             ) { multipleContentList, contentType, contentPosition ->
                 addContent(multipleContentList,contentType,contentPosition,item,binding)
             }
@@ -782,14 +789,15 @@ class ContentItemAdapter(
         }
     }
 
-    fun updateSpecialCharacters(specialCharactersList: MutableList<SpecialCharacters>){
+    fun updateSpecialCharacters(specialCharactersList: MutableList<SpecialCharacters>, textSize:Float){
         scriptContentList.value.forEach{ content->
             content.replace(
                 specialCharactersList,
                 context,
                 markupLanguage.value,
                 isEditingScript.value,
-                viewModelScope
+                viewModelScope,
+                textSize
             )
         }
     }

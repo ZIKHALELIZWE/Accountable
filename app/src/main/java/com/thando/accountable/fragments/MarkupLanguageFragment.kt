@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +35,7 @@ import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -51,6 +53,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -77,7 +80,10 @@ import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel
 import com.thando.accountable.ui.cards.Colour
 import com.thando.accountable.ui.cards.MarkupLanguageCard
 import com.thando.accountable.ui.cards.TextFieldAccountable
+import com.thando.accountable.ui.screens.MenuItemData
+import com.thando.accountable.ui.screens.basicDropdownMenu
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.launch
 
 class MarkupLanguageFragment : Fragment() {
 
@@ -92,10 +98,13 @@ class MarkupLanguageFragment : Fragment() {
         return ComposeView(requireContext()).apply {
             setContent {
                 val mainActivity = (requireActivity() as MainActivity)
+                val scope = rememberCoroutineScope()
                 mainActivity.onBackPressedDispatcher.addCallback(viewLifecycleOwner,
                     object : OnBackPressedCallback(true){
                         override fun handleOnBackPressed() {
-                            viewModel.navigateToScript(true)
+                            scope.launch {
+                                viewModel.closeMarkupLanguageFragment(true,context)
+                            }
                         }
                     }
                 )
@@ -108,7 +117,9 @@ class MarkupLanguageFragment : Fragment() {
                             CenterAlignedTopAppBar(
                                 title = { Text(stringResource(R.string.markup_language)) },
                                 navigationIcon = { IconButton(onClick = {
-                                    viewModel.navigateToScript(true)
+                                    scope.launch {
+                                        viewModel.closeMarkupLanguageFragment(true,context)
+                                    }
                                 })  {
                                     Icon(
                                         Icons.AutoMirrored.Filled.ArrowBack,
@@ -166,6 +177,7 @@ fun MarkupLanguageFragmentView(
     val deleteButtonText by viewModel.deleteButtonText.collectAsStateWithLifecycle()
 
     val example by viewModel.openingClosingExampleSpannedString.spannableAnnotatedString.collectAsStateWithLifecycle()
+    val exampleFontSize = 26
     val selectedIndex by viewModel.selectedIndex.collectAsStateWithLifecycle()
     var spinnerView by remember{ mutableStateOf<View?>(null) }
     var opening by remember { mutableStateOf(markupLanguage?.opening) }
@@ -220,7 +232,7 @@ fun MarkupLanguageFragmentView(
 
     if (markupLanguage!=null && markupLanguagesList.isNotEmpty()){
         LaunchedEffect(opening?.selection, closing?.selection){
-            viewModel.setOpeningClosingExample(context)
+            viewModel.setOpeningClosingExample(context, exampleFontSize.toFloat())
         }
     }
 
@@ -233,16 +245,6 @@ fun MarkupLanguageFragmentView(
                 nameNotUniqueErrorMessage,
                 Snackbar.LENGTH_SHORT
             ).show()
-        }
-    }
-
-    LaunchedEffect(viewModel.navigateToScript) {
-        viewModel.navigateToScript.collect { save ->
-            viewModel.closeMarkupLanguageFragment(
-                save,
-                markupLanguage,
-                context
-            )
         }
     }
 
@@ -353,7 +355,7 @@ fun MarkupLanguageFragmentView(
                     .background(MaterialTheme.colorScheme.primary),
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onPrimary,
-                fontSize = 26.sp
+                fontSize = exampleFontSize.sp
             )
 
             Row(modifier = Modifier.fillMaxWidth()
@@ -370,7 +372,7 @@ fun MarkupLanguageFragmentView(
                     fontSize = 26.sp
                 )
                 opening?.let { opening ->
-                    TextFieldAccountable(
+                    TextField(
                         state = opening,
                         modifier = Modifier.weight(1f)
                             .fillMaxWidth().fillMaxHeight().padding(1.dp),
@@ -404,7 +406,7 @@ fun MarkupLanguageFragmentView(
                     fontSize = 26.sp
                 )
                 closing?.let { closing ->
-                    TextFieldAccountable(
+                    TextField(
                         state = closing,
                         modifier = Modifier.weight(1f)
                             .fillMaxWidth().fillMaxHeight().padding(1.dp),
@@ -435,10 +437,11 @@ fun MarkupLanguageFragmentView(
         LazyColumn(
             state = viewModel.lazyListState,
             contentPadding = PaddingValues(2.dp),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().imePadding()
         ) {
             items(
-                items = cardList
+                items = cardList,
+                key = {"${it.markupLanguageName}:${it.tag.spanName}"}
             ) { spanCard ->
                 MarkupLanguageSpanCard(
                     spanCard,
@@ -460,6 +463,7 @@ fun MarkupLanguageSpanCard(
     val context = LocalContext.current
     val backgroundColor by spanCard.backgroundColour.collectAsStateWithLifecycle()
     val exampleText by spanCard.spannedString.spannableAnnotatedString.collectAsStateWithLifecycle()
+    val exampleTextFontSize = 26
     val identifier = remember { spanCard.tag.spanCharValue.first }
     val exampleValue = remember { spanCard.tag.spanCharValue.second }
     val colourButtonEnabled by spanCard.colourButtonEnabled.collectAsStateWithLifecycle()
@@ -467,8 +471,9 @@ fun MarkupLanguageSpanCard(
     val duplicateErrorMessage by spanCard.duplicateErrorMessage.collectAsStateWithLifecycle()
     var exampleValueInputType by remember { mutableStateOf(KeyboardType.Text) }
     var buttonOnClick by remember { mutableStateOf({}) }
+    var showDialog by remember { mutableStateOf(false) }
+    var alignmentOptions by remember { mutableStateOf(listOf<MenuItemData>())}
     var buttonText by remember { mutableStateOf("") }
-    var buttonView by remember { mutableStateOf<View?>(null) }
 
     if (spanCard.hasValue()) {
         if (spanCard.getSpanType() == MarkupLanguage.TagType.FUNCTION_FLOAT) {
@@ -493,42 +498,38 @@ fun MarkupLanguageSpanCard(
             }
         } else if (spanCard.getSpanType() == MarkupLanguage.TagType.FUNCTION_STRING) {
             buttonText = stringResource(R.string.select_alignment)
-            buttonOnClick = {
-                buttonView?.let { buttonView ->
-                    MarkupLanguage.getAlignmentMenuOnClick(
-                        context, buttonView,
-                        {
-                            //Normal
-                            spanCard.tag.spanCharValue.second.setTextAndPlaceCursorAtEnd(
-                                Layout.Alignment.ALIGN_NORMAL.name
-                            )
-                        },
-                        {
-                            //Center
-                            spanCard.tag.spanCharValue.second.setTextAndPlaceCursorAtEnd(
-                                Layout.Alignment.ALIGN_CENTER.name
-                            )
-                        },
-                        {
-                            //Opposite
-                            spanCard.tag.spanCharValue.second.setTextAndPlaceCursorAtEnd(
-                                Layout.Alignment.ALIGN_OPPOSITE.name
-                            )
-                        }
-                    )()
-                }
+            buttonOnClick =  {
+                alignmentOptions = listOf(
+                    MenuItemData(Layout.Alignment.ALIGN_NORMAL.name){
+                        spanCard.tag.spanCharValue.second.setTextAndPlaceCursorAtEnd(
+                            Layout.Alignment.ALIGN_NORMAL.name
+                        )
+                    },
+                    MenuItemData(Layout.Alignment.ALIGN_CENTER.name){
+                        spanCard.tag.spanCharValue.second.setTextAndPlaceCursorAtEnd(
+                            Layout.Alignment.ALIGN_CENTER.name
+                        )
+                    },
+                    MenuItemData(Layout.Alignment.ALIGN_OPPOSITE.name){
+                        spanCard.tag.spanCharValue.second.setTextAndPlaceCursorAtEnd(
+                            Layout.Alignment.ALIGN_OPPOSITE.name
+                        )
+                    }
+                )
+                showDialog = true
             }
         }
     }
 
     LaunchedEffect(
-        spanCard.tag.spanCharValue.first,
-        spanCard.tag.spanCharValue.second
+        spanCard.tag.spanCharValue.first.text,
+        spanCard.tag.spanCharValue.second.text
     ){
         spanCard.processText(
             markupLanguage = markupLanguage,
             context,
-            updateStates
+            updateStates,
+            exampleTextFontSize.toFloat()
         )
     }
 
@@ -537,7 +538,7 @@ fun MarkupLanguageSpanCard(
     Card(
         modifier = modifier.fillMaxWidth()
             .background(Color(backgroundColor))
-            .padding(1.dp),
+            .padding(horizontal = 1.dp, vertical = 5.dp),
         elevation = CardDefaults.cardElevation(30.dp),
         shape = RectangleShape
     ) {
@@ -546,21 +547,21 @@ fun MarkupLanguageSpanCard(
                 text = exampleText,
                 modifier = Modifier.fillMaxWidth(),
                 style = TextStyle(
-                    fontSize = 26.sp,
+                    fontSize = exampleTextFontSize.sp,
                     color = Color.Black
                 )
             )
             Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                 Text(
                     text = spanCard.tag.spanName+":",
-                    modifier = Modifier.fillMaxHeight(),
+                    modifier = Modifier.fillMaxHeight().fillMaxWidth().weight(0.8f),
                     fontSize = 26.sp,
                     color = Color.Black
                 )
-                TextFieldAccountable(
+                TextField(
                     state = identifier,
                     modifier = Modifier.weight(1f)
-                        .fillMaxHeight(),
+                        .fillMaxHeight().fillMaxWidth().padding(horizontal = 2.dp),
                     inputTransformation = {
                         val maxCharacters = 10
                         if(length > maxCharacters){
@@ -574,23 +575,23 @@ fun MarkupLanguageSpanCard(
                 )
 
                 if (spanCard.valueEditTextVisibility){
-                    TextFieldAccountable(
+                    TextField(
                         state = exampleValue,
                         modifier = Modifier.weight(1f)
-                            .fillMaxHeight(),
+                            .fillMaxHeight().fillMaxWidth().padding(horizontal = 2.dp),
                         textStyle = TextStyle(
                             fontSize = 26.sp,
                             color = Color.Black
                         ),
                         keyboardOptions = KeyboardOptions(keyboardType = exampleValueInputType),
                         inputTransformation = {
-                            if (exampleValueInputType == KeyboardType.Number  ||
+                            /*if (exampleValueInputType == KeyboardType.Number  ||
                                 exampleValueInputType == KeyboardType.Decimal) {
                                 val digitsOnly = originalText.filter { it.isDigit() }
                                 if (digitsOnly != originalText) {
                                     replace(0, length, digitsOnly)
                                 }
-                            }
+                            }*/
                         }
                     )
                 }
@@ -598,7 +599,7 @@ fun MarkupLanguageSpanCard(
                 if (spanCard.colourButtonVisibility) {
                     Button(
                         modifier = Modifier.weight(1f)
-                            .fillMaxHeight(),
+                            .fillMaxHeight().fillMaxWidth().padding(horizontal = 2.dp),
                         onClick = buttonOnClick,
                         enabled = colourButtonEnabled,
                         colors = ButtonColors(
@@ -608,22 +609,36 @@ fun MarkupLanguageSpanCard(
                             MaterialTheme.colorScheme.onPrimary
                         )
                     ){
-                        buttonView = LocalView.current
                         Text(
                             buttonText,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
+                        if (showDialog) {
+                            DropdownMenu(
+                                expanded = true,
+                                onDismissRequest = { showDialog = false }
+                            ) {
+                                alignmentOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.text) },
+                                        onClick = {
+                                            option.onClick.invoke()
+                                            showDialog = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-
-                if (errorMessageVisibility) {
-                    Text(
-                        text = duplicateErrorMessage,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Color.Red,
-                        fontSize = 18.sp
-                    )
-                }
+            }
+            if (errorMessageVisibility) {
+                Text(
+                    text = duplicateErrorMessage,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.Red,
+                    fontSize = 18.sp
+                )
             }
         }
     }

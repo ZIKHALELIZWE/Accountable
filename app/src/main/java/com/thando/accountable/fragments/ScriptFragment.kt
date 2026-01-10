@@ -591,7 +591,9 @@ class ScriptFragment : Fragment() {
                 }
             ),
             MenuItemData(
-                text = stringResource(R.string.choose_markup_language),
+                text = if (script.scriptMarkupLanguage==null)
+                        stringResource(R.string.choose_markup_language)
+                    else stringResource(R.string.change_markup_language,script.scriptMarkupLanguage!!),
                 onClick = { viewModel.saveScriptAndOpenMarkupLanguage() }
             ),
             MenuItemData(
@@ -637,7 +639,7 @@ class ScriptFragment : Fragment() {
                 progressMax = toolbarState.scrollOffset,
                 imageUri,
                 navigationIcon,
-                if (textIndex!=null && textIndex!!.second.type == ContentType.TEXT) addContentButton else null,
+                if (textIndex!=null) addContentButton else null,
                 shareIcon,
                 teleprompterIcon,
                 basicDropdownMenu(options = menuList)

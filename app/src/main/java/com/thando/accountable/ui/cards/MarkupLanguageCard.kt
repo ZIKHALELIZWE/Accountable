@@ -37,6 +37,7 @@ data class MarkupLanguageCard(
         when(tag.spanType){
             MarkupLanguage.TagType.FUNCTION_INT,
             MarkupLanguage.TagType.FUNCTION_FLOAT,
+            MarkupLanguage.TagType.FUNCTION_RELATIVE_SIZE,
             MarkupLanguage.TagType.FUNCTION_URL -> {
                 valueEditTextVisibility = true
                 colourButtonVisibility = false
@@ -102,6 +103,7 @@ data class MarkupLanguageCard(
             MarkupLanguage.TagType.FUNCTION_INT -> spanValueSet && MarkupLanguage.getInt(tag.spanCharValue.second)!=null
             MarkupLanguage.TagType.FUNCTION_FLOAT -> spanValueSet && MarkupLanguage.getFloat(tag.spanCharValue.second)!=null
             MarkupLanguage.TagType.FUNCTION_COLOUR -> spanValueSet && MarkupLanguage.getColour(tag.spanCharValue.second)!=null
+            MarkupLanguage.TagType.FUNCTION_RELATIVE_SIZE -> spanValueSet && MarkupLanguage.getFloat(tag.spanCharValue.second)!=null
             MarkupLanguage.TagType.FUNCTION_IMAGE_URI -> spanValueSet
             MarkupLanguage.TagType.FUNCTION_URL -> spanValueSet
             MarkupLanguage.TagType.FUNCTION_CLICKABLE -> true
@@ -117,6 +119,7 @@ data class MarkupLanguageCard(
             MarkupLanguage.TagType.FUNCTION_COLOUR -> getSpanCharValueConversionSet()
             MarkupLanguage.TagType.FUNCTION_URL -> getSpanCharValueConversionSet()
             MarkupLanguage.TagType.FUNCTION_STRING -> getSpanCharValueConversionSet()
+            MarkupLanguage.TagType.FUNCTION_RELATIVE_SIZE -> getSpanCharValueConversionSet()
             MarkupLanguage.TagType.FUNCTION_IMAGE_URI -> context != null
             MarkupLanguage.TagType.FUNCTION_CLICKABLE -> clickable!=null
         }
@@ -125,7 +128,8 @@ data class MarkupLanguageCard(
     suspend fun processText(
         markupLanguage: MarkupLanguage?,
         context: Context,
-        updateStates: ()->Unit
+        updateStates: ()->Unit,
+        textSize: Float
     ) {
         val span = tag.spanCharValue.first.text.toString()
         val value = tag.spanCharValue.second.text.toString()
@@ -141,11 +145,19 @@ data class MarkupLanguageCard(
                         this@MarkupLanguageCard,
                         variablesSet(context, clickableSpan)
                     ) { text, range ->
-                        spannedString.setText(text, context)
+                        spannedString.setText(text, context, textSize)
                         if (range != null) {
                             tag.applyTag(
                                 range,
                                 spannedString.spannableStringBuilder,
+                                textSize,
+                                context,
+                                clickable = clickableSpan
+                            )
+                            tag.applyTagAnnotated(
+                                range,
+                                spannedString.spannableAnnotatedString,
+                                textSize,
                                 context,
                                 clickable = clickableSpan
                             )
@@ -154,7 +166,7 @@ data class MarkupLanguageCard(
                     colourButtonEnabled.value = true
                 }
             } else {
-                spannedString.setText("", context)
+                spannedString.setText("", context, textSize)
                 colourButtonEnabled.value = false
             }
             updateStates()

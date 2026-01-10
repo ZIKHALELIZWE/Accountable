@@ -68,7 +68,7 @@
     <string name="edit_script">Edit Script</string>
     <string name="preview_script">Preview Script</string>
     <string name="choose_markup_language">Choose Markup Language</string>
-    <string name="change_markup_language">Change Markup Language: </string>
+    <string name="change_markup_language">Change Markup Language: %s</string>
     <string name="opening">Opening:</string>
     <string name="closing">Closing:</string>
     <string name="pick_colour">Pick Colour</string>

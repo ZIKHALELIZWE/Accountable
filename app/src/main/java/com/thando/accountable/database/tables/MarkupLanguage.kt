@@ -76,6 +76,7 @@ import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Com
 import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Companion.EXAMPLE_TEXT
 import com.thando.accountable.ui.cards.MarkupLanguageCard
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlin.reflect.KFunction2
 import kotlin.reflect.KFunction3
 import kotlin.reflect.KFunction4
@@ -238,7 +239,7 @@ data class MarkupLanguage(
 
     enum class TagType{
         FUNCTION, FUNCTION_INT, FUNCTION_FLOAT, FUNCTION_COLOUR, FUNCTION_IMAGE_URI,
-        FUNCTION_URL, FUNCTION_CLICKABLE, FUNCTION_STRING
+        FUNCTION_URL, FUNCTION_CLICKABLE, FUNCTION_STRING, FUNCTION_RELATIVE_SIZE
     }
 
     @Ignore
@@ -254,7 +255,7 @@ data class MarkupLanguage(
         "Line Height" to Tag( "Line Height", true, TagType.FUNCTION_INT, lineHeight, opening, closing, functionInt = this::lineHeightSpan, functionIntAnnotated = this::lineHeightSpanAnnotated),
         "Leading Margin" to Tag( "Leading Margin", true, TagType.FUNCTION_INT, leadingMargin, opening, closing, functionInt = this::leadingMarginSpan, functionIntAnnotated = this::leadingMarginSpanAnnotated),
         "Tab Stop" to Tag( "Tab Stop", true, TagType.FUNCTION_INT, tabStop, opening, closing, functionInt = this::tabStopSpan, functionIntAnnotated = this::tabStopSpanAnnotated),
-        "Relative Size" to Tag( "Relative Size", false, TagType.FUNCTION_FLOAT, relativeSize, opening, closing, functionFloat = this::relativeSizeSpan, functionFloatAnnotated = this::relativeSizeSpanAnnotated),
+        "Relative Size" to Tag( "Relative Size", false, TagType.FUNCTION_RELATIVE_SIZE, relativeSize, opening, closing, functionRelativeSize = this::relativeSizeSpan, functionRelativeSizeAnnotated = this::relativeSizeSpanAnnotated),
         "Scale X" to Tag( "Scale X", false, TagType.FUNCTION_FLOAT, scaleX, opening, closing, functionFloat = this::scaleXSpan, functionFloatAnnotated = this::scaleXSpanAnnotated),
         "Colour Text" to Tag( "Colour Text", false, TagType.FUNCTION_COLOUR, colourText, opening, closing, functionColour = this::colourTextSpan, functionColourAnnotated = this::colourTextSpanAnnotated),
         "Highlight" to Tag( "Highlight", false, TagType.FUNCTION_COLOUR, highlight, opening, closing, functionColour = this::highlightSpan, functionColourAnnotated = this::highlightSpanAnnotated),
@@ -285,6 +286,7 @@ data class MarkupLanguage(
         var functionUrl: KFunction3<SpannableStringBuilder, String, IntRange, SpannableStringBuilder>? = null,
         var functionClickable: KFunction3<SpannableStringBuilder, () -> Unit, IntRange, SpannableStringBuilder>? = null,
         var functionString: KFunction3<SpannableStringBuilder, String, IntRange, SpannableStringBuilder>? = null,
+        var functionRelativeSize: KFunction4<SpannableStringBuilder, Float, Float, IntRange, SpannableStringBuilder>? = null,
         var functionAnnotated: KFunction2<AnnotatedString, IntRange, AnnotatedString>? = null,
         var functionIntAnnotated: KFunction3<AnnotatedString, Int, IntRange, AnnotatedString>? = null,
         var functionFloatAnnotated: KFunction3<AnnotatedString, Float, IntRange, AnnotatedString>? = null,
@@ -292,7 +294,8 @@ data class MarkupLanguage(
         var functionImageUriAnnotated: KFunction4<AnnotatedString, Context, Uri, IntRange, AnnotatedString>? = null,
         var functionUrlAnnotated: KFunction4<AnnotatedString, Context, String, IntRange, AnnotatedString>? = null,
         var functionClickableAnnotated: KFunction3<AnnotatedString, () -> Unit, IntRange, AnnotatedString>? = null,
-        var functionStringAnnotated: KFunction3<AnnotatedString, String, IntRange, AnnotatedString>? = null
+        var functionStringAnnotated: KFunction3<AnnotatedString, String, IntRange, AnnotatedString>? = null,
+        var functionRelativeSizeAnnotated: KFunction4<AnnotatedString, Float, Float, IntRange, AnnotatedString>? = null,
     ){
         private var openingTag:String = ""
         private var valueClosing:String = ""
@@ -313,14 +316,16 @@ data class MarkupLanguage(
                     && functionImageUri==null
                     && functionUrl==null
                     && functionClickable==null
-                    && functionString==null) throw IllegalArgumentException("No function passed")
+                    && functionString==null
+                    && functionRelativeSize==null) throw IllegalArgumentException("No function passed")
                 else if (functionInt!=null
                     && functionFloat!=null
                     && functionColour!=null
                     && functionImageUri!=null
                     && functionUrl!=null
                     && functionClickable!=null
-                    && functionString!=null) throw IllegalArgumentException("Too many functions passed")
+                    && functionString!=null
+                    && functionRelativeSize!=null) throw IllegalArgumentException("Too many functions passed")
             }
             if (spanCharValue.first.text.isEmpty().not()) {
                 openingTag = openingChar.text.toString() + spanCharValue.first.text.toString()
@@ -409,17 +414,19 @@ data class MarkupLanguage(
         fun applyTag(
             range: IntRange,
             spannableStringBuilder: MutableStateFlow<SpannableStringBuilder>,
+            textSize: Float,
             context: Context? = null,
             clickable: (() -> Unit)? = null
         ){
             val storedContentRange = contentRange
             contentRange = range
-            applyTag(spannableStringBuilder, context, clickable)
+            applyTag(spannableStringBuilder, textSize, context, clickable)
             contentRange = storedContentRange
         }
 
         fun applyTag(
             spannableStringBuilder: MutableStateFlow<SpannableStringBuilder>,
+            textSize: Float,
             context: Context? = null,
             clickable: (() -> Unit)? = null,
         ) {
@@ -435,6 +442,7 @@ data class MarkupLanguage(
                         contentRange = it
                         stringBuilder = executeFunction(
                             stringBuilder,
+                            textSize,
                             context,
                             clickable
                         )
@@ -445,6 +453,7 @@ data class MarkupLanguage(
             } else {
                 spannableStringBuilder.value = executeFunction(
                     spannableStringBuilder.value,
+                    textSize,
                     context,
                     clickable
                 )
@@ -452,7 +461,21 @@ data class MarkupLanguage(
         }
 
         fun applyTagAnnotated(
+            range: IntRange,
             annotatedString: MutableStateFlow<AnnotatedString>,
+            textSize: Float,
+            context: Context? = null,
+            clickable: (() -> Unit)? = null
+        ){
+            val storedContentRange = contentRange
+            contentRange = range
+            applyTagAnnotated(annotatedString, textSize, context, clickable)
+            contentRange = storedContentRange
+        }
+
+        fun applyTagAnnotated(
+            annotatedString: MutableStateFlow<AnnotatedString>,
+            textSize: Float,
             context: Context? = null,
             clickable: (() -> Unit)? = null,
         ) {
@@ -468,24 +491,29 @@ data class MarkupLanguage(
                         contentRange = it
                         stringBuilder = executeFunction(
                             stringBuilder,
+                            textSize,
                             context,
                             clickable
                         )
                     }
                     contentRange = storedContentRange
-                    annotatedString.value = stringBuilder
+                    annotatedString.update { stringBuilder }
                 }
             } else {
-                annotatedString.value = executeFunction(
-                    annotatedString.value,
-                    context,
-                    clickable
-                )
+                annotatedString.update {
+                    executeFunction(
+                        annotatedString.value,
+                        textSize,
+                        context,
+                        clickable
+                    )
+                }
             }
         }
 
         private fun executeFunction(
             spannableStringBuilder: SpannableStringBuilder,
+            textSize: Float,
             context: Context? = null,
             clickable: (() -> Unit)? = null
         ): SpannableStringBuilder {
@@ -541,6 +569,13 @@ data class MarkupLanguage(
                         spanCharValue.second.text.toString(),
                         contentRange!!
                     )
+
+                    TagType.FUNCTION_RELATIVE_SIZE -> return functionRelativeSize!!(
+                        spannableStringBuilder,
+                        getFloat(spanCharValue.second)!!,
+                        textSize,
+                        contentRange!!
+                    )
                 }
             }
             return spannableStringBuilder
@@ -548,6 +583,7 @@ data class MarkupLanguage(
 
         private fun executeFunction(
             annotatedString: AnnotatedString,
+            textSize: Float,
             context: Context? = null,
             clickable: (() -> Unit)? = null
         ): AnnotatedString {
@@ -602,6 +638,13 @@ data class MarkupLanguage(
                     TagType.FUNCTION_STRING -> return functionStringAnnotated!!(
                         annotatedString,
                         spanCharValue.second.text.toString(),
+                        contentRange!!
+                    )
+
+                    TagType.FUNCTION_RELATIVE_SIZE -> return functionRelativeSizeAnnotated!!(
+                        annotatedString,
+                        getFloat(spanCharValue.second)!!,
+                        textSize,
                         contentRange!!
                     )
                 }
@@ -724,7 +767,7 @@ data class MarkupLanguage(
         return list
     }
 
-    fun relativeSizeSpan(spannableStringBuilder: SpannableStringBuilder, proportion:Float, range:IntRange):SpannableStringBuilder{
+    fun relativeSizeSpan(spannableStringBuilder: SpannableStringBuilder, proportion:Float, textSize:Float, range:IntRange):SpannableStringBuilder{
         spannableStringBuilder[range] = RelativeSizeSpan(proportion)
         return spannableStringBuilder
     }
@@ -903,8 +946,8 @@ data class MarkupLanguage(
         }
     }
 
-    fun relativeSizeSpanAnnotated(annotatedString: AnnotatedString, proportion:Float, range:IntRange):AnnotatedString{
-        val baseFontSize: TextUnit = TextUnit.Unspecified
+    fun relativeSizeSpanAnnotated(annotatedString: AnnotatedString, proportion:Float, textSize: Float, range:IntRange):AnnotatedString{
+        val baseFontSize = TextUnit(textSize, TextUnitType.Sp)
         val builder = AnnotatedString.Builder(annotatedString)
         val style = SpanStyle(fontSize = baseFontSize * proportion)
         builder.addStyle(style, range.first, range.last)

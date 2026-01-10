@@ -58,6 +58,7 @@ class TeleprompterFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        val textSize = 26
         // Inflate the layout for this fragment
         _binding = FragmentTeleprompterBinding.inflate(inflater, container, false)
         binding.viewModel = viewModel
@@ -66,7 +67,8 @@ class TeleprompterFragment : Fragment() {
         contentAdapter = viewModel.getContentAdapter(
             requireContext(),
             viewLifecycleOwner,
-            childFragmentManager
+            childFragmentManager,
+            textSize.toFloat()
         ) {
             setScrollPosition(viewModel.getScrollPosition())
             viewModel.loadTeleprompterSettings()
@@ -82,7 +84,7 @@ class TeleprompterFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
+        val textSize = 26
         bindingController = WindowCompat.getInsetsController(requireActivity().window, binding.root)
         // Configure the behavior of the hidden system bars.
         bindingController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -284,7 +286,7 @@ class TeleprompterFragment : Fragment() {
         }
 
         collectFlow(this,viewModel.updateContentAdapterSpecialCharacters){
-            specialCharactersList ->  contentAdapter.updateSpecialCharacters(specialCharactersList)
+            specialCharactersList ->  contentAdapter.updateSpecialCharacters(specialCharactersList, textSize.toFloat())
         }
 
         collectFlow(this, viewModel.addSpecialCharacterUpdate){

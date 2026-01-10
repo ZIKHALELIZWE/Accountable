@@ -28,31 +28,33 @@ class SpannedString(inputText: String) {
     constructor(
         inputText: String,
         context: Context,
-        markupLanguage: MarkupLanguage?
+        markupLanguage: MarkupLanguage?,
+        textSize: Float
     ):this(inputText){
-        setText(inputText,context,markupLanguage)
+        setText(inputText,context, textSize,markupLanguage)
     }
 
     fun getString():String{ return spannableStringBuilder.value.toString() }
 
-    fun setText(inputText: String?, context: Context?, markupLanguage: MarkupLanguage? = null) {
+    fun setText(inputText: String?, context: Context?, textSize: Float, markupLanguage: MarkupLanguage? = null) {
         spannableStringBuilder.value.clear()
         spannableStringBuilder.value.clearSpans()
-        spannableStringBuilder.value = processString(inputText, markupLanguage, context)
+        spannableStringBuilder.value = processString(inputText, markupLanguage, context, textSize)
 
-        spannableAnnotatedString.value = processAnnotatedString(inputText, markupLanguage, context)
+        spannableAnnotatedString.value = processAnnotatedString(inputText, markupLanguage, context, textSize)
     }
 
     private fun processString(
         inputString: String?,
         markupLanguage: MarkupLanguage?,
-        context: Context?
+        context: Context?,
+        textSize: Float
     ): SpannableStringBuilder {
         return if (markupLanguage != null && inputString != null) {
             val (tags, noTagString) = markupLanguage.getTagRanges(inputString, true)
             val temp = SpannedString(noTagString)
             tagsList = tags
-            tags.forEach { it.applyTag(temp.spannableStringBuilder, context) }
+            tags.forEach { it.applyTag(temp.spannableStringBuilder, textSize,context) }
             temp.spannableStringBuilder.value
         } else if (inputString != null) {
             SpannedString(inputString).spannableStringBuilder.value
@@ -64,13 +66,14 @@ class SpannedString(inputText: String) {
     private fun processAnnotatedString(
         inputString: String?,
         markupLanguage: MarkupLanguage?,
-        context: Context?
+        context: Context?,
+        textSize: Float
     ): AnnotatedString {
         return if (markupLanguage != null && inputString != null) {
             val (tags, noTagString) = markupLanguage.getTagRanges(inputString, true)
             val temp = MutableStateFlow(buildAnnotatedString { append(noTagString) } )
             tagsList = tags
-            tags.forEach { it.applyTagAnnotated(temp, context) }
+            tags.forEach { it.applyTagAnnotated(temp, textSize, context) }
             temp.value
         } else if (inputString != null) {
             buildAnnotatedString {

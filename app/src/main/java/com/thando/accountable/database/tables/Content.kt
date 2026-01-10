@@ -183,7 +183,7 @@ data class Content(
         }
     }
 
-    fun getText(markupLanguage: MarkupLanguage?, context: Context){
+    fun getText(markupLanguage: MarkupLanguage?, context: Context, textSize: Float){
         spannedString.setText(
             when(type){
                 ContentType.TEXT -> content.text.toString()
@@ -192,7 +192,7 @@ data class Content(
                 ContentType.VIDEO,
                 ContentType.DOCUMENT,
                 ContentType.AUDIO -> description.text.toString()
-            }, context, markupLanguage
+            }, context, textSize,markupLanguage
         )
     }
 
@@ -201,7 +201,8 @@ data class Content(
         context: Context,
         markupLanguage: MarkupLanguage?,
         isEditing: Boolean,
-        lifecycleScope: CoroutineScope
+        lifecycleScope: CoroutineScope,
+        textSize: Float
     ){
         if (replaceAsync!=null) {
             if (replaceAsync!!.isActive) replaceAsync!!.cancel()
@@ -321,6 +322,7 @@ data class Content(
                         spannedString.setText(
                             result,
                             context,
+                            textSize,
                             markupLanguage
                         )
                     }

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.KeyboardActionHandler
@@ -60,7 +59,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
@@ -220,7 +218,14 @@ fun TextFieldAccountable(
 
    TextField(
        state = state,
-       modifier = modifier.bringIntoViewRequester(bringIntoViewRequester),
+       modifier = modifier.bringIntoViewRequester(bringIntoViewRequester).onFocusChanged{
+           if (it.isFocused) onTextSelect(state) { newTextFieldState ->
+               state.edit {
+                   replace(0,length, newTextFieldState.text.toString())
+                   selection = newTextFieldState.selection
+               }
+           }
+       },
        enabled = enabled,
        readOnly = readOnly,
        textStyle = textStyle,
@@ -260,7 +265,6 @@ fun TextCard(
     filename: String? = null,
     textAlign: TextAlign = TextAlign.Start
 ){
-    val annotatedString by content.spannedString.spannableAnnotatedString.collectAsStateWithLifecycle()
     val textSize by teleprompterSettings?.textSize?.collectAsStateWithLifecycle()
         ?:MutableStateFlow(appSettings?.textSize?:24).collectAsStateWithLifecycle()
     val textColour by teleprompterSettings?.textColour?.collectAsStateWithLifecycle()
@@ -275,26 +279,21 @@ fun TextCard(
         else remember { content.content }
     val context = LocalContext.current
 
-    content.getText(markupLanguage,context)
-
-    LaunchedEffect(text.selection) {
-        if (filename == null){
-            content.spannedString.setText(
-                text.text.toString(),
-                context,
-                markupLanguage
-            )
-        }
-    }
+    content.getText(markupLanguage,context, textSize.toFloat())
 
     if (!isEditingScript) {
         if ((description && text.text.isNotEmpty()) || (!description)){
-            content.getText(markupLanguage,context)
+            content.getText(markupLanguage,context, textSize.toFloat())
             Text(
-                text = if (filename!=null){
-                    val fileNameSpannable by SpannedString(text.text.toString(), context,markupLanguage).spannableAnnotatedString.collectAsStateWithLifecycle()
-                    fileNameSpannable
-                } else annotatedString,
+                text = run{
+                    val annotatedString by SpannedString(
+                        text.text.toString(),
+                        context,
+                        markupLanguage,
+                        textSize.toFloat()
+                    ).spannableAnnotatedString.collectAsStateWithLifecycle()
+                    annotatedString
+                },
                 style = TextStyle(
                     textAlign = textAlign,
                     fontSize = textSize.sp,

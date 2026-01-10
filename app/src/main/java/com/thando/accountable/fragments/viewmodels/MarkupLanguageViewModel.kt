@@ -1,7 +1,6 @@
 package com.thando.accountable.fragments.viewmodels
 
 import android.content.Context
-import android.view.View
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
@@ -54,10 +53,6 @@ class MarkupLanguageViewModel(
     private val _showNameNotUniqueSnackBar = MutableSharedFlow<String>()
     val showNameNotUniqueSnackBar: SharedFlow<String> get() = _showNameNotUniqueSnackBar
 
-    // Click Events
-    private val _navigateToScript = MutableSharedFlow<Boolean>()
-    val navigateToScript: SharedFlow<Boolean> get() = _navigateToScript
-
     // View States
     val selectedIndex = repository.getMarkupLanguageSelectedIndex()
     val menuOpen = MutableStateFlow(true)
@@ -96,12 +91,6 @@ class MarkupLanguageViewModel(
         return original.spanName!=check.spanName && original.spanCharValue.first.text.isNotEmpty() && check.spanCharValue.first.text.isNotEmpty() && original.spanCharValue.first.text.toString() == check.spanCharValue.first.text.toString()
     }
 
-    fun getVisibility(opening:String?,closing:String?): Int{
-        return if (opening.isNullOrEmpty() || closing.isNullOrEmpty())
-            View.GONE
-        else View.VISIBLE
-    }
-
     fun setMarkupLanguageFunctions(
         markupLanguage: MarkupLanguage,
         context: Context
@@ -132,7 +121,7 @@ class MarkupLanguageViewModel(
             deleteButtonFunction = {
                 // Close
                 viewModelScope.launch {
-                    _navigateToScript.emit(false)
+                    closeMarkupLanguageFragment(false,context)
                 }
             }
         } else {
@@ -197,12 +186,6 @@ class MarkupLanguageViewModel(
         }
     }
 
-    fun navigateToScript(save: Boolean){
-        viewModelScope.launch {
-            _navigateToScript.emit(save)
-        }
-    }
-
     fun changeLanguageName(){
         changeNameFunction.invoke()
     }
@@ -211,36 +194,42 @@ class MarkupLanguageViewModel(
         deleteButtonFunction.invoke()
     }
 
-    fun closeMarkupLanguageFragment(save:Boolean, markupLanguage: MarkupLanguage?, context: Context){
-        val similarList = spansNotSimilar(markupLanguage)
-        if (similarList.isNotEmpty() && save){
-            repository.spansNotSimilarAndNameUnique(similarList) { isValid, innerSimilarList, nameUniqueErrorMessage ->
-                if (isValid) {
-                    viewModelScope.launch {
-                        if (markupLanguage != defaultMarkupLanguage.value){
-                            repository.deleteDefaultMarkupLanguage()
-                        }
-                        repository.saveMarkupLanguage(innerSimilarList){
-                            repository.setMarkupLanguageToScript(true){
-                                repository.resetDefaultMarkupLanguage {
-                                    repository.changeFragment(AccountableFragment.ScriptFragment)
+    suspend fun closeMarkupLanguageFragment(
+        save:Boolean,
+        context: Context
+    ){
+        if (save) {
+            markupLanguage.collect { markupLanguage ->
+                val similarList = spansNotSimilar(markupLanguage)
+                repository.spansNotSimilarAndNameUnique(similarList) { isValid, innerSimilarList, nameUniqueErrorMessage ->
+                    if (isValid) {
+                        viewModelScope.launch {
+                            if (markupLanguage != defaultMarkupLanguage.value) {
+                                repository.deleteDefaultMarkupLanguage()
+                            }
+                            repository.saveMarkupLanguage(innerSimilarList) {
+                                repository.setMarkupLanguageToScript(true) {
+                                    repository.resetDefaultMarkupLanguage {
+                                        repository.changeFragment(AccountableFragment.ScriptFragment)
+                                    }
                                 }
                             }
                         }
-                    }
-                } else {
-                    showErrorExitDialog(context, similarList, nameUniqueErrorMessage, {
-                        // Dismiss
+                    } else {
+                        showErrorExitDialog(context, similarList, nameUniqueErrorMessage, {
+                            // Dismiss
 
-                    }) {
-                        // Close
-                        closeMarkupLanguageFragment(false, markupLanguage, context)
+                        }) {
+                            // Close
+                            viewModelScope.launch {
+                                closeMarkupLanguageFragment(false, context)
+                            }
+                        }
                     }
                 }
             }
-        }
-        else{
-            repository.setMarkupLanguageToScript(false){
+        } else {
+            repository.setMarkupLanguageToScript(false) {
                 repository.deleteDefaultMarkupLanguage {
                     repository.resetDefaultMarkupLanguage {
                         repository.changeFragment(AccountableFragment.ScriptFragment)
@@ -250,7 +239,7 @@ class MarkupLanguageViewModel(
         }
     }
 
-    fun setOpeningClosingExample(context: Context){
+    fun setOpeningClosingExample(context: Context, textSize:Float){
         markupLanguage.value?.let { markupLanguage ->
             val openingIsNotEmpty = markupLanguage.opening.text.isNotEmpty()
             val closingIsNotEmpty = markupLanguage.closing.text.isNotEmpty()
@@ -263,24 +252,46 @@ class MarkupLanguageViewModel(
             getProcessedExampleString(stringBuilder, markupLanguage.opening.text.toString(),
                 markupLanguage.closing.text.toString(),openingIsNotEmpty,
                 closingIsNotEmpty,true,spanRange)
-            openingClosingExampleSpannedString.setText(stringBuilder.toString(), context)
+            openingClosingExampleSpannedString.setText(stringBuilder.toString(), context, textSize)
 
             if (openingIsNotEmpty && closingIsNotEmpty) {
                 val spanAddition = EXAMPLE_TEXT.length + 1 + markupLanguage.opening.text.length * 2 + EXAMPLE_SPAN.length * 2 + markupLanguage.closing.text.length * 2 + MarkupLanguage.CLOSING_INDICATOR.length
-                openingClosingExampleSpannedString.spannableStringBuilder.value = markupLanguage.boldSpan(
-                    openingClosingExampleSpannedString.spannableStringBuilder.value,
-                    IntRange(
-                        spanAddition + spanRange.first,
-                        spanAddition + spanRange.last
+                openingClosingExampleSpannedString.spannableStringBuilder.update {
+                    markupLanguage.boldSpan(
+                        openingClosingExampleSpannedString.spannableStringBuilder.value,
+                        IntRange(
+                            spanAddition + spanRange.first,
+                            spanAddition + spanRange.last
+                        )
                     )
-                )
-                openingClosingExampleSpannedString.spannableStringBuilder.value = markupLanguage.italicSpan(
-                    openingClosingExampleSpannedString.spannableStringBuilder.value,
-                    IntRange(
-                        spanAddition + spanRange.first,
-                        spanAddition + spanRange.last
+                }
+                openingClosingExampleSpannedString.spannableStringBuilder.update {
+                    markupLanguage.italicSpan(
+                        openingClosingExampleSpannedString.spannableStringBuilder.value,
+                        IntRange(
+                            spanAddition + spanRange.first,
+                            spanAddition + spanRange.last
+                        )
                     )
-                )
+                }
+                openingClosingExampleSpannedString.spannableAnnotatedString.update {
+                    markupLanguage.boldSpanAnnotated(
+                        openingClosingExampleSpannedString.spannableAnnotatedString.value,
+                        IntRange(
+                            spanAddition + spanRange.first,
+                            spanAddition + spanRange.last
+                        )
+                    )
+                }
+                openingClosingExampleSpannedString.spannableAnnotatedString.update {
+                    markupLanguage.italicSpanAnnotated(
+                        openingClosingExampleSpannedString.spannableAnnotatedString.value,
+                        IntRange(
+                            spanAddition + spanRange.first,
+                            spanAddition + spanRange.last
+                        )
+                    )
+                }
                 spanCharChanged()
             }
         }
