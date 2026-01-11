@@ -3,6 +3,7 @@ package com.thando.accountable.fragments.viewmodels
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -38,6 +39,7 @@ class ScriptViewModel(
 
     // Script or Teleprompter
     private var isScriptFragment = true
+    val listState = LazyListState()
 
     fun setIsScriptFragment(isScriptFragment: Boolean) {
         this.isScriptFragment = isScriptFragment

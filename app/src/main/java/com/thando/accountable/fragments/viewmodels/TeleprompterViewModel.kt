@@ -2,8 +2,12 @@ package com.thando.accountable.fragments.viewmodels
 
 import android.content.Context
 import android.view.View
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.mutableStateOf
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -24,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -55,6 +60,9 @@ class TeleprompterViewModel(
     val updateContentAdapterSpecialCharacters: SharedFlow<MutableList<SpecialCharacters>> get() = _updateContentAdapterSpecialCharacters
     private val _addSpecialCharacterUpdate = MutableSharedFlow<Int>()
     val addSpecialCharacterUpdate: SharedFlow<Int> get() = _addSpecialCharacterUpdate
+    private val _countDownButtonVisibility = MutableStateFlow(false)
+    val countDownButtonVisibility: StateFlow<Boolean> get() = _countDownButtonVisibility
+
 
 
     // Click Events
@@ -64,20 +72,21 @@ class TeleprompterViewModel(
     val skipForward: SharedFlow<Boolean> get() = _skipForward
     private var _skipBack = MutableSharedFlow<Boolean>()
     val skipBack: SharedFlow<Boolean> get() = _skipBack
-    private var _cancelCountdown = MutableSharedFlow<Pair<Boolean,(()->Unit)?>>()
-    val cancelCountdown = _cancelCountdown.asSharedFlow()
+    private var _cancelCountdown = MutableStateFlow(false)
+    val cancelCountdown: StateFlow<Boolean> get() = _cancelCountdown
     private var _finishCountdown = MutableSharedFlow<Boolean>()
     val finishCountdown: SharedFlow<Boolean> get() = _finishCountdown
 
     // View States
-    private var scrollPosition = 0
+    val listState = LazyListState()
     private var scrolled = false
     private var isTouching = false
-    private var _isFullscreen = MutableStateFlow(true)
-    val isFullscreen: StateFlow<Boolean> get() = _isFullscreen
-    private var _controlsVisibility = MutableStateFlow(View.VISIBLE)
-    val controlsVisibility: StateFlow<Int> get() = _controlsVisibility
+    private var _isFullscreen = MutableStateFlow(false)
+    val isFullScreen: StateFlow<Boolean> get() = _isFullscreen
+    private var _controlsVisible = MutableStateFlow(true)
+    val controlsVisible: StateFlow<Boolean> get() = _controlsVisible
     var countdownTimer : MutableStateFlow<TeleprompterFragment.CustomCountDownTimer?> = MutableStateFlow(null)
+    var countDownText = MutableStateFlow("")
 
     private var _contentSheetExpanded = MutableStateFlow(true)
     val contentSheetExpanded: StateFlow<Boolean> get() = _contentSheetExpanded
@@ -109,6 +118,14 @@ class TeleprompterViewModel(
             MutableStateFlow(null),
             textSize
         )
+    }
+
+    fun setCountDownText(countDownTextAfterTick: String){
+        countDownText.update { countDownTextAfterTick }
+    }
+
+    fun countDownCancelled(){
+        _cancelCountdown.value = false
     }
 
     fun loadTeleprompterSettings() {
@@ -215,26 +232,31 @@ class TeleprompterViewModel(
         repository.deleteSpecialCharacter(specialCharacter)
     }
 
-    fun setScrollPosition(inputScrollPosition:Int){
-        scrollPosition = inputScrollPosition
-    }
-
-    fun getScrollPosition(): Int{
-        return scrollPosition
-    }
-
     fun navigateToScript(){
         viewModelScope.launch {
             _navigateToScript.emit(true)
         }
     }
 
+    fun toggleControlsVisible(){
+        if (_controlsVisible.value) hideControls()
+        else showControls()
+    }
+
     fun hideControls() {
-        _controlsVisibility.value = View.GONE
+        _controlsVisible.value = false
     }
 
     fun showControls() {
-        _controlsVisibility.value = View.VISIBLE
+        _controlsVisible.value = true
+    }
+
+    fun showCountDownButton(){
+        _countDownButtonVisibility.update { true }
+    }
+
+    fun hideCountDownButton(){
+        _countDownButtonVisibility.update { false }
     }
 
     fun skipBack(){
@@ -255,6 +277,10 @@ class TeleprompterViewModel(
 
     fun pause(){
         _isPlaying.value = false
+    }
+
+    suspend fun countDownFinished(){
+        _finishCountdown.emit(false)
     }
 
     fun getIsPlaying() : Boolean{
@@ -289,13 +315,15 @@ class TeleprompterViewModel(
         isTouching = false
     }
 
+    fun isTouchingValue() = isTouching
+
     fun getScrollSpeedValue(): Int{
         return teleprompterSettings.value?.scrollSpeed?.value?:6
     }
 
-    fun cancelCountDown(appendedUnit:(()->Unit)?=null){
+    fun cancelCountDown(){
         viewModelScope.launch {
-            _cancelCountdown.emit(Pair(true,appendedUnit))
+            _cancelCountdown.emit(true)
         }
     }
 

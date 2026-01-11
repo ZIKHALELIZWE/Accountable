@@ -1,12 +1,10 @@
 package com.thando.accountable
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
-import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -79,7 +77,6 @@ class MainActivity : AppCompatActivity() {
     private val fragmentContainerViewId = 123456
 
     companion object{
-        val REQUEST_BLUETOOTH_CONNECT = 65165
         fun log(message:String){
             Log.i("FATAL EXCEPTION",message)
         }
@@ -132,8 +129,8 @@ class MainActivity : AppCompatActivity() {
         // Detect Bluetooth remote click (often volume or camera key)
         if (keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
             keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
-            keyCode == KeyEvent.KEYCODE_CAMERA ||
-            ) {
+            keyCode == KeyEvent.KEYCODE_CAMERA
+        ) {
             // Trigger skip back
             skipBackAction()
             return true
@@ -143,20 +140,6 @@ class MainActivity : AppCompatActivity() {
     private fun skipBackAction() {
         // You can expose this via a shared ViewModel or state holder
         TeleprompterFragment.TeleprompterController.skipBack()
-    }
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_BLUETOOTH_CONNECT) {
-            if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                // Permission granted → safe to use Bluetooth APIs
-            } else {
-                // Permission denied → show rationale or disable feature
-            }
-        }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)

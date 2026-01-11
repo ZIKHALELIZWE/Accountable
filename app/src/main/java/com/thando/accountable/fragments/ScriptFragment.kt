@@ -334,7 +334,7 @@ fun ScriptFragmentCatalog(
             collapseType
         else ToolbarState.CollapseType.Scroll
         , toolbarHeightRange)
-    val listState = rememberLazyListState()//script.scrollPosition
+    val listState = remember { viewModel.listState }
 
     val scope = rememberCoroutineScope()
     val nestedScrollConnection = remember {
