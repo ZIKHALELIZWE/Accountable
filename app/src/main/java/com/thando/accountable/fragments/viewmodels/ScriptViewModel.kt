@@ -40,6 +40,9 @@ class ScriptViewModel(
     // Script or Teleprompter
     private var isScriptFragment = true
     val listState = LazyListState()
+    var toolBarCollapsedFunction: suspend (Float, suspend (Float)->Unit)->Unit =  { _, ifTrueRun ->
+        ifTrueRun(0f)
+    }
 
     fun setIsScriptFragment(isScriptFragment: Boolean) {
         this.isScriptFragment = isScriptFragment
@@ -47,6 +50,12 @@ class ScriptViewModel(
 
     fun getIsScriptFragment(): Boolean {
         return isScriptFragment
+    }
+
+    suspend fun toolBarCollapsed(scrollBy: Float, ifTrueRun: suspend (Float)->Unit){
+        toolBarCollapsedFunction(scrollBy){ leftOverScroll ->
+            ifTrueRun(leftOverScroll)
+        }
     }
 
     fun chooseTopImage(chooseImage:(String)->Unit) {

@@ -9,7 +9,7 @@ class SpecialCharacterDiffItemCallback: DiffUtil.ItemCallback<SpecialCharacters>
         newItem: SpecialCharacters
     ): Boolean {
         return oldItem.teleprompterSettingsId == newItem.teleprompterSettingsId &&
-                oldItem.character.value == newItem.character.value &&
+                oldItem.character.text.toString() == newItem.character.text.toString() &&
                 oldItem.oldCharacter == newItem.oldCharacter
     }
 
@@ -17,6 +17,6 @@ class SpecialCharacterDiffItemCallback: DiffUtil.ItemCallback<SpecialCharacters>
         oldItem: SpecialCharacters,
         newItem: SpecialCharacters
     ): Boolean {
-        return oldItem.editingAfterChar.value == newItem.editingAfterChar.value
+        return oldItem.editingAfterChar.text.toString() == newItem.editingAfterChar.text.toString()
     }
 }

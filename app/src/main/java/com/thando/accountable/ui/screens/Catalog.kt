@@ -14,12 +14,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.thando.accountable.R
-
-val MinToolbarHeight = 64.dp
-val MaxToolbarHeight = 300.dp
 
 data class MenuItemData(
     var text:String = "No Name",
@@ -34,7 +31,8 @@ fun basicDropdownMenu(options:List<MenuItemData>):@Composable ((Modifier) -> Uni
         IconButton(onClick = { expanded = !expanded }) {
              Icon(
                  Icons.Default.MoreVert,
-                 contentDescription = stringResource(R.string.more_options)
+                 contentDescription = stringResource(R.string.more_options),
+                 tint = Color.Black
              )
         }
         DropdownMenu(

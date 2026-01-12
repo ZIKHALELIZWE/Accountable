@@ -31,7 +31,6 @@
             android:textAlignment="textStart"
             android:text="@{task.spannedString.spannableStringBuilder}"
             android:visibility="@{contentItemAdapter.isEditingScript?View.GONE:View.VISIBLE}"
-            android:textSize="@{textItemViewHolder.teleprompterSettings.textSize??contentItemAdapter.appSettings.textSize}"
             android:textColor="@{textItemViewHolder.teleprompterSettings.textColour??@color/black}"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
@@ -40,7 +39,6 @@
         <EditText
             android:id="@+id/editText"
             android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:View.GONE}"
-            android:textSize="@{textItemViewHolder.teleprompterSettings.textSize??contentItemAdapter.appSettings.textSize}"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="48dp"

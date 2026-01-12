@@ -125,9 +125,7 @@
             android:contentDescription="@string/count_down_display_button"
             app:layout_constraintStart_toStartOf="@id/teleprompterCoordinatorLayout"
             app:layout_constraintTop_toTopOf="@id/teleprompterCoordinatorLayout"
-            android:onClick="@{() -> viewModel.finishCountDown()}"
-            android:visibility="@{viewModel.countdownTimer==null?View.GONE:View.VISIBLE}"
-            android:text="@{String.valueOf(((viewModel.countdownTimer.millisUntilItIsFinished / 1000)+1))}"/>
+            android:onClick="@{() -> viewModel.finishCountDown()}"/>
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/content_sheet"
@@ -145,7 +143,6 @@
                 android:backgroundTint="@android:color/transparent"
                 android:contentDescription="@string/expand_retract_bottom_sheet"
                 android:minHeight="?android:actionBarSize"
-                android:onClick="@{()->viewModel.toggleContentSheet()}"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
@@ -182,7 +179,6 @@
                             android:backgroundTint="?attr/colorPrimary"
                             android:contentDescription="@string/skip_back"
                             android:minHeight="?android:actionBarSize"
-                            android:onClick="@{()->viewModel.skipBack()}"
                             android:src="@android:drawable/ic_media_previous" />
 
                         <ImageButton
@@ -204,7 +200,6 @@
                             android:backgroundTint="?attr/colorPrimary"
                             android:contentDescription="@string/skip_forward"
                             android:minHeight="?android:actionBarSize"
-                            android:onClick="@{()->viewModel.skipForward()}"
                             android:src="@android:drawable/ic_media_next" />
                     </LinearLayout>
 
@@ -265,7 +260,6 @@
                         android:layout_height="wrap_content"
                         android:max="120"
                         android:min="30"
-                        android:progress="@={viewModel.teleprompterSettings.textSize}"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/textSizeSeekBarValue" />
@@ -287,7 +281,6 @@
                         android:layout_height="wrap_content"
                         android:max="20"
                         android:min="1"
-                        android:progress="@={viewModel.teleprompterSettings.scrollSpeed}"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/scrollSpeedSeekBarValue" />
 
@@ -343,7 +336,6 @@
                         android:layout_height="wrap_content"
                         android:max="10"
                         android:min="0"
-                        android:progress="@={viewModel.teleprompterSettings.startCountDown}"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/startCountDownSeekBarValue" />
 
@@ -364,7 +356,6 @@
                         android:layout_height="wrap_content"
                         android:max="10"
                         android:min="0"
-                        android:progress="@={viewModel.teleprompterSettings.scrollCountDown}"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/scrollCountDownSeekBarValue" />
 
@@ -385,7 +376,6 @@
                         android:layout_height="wrap_content"
                         android:max="@{rootConstraintLayoutHeight}"
                         android:min="@{rootConstraintLayoutHeight/3}"
-                        android:progress="@={viewModel.teleprompterSettings.skipSize}"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toBottomOf="@id/skipSizeSeekBarValue" />
 

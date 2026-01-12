@@ -1,8 +1,12 @@
 package com.thando.accountable.database.tables
 
 import android.graphics.Color
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.MainActivity
 import com.thando.accountable.R
@@ -17,10 +21,10 @@ data class TeleprompterSettings(
     var name: MutableStateFlow<String> = MutableStateFlow(MainActivity.ResourceProvider.getString(R.string.default_settings)),
 
     @ColumnInfo (name = "text_size")
-    var textSize: MutableStateFlow<Int> = MutableStateFlow(54),
+    var textSize: MutableState<Int> = mutableIntStateOf(24),
 
     @ColumnInfo (name = "scroll_speed")
-    var scrollSpeed: MutableStateFlow<Int> = MutableStateFlow(6),
+    var scrollSpeed: MutableState<Int> = mutableIntStateOf(4),
 
     @ColumnInfo (name = "text_colour")
     var textColour: MutableStateFlow<Int> = MutableStateFlow(Color.BLACK),
@@ -29,17 +33,20 @@ data class TeleprompterSettings(
     var backgroundColour: MutableStateFlow<Int> = MutableStateFlow(Color.WHITE),
 
     @ColumnInfo (name = "controls_position_bottom")
-    var controlsPositionBottom: MutableStateFlow<Boolean> = MutableStateFlow(true),
+    var controlsPositionBottom: MutableStateFlow<Boolean> = MutableStateFlow(false),
 
     @ColumnInfo (name = "start_countdown")
-    var startCountDown: MutableStateFlow<Int> = MutableStateFlow(0),
+    var startCountDown: MutableState<Int> = mutableIntStateOf(0),
 
     @ColumnInfo (name = "scroll_countdown")
-    var scrollCountDown: MutableStateFlow<Int> = MutableStateFlow(0),
+    var scrollCountDown: MutableState<Int> = mutableIntStateOf(0),
 
     @ColumnInfo (name = "skip_size")
-    var skipSize: MutableStateFlow<Int> = MutableStateFlow(0)
+    var skipSize: MutableState<Int> = mutableIntStateOf(0)
 ){
+    @Ignore
+    val specialCharactersList = mutableStateListOf<SpecialCharacters>()
+
     fun equalsContent(teleprompterSettings: TeleprompterSettings): Boolean {
         return (teleprompterSettings.name.value == name.value
                 && teleprompterSettings.textSize.value == textSize.value

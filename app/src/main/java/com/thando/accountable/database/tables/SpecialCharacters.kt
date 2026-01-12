@@ -1,6 +1,7 @@
 package com.thando.accountable.database.tables
 
 import android.view.View
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.LifecycleOwner
@@ -8,8 +9,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @Entity (tableName = "special_characters", primaryKeys = ["teleprompter_settings_id","character"])
@@ -18,26 +21,23 @@ data class SpecialCharacters(
     var teleprompterSettingsId: Long,
 
     @ColumnInfo (name = "character")
-    var character: MutableStateFlow<String> = MutableStateFlow(""),
+    var character: TextFieldState = TextFieldState(""),
 
     @ColumnInfo (name = "editing_after_char")
-    var editingAfterChar: MutableStateFlow<String> = MutableStateFlow("")
+    var editingAfterChar: TextFieldState = TextFieldState("")
 ){
     enum class State{
         EMPTY, VALID, DUPLICATE
     }
 
     @Ignore
-    val oldCharacter = character.value
-
-    @Ignore
-    val deleteClicked = MutableSharedFlow<Boolean>()
+    val oldCharacter = character.text.toString()
 
     @Ignore
     val backgroundColour = MutableStateFlow(Color.Gray.toArgb())
 
     @Ignore
-    var state = State.EMPTY
+    var state = MutableStateFlow(State.EMPTY)
 
     @Ignore
     var position : Int? = null
@@ -49,39 +49,33 @@ data class SpecialCharacters(
     val duplicateErrorMessage = MutableStateFlow("")
 
     @Ignore
-    val errorMessageButtonVisibility = MutableStateFlow(View.GONE)
-
-    fun delete(viewLifecycleOwner: LifecycleOwner){
-        viewLifecycleOwner.lifecycleScope.launch {
-            deleteClicked.emit(true)
-        }
-    }
+    val errorMessageButtonVisibility = MutableStateFlow(false)
 
     private fun isValid():Boolean{
-        return state == State.VALID
+        return state.value == State.VALID
     }
 
     fun canUpdateList(): Boolean{
-        return isValid() && editingAfterChar.value.isNotEmpty()
+        return isValid() && editingAfterChar.text.isNotEmpty()
     }
 
     private fun setAndUpdateState(inputState:State){
-        state = inputState
-        when(state){
+        state.update { inputState }
+        when(state.value){
             State.EMPTY->{
                 backgroundColour.value = Color.Gray.toArgb()
-                errorMessageButtonVisibility.value = View.GONE
+                errorMessageButtonVisibility.value = false
             }
             State.VALID->{
                 backgroundColour.value = Color.Green.toArgb()
-                errorMessageButtonVisibility.value = View.GONE
+                errorMessageButtonVisibility.value = false
             }
             State.DUPLICATE->{
                 backgroundColour.value = Color.Red.toArgb()
                 val errorMessage = StringBuilder("Character The Same As:\n")
                 duplicateList?.forEach { if (it != position) errorMessage.append("\nItem $it") }
                 duplicateErrorMessage.value = errorMessage.toString()
-                errorMessageButtonVisibility.value = View.VISIBLE
+                errorMessageButtonVisibility.value = true
             }
         }
     }

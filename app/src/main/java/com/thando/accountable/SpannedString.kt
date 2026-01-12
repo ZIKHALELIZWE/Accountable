@@ -9,6 +9,7 @@ import androidx.compose.ui.text.withStyle
 import com.thando.accountable.MainActivity.Companion.collectFlow
 import com.thando.accountable.database.tables.MarkupLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 
 
 class SpannedString(inputText: String) {
@@ -39,9 +40,9 @@ class SpannedString(inputText: String) {
     fun setText(inputText: String?, context: Context?, textSize: Float, markupLanguage: MarkupLanguage? = null) {
         spannableStringBuilder.value.clear()
         spannableStringBuilder.value.clearSpans()
-        spannableStringBuilder.value = processString(inputText, markupLanguage, context, textSize)
+        spannableStringBuilder.update { processString(inputText, markupLanguage, context, textSize) }
 
-        spannableAnnotatedString.value = processAnnotatedString(inputText, markupLanguage, context, textSize)
+        spannableAnnotatedString.update { processAnnotatedString(inputText, markupLanguage, context, textSize) }
     }
 
     private fun processString(

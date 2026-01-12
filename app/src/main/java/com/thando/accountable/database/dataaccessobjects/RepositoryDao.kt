@@ -24,6 +24,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
@@ -486,7 +487,7 @@ interface RepositoryDao {
                             >
                     >()
             if (title!=null) deferredList.add(Pair(
-                CoroutineScope(coroutineContext).async {
+                CoroutineScope(currentCoroutineContext()).async {
                     val list = searchForStringInString(searchString, title, matchCaseCheck, wordCheck)
                     if (list.isNullOrEmpty()) null
                     else Triple(title, list, null)
@@ -497,7 +498,7 @@ interface RepositoryDao {
                 when (content.type) {
                     Content.ContentType.TEXT -> {
                         deferredList.add(Pair(
-                            CoroutineScope(coroutineContext).async{
+                            CoroutineScope(currentCoroutineContext()).async{
                                 val list: MutableList<IntRange>? = searchForStringInString(
                                     searchString, content.content.text.toString(), matchCaseCheck, wordCheck
                                 )

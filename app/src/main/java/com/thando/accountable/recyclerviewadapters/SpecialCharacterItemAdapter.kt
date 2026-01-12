@@ -17,14 +17,6 @@ class SpecialCharacterItemAdapter(
     private val viewModel: TeleprompterViewModel
 ): ListAdapter<SpecialCharacters, SpecialCharacterItemAdapter.SpecialCharacterItemViewHolder>(SpecialCharacterDiffItemCallback()) {
 
-    init {
-        collectFlow(viewLifecycleOwner,viewModel.specialCharactersList){ specialCharactersList ->
-            submitList(specialCharactersList)
-            updateStates()
-            viewModel.emitUpdateContentAdapterSpecialCharacters()
-        }
-    }
-
     override fun onCreateViewHolder(
         parent: ViewGroup,
         viewType: Int
@@ -42,33 +34,11 @@ class SpecialCharacterItemAdapter(
         super.onViewRecycled(holder)
     }
 
-    fun notifyAddSpecialCharacter(position: Int){
-        notifyItemInserted(position)
-        updateStates()
-    }
-
     fun delete(specialCharactersInput: SpecialCharacters){
-        val position = viewModel.specialCharactersList.value.indexOf(specialCharactersInput)
-        viewModel.specialCharactersList.value.remove(specialCharactersInput)
-        notifyItemRemoved(position)
-        updateStates()
-        viewModel.emitUpdateContentAdapterSpecialCharacters()
     }
 
     private fun updateStates(){
-        val charList = arrayListOf<String>()
-        viewModel.specialCharactersList.value.forEach { specialCharacter -> charList.add(specialCharacter.character.value) }
-        charList.forEachIndexed { index, searchString ->
-            if (searchString.isEmpty())  viewModel.specialCharactersList.value[index].setDuplicateIndexes(listOf(),index)
-            else{
-                viewModel.specialCharactersList.value[index].setDuplicateIndexes(
-                    charList.mapIndexed { i, string -> i to string }
-                    .filter { it.second == searchString }
-                    .map { it.first },
-                    index
-                )
-            }
-        }
+
     }
 
     private fun inflateSpecialCharacterItem(parent: ViewGroup): SpecialCharacterItemViewHolder {
@@ -85,24 +55,9 @@ class SpecialCharacterItemAdapter(
             binding.lifecycleOwner = viewLifecycleOwner
             binding.viewLifecycleOwner = viewLifecycleOwner
 
-            jobs.add(collectFlow(viewLifecycleOwner,item.deleteClicked){ deleteClicked->
-                if (deleteClicked){
-                    viewModel.deleteSpecialCharacter(item)
-                    delete(item)
-                }
-            })
-            jobs.add(collectFlow(viewLifecycleOwner,item.character){
-                updateStates()
-                if (item.canUpdateList()) viewModel.emitUpdateContentAdapterSpecialCharacters()
-            })
-            jobs.add(collectFlow(viewLifecycleOwner,item.editingAfterChar){
-                if (item.canUpdateList()) viewModel.emitUpdateContentAdapterSpecialCharacters()
-            })
+
             jobs.add(collectFlow(viewLifecycleOwner,item.backgroundColour){ colour ->
                 binding.background.setCardBackgroundColor(colour)
-            })
-            jobs.add(collectFlow(viewLifecycleOwner,item.errorMessageButtonVisibility){ visibility ->
-                binding.errorMessageTextView.visibility = visibility
             })
             jobs.add(collectFlow(viewLifecycleOwner,item.duplicateErrorMessage){ message ->
                 binding.errorMessageTextView.text = message

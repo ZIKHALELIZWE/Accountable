@@ -82,7 +82,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:minHeight="48dp"
-                    android:textSize="@{scriptContentItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.GONE:View.VISIBLE}"
                     android:text="@{task.spannedString.spannableStringBuilder}"
                     android:textColor="@{scriptContentItemViewHolder.teleprompterSettings.textColour??@color/black}"
@@ -94,7 +93,6 @@
                 <EditText
                     android:id="@+id/editText"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:View.GONE}"
-                    android:textSize="@{scriptContentItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
                     android:onFocusChange="@{scriptContentItemViewHolder.editTextListener}"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

@@ -1,9 +1,11 @@
 package com.thando.accountable.fragments.viewmodels
 
 import android.content.Context
+import android.os.CountDownTimer
 import android.view.View
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
@@ -15,13 +17,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.AccountableRepository
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
+import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.TeleprompterFragment
 import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel.Companion.showMarkupLanguageNameDialog
 import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
 import com.thando.accountable.ui.cards.Colour
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,7 +49,6 @@ class TeleprompterViewModel(
     val teleprompterSettings = repository.getScriptTeleprompterSetting()
     val teleprompterSettingsList = repository.getTeleprompterSettingsList()
 
-    val specialCharactersList = repository.getSpecialCharactersList()
     private val defaultTeleprompterSetting = repository.getDefaultTeleprompterSettings()
     val selectedIndex = repository.getTeleprompterSettingsSelectedIndex()
 
@@ -68,28 +72,21 @@ class TeleprompterViewModel(
     // Click Events
     private val _navigateToScript = MutableSharedFlow<Boolean>()
     val navigateToScript: SharedFlow<Boolean> get() = _navigateToScript
-    private var _skipForward = MutableSharedFlow<Boolean>()
-    val skipForward: SharedFlow<Boolean> get() = _skipForward
-    private var _skipBack = MutableSharedFlow<Boolean>()
-    val skipBack: SharedFlow<Boolean> get() = _skipBack
-    private var _cancelCountdown = MutableStateFlow(false)
-    val cancelCountdown: StateFlow<Boolean> get() = _cancelCountdown
     private var _finishCountdown = MutableSharedFlow<Boolean>()
     val finishCountdown: SharedFlow<Boolean> get() = _finishCountdown
 
     // View States
-    val listState = LazyListState()
     private var scrolled = false
     private var isTouching = false
     private var _isFullscreen = MutableStateFlow(false)
     val isFullScreen: StateFlow<Boolean> get() = _isFullscreen
     private var _controlsVisible = MutableStateFlow(true)
     val controlsVisible: StateFlow<Boolean> get() = _controlsVisible
-    var countdownTimer : MutableStateFlow<TeleprompterFragment.CustomCountDownTimer?> = MutableStateFlow(null)
     var countDownText = MutableStateFlow("")
+    private val _deleteButtonText = MutableStateFlow(MainActivity.ResourceProvider.getString(R.string.restore_default_settings))
+    val deleteButtonText: StateFlow<String> get() = _deleteButtonText
+    val countDownTimer = mutableStateOf<CountDownTimer?>(null)
 
-    private var _contentSheetExpanded = MutableStateFlow(true)
-    val contentSheetExpanded: StateFlow<Boolean> get() = _contentSheetExpanded
     private var _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> get() = _isPlaying
 
@@ -124,10 +121,6 @@ class TeleprompterViewModel(
         countDownText.update { countDownTextAfterTick }
     }
 
-    fun countDownCancelled(){
-        _cancelCountdown.value = false
-    }
-
     fun loadTeleprompterSettings() {
         repository.loadTeleprompterSettingsList()
     }
@@ -135,13 +128,11 @@ class TeleprompterViewModel(
     fun loadTeleprompterSetting(
         index: Int
     ){
-        if (index<0 || teleprompterSettingsList.value.isEmpty()) return
-        teleprompterSettingsList.value.let {
-            viewModelScope.launch {
-                withContext(Dispatchers.IO) {
-                    repository.saveTeleprompterSettings()
-                    repository.setRepositoryTeleprompterSetting(it[index])
-                }
+        if (index<0 || teleprompterSettingsList.isEmpty()) return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                repository.saveTeleprompterSettings()
+                repository.setRepositoryTeleprompterSetting(teleprompterSettingsList[index])
             }
         }
     }
@@ -156,7 +147,7 @@ class TeleprompterViewModel(
                 context.getString(R.string.enter_teleprompter_setting_name)
             ) { name ->
                 var nameUnique = true
-                for ((i, mLanguage) in teleprompterSettingsList.value.withIndex()) {
+                for ((i, mLanguage) in teleprompterSettingsList.withIndex()) {
                     if (i != index && mLanguage.name.value == name) {
                         nameUnique = false
                         viewModelScope.launch {
@@ -173,7 +164,8 @@ class TeleprompterViewModel(
             }
         }
 
-        if (teleprompterSettingsList.value.isNotEmpty() && teleprompterSetting == teleprompterSettingsList.value.last()) {
+        if (teleprompterSettingsList.isNotEmpty() && teleprompterSetting == teleprompterSettingsList.last()) {
+            _deleteButtonText.value = context.getString(R.string.restore_default_settings)
             deleteButtonFunction = {
                 repository.deleteTeleprompterSettingSpecialCharacter(teleprompterSetting) {
                     teleprompterSetting.setValues(TeleprompterSettings())
@@ -181,6 +173,7 @@ class TeleprompterViewModel(
                 }
             }
         } else {
+            _deleteButtonText.value = context.getString(R.string.delete)
             deleteButtonFunction = {
                 viewModelScope.launch {
                     withContext(Dispatchers.IO) {
@@ -200,6 +193,27 @@ class TeleprompterViewModel(
         }
     }
 
+    suspend fun updateStates(){
+        val charList = arrayListOf<String>()
+        snapshotFlow { teleprompterSettings }.collect { teleprompterSettings ->
+            teleprompterSettings.value?.specialCharactersList?.forEach { specialCharacter -> charList.add(specialCharacter.character.text.toString()) }
+            charList.forEachIndexed { index, searchString ->
+                if (searchString.isEmpty()) teleprompterSettings.value?.specialCharactersList[index]?.setDuplicateIndexes(
+                    listOf(),
+                    index
+                )
+                else {
+                    teleprompterSettings.value?.specialCharactersList[index]?.setDuplicateIndexes(
+                        charList.mapIndexed { i, string -> i to string }
+                            .filter { it.second == searchString }
+                            .map { it.first },
+                        index
+                    )
+                }
+            }
+        }
+    }
+
     fun setSelectedIndex(selection: Int){
         if (selection == selectedIndex.value){
             loadTeleprompterSetting(selection)
@@ -209,14 +223,23 @@ class TeleprompterViewModel(
 
     fun emitUpdateContentAdapterSpecialCharacters(){
         viewModelScope.launch {
-            script.value?.scriptTitle?.let { setScriptTitleEdited(it.text.toString(),specialCharactersList.value) }
-            _updateContentAdapterSpecialCharacters.emit(specialCharactersList.value)
+            snapshotFlow { teleprompterSettings.value }.collect { teleprompterSettings ->
+                teleprompterSettings?.let {
+                    script.value?.scriptTitle?.let {
+                        setScriptTitleEdited(
+                            it.text.toString(),
+                            teleprompterSettings.specialCharactersList
+                        )
+                    }
+                    _updateContentAdapterSpecialCharacters.emit(teleprompterSettings.specialCharactersList)
+                }
+            }
         }
     }
 
     fun setScriptTitleEdited(title:String,specialList:MutableList<SpecialCharacters>?= mutableListOf()){
         var newTitle = title
-        specialList?.forEach { newTitle = newTitle.replace(it.character.value,it.editingAfterChar.value) }
+        specialList?.forEach { newTitle = newTitle.replace(it.character.text.toString(),it.editingAfterChar.text.toString()) }
         scriptTitle.value = newTitle
     }
 
@@ -228,8 +251,47 @@ class TeleprompterViewModel(
         repository.addSpecialCharacter(_addSpecialCharacterUpdate)
     }
 
-    fun deleteSpecialCharacter(specialCharacter: SpecialCharacters){
-        repository.deleteSpecialCharacter(specialCharacter)
+    fun deleteSpecialCharacter(
+        specialCharacter: SpecialCharacters,
+        context:Context,
+        coroutineScope: CoroutineScope,
+        markupLanguage: MarkupLanguage?,
+        textSize: Float
+    ){
+        viewModelScope.launch {
+            repository.deleteSpecialCharacter(specialCharacter)
+            updateStates()
+            updateSpecialCharacters(
+                context,
+                coroutineScope,
+                markupLanguage,
+                textSize
+            )
+        }
+    }
+
+    fun updateSpecialCharacters(
+        context:Context,
+        coroutineScope: CoroutineScope,
+        markupLanguage: MarkupLanguage?,
+        textSize: Float
+    ){
+        viewModelScope.launch {
+            snapshotFlow { teleprompterSettings.value }.collect { teleprompterSettings ->
+                teleprompterSettings?.let {
+                    repository.getScriptContentList().forEach { content ->
+                        content.replace(
+                            specialCharactersList = teleprompterSettings.specialCharactersList,
+                            context = context,
+                            markupLanguage = markupLanguage,
+                            isEditing = false,
+                            lifecycleScope = coroutineScope,
+                            textSize = textSize
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun navigateToScript(){
@@ -259,18 +321,6 @@ class TeleprompterViewModel(
         _countDownButtonVisibility.update { false }
     }
 
-    fun skipBack(){
-        viewModelScope.launch {
-            _skipBack.emit(true)
-        }
-    }
-
-    fun skipForward(){
-        viewModelScope.launch {
-            _skipForward.emit(true)
-        }
-    }
-
     fun playPause(){
         _isPlaying.value = _isPlaying.value.not()
     }
@@ -285,14 +335,6 @@ class TeleprompterViewModel(
 
     fun getIsPlaying() : Boolean{
         return _isPlaying.value
-    }
-
-    fun toggleContentSheet(){
-        _contentSheetExpanded.value = _contentSheetExpanded.value.not()
-    }
-
-    fun triggerContentSheet(){
-        _contentSheetExpanded.value = _contentSheetExpanded.value
     }
 
     fun getAnimationDuration():Long{ return animationDuration }
@@ -313,18 +355,13 @@ class TeleprompterViewModel(
 
     fun isNotTouching(){
         isTouching = false
+        scrolled = false
     }
 
     fun isTouchingValue() = isTouching
 
     fun getScrollSpeedValue(): Int{
         return teleprompterSettings.value?.scrollSpeed?.value?:6
-    }
-
-    fun cancelCountDown(){
-        viewModelScope.launch {
-            _cancelCountdown.emit(true)
-        }
     }
 
     fun finishCountDown(){
@@ -345,7 +382,7 @@ class TeleprompterViewModel(
     }
 
     fun getSkipSizeValue(rootHeight:Int): Int{
-        setSkipSizeValue(rootHeight)
+        //setSkipSizeValue(rootHeight)
         return teleprompterSettings.value?.skipSize?.value?:(rootHeight/3)
     }
 
@@ -380,8 +417,8 @@ class TeleprompterViewModel(
 
     fun closeTeleprompterFragment() {
         teleprompterSettings.value?.let { teleprompterSettings ->
-            if (teleprompterSettingsList.value.isNotEmpty() && teleprompterSettings != teleprompterSettingsList.value.last()) {
-                repository.deleteTeleprompterSetting(teleprompterSettingsList.value.last()){
+            if (teleprompterSettingsList.isNotEmpty() && teleprompterSettings != teleprompterSettingsList.last()) {
+                repository.deleteTeleprompterSetting(teleprompterSettingsList.last()){
                     repository.resetDefaultTeleprompterSetting{
                         repository.saveTeleprompterSettings{
                             repository.setTeleprompterSettingToScript(true){
@@ -400,7 +437,7 @@ class TeleprompterViewModel(
                 }
             }
             else{
-                repository.deleteTeleprompterSetting(teleprompterSettingsList.value.last()){
+                repository.deleteTeleprompterSetting(teleprompterSettingsList.last()){
                     repository.resetDefaultTeleprompterSetting{
                         repository.setTeleprompterSettingToScript(false){
                             repository.changeFragment(AccountableFragment.ScriptFragment)

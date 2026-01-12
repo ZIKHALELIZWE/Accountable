@@ -55,7 +55,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:minHeight="48dp"
-                    android:textSize="@{imageItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.GONE:View.VISIBLE}"
                     android:textColor="@{imageItemViewHolder.teleprompterSettings.textColour??@color/black}"
                     android:textAlignment="textStart"
@@ -67,7 +66,6 @@
                 <EditText
                     android:id="@+id/editText"
                     android:visibility="@{contentItemAdapter.isEditingScript?View.VISIBLE:View.GONE}"
-                    android:textSize="@{imageItemViewHolder.teleprompterSettings.textSize??(contentItemAdapter.appSettings.textSize+40)}"
                     android:onFocusChange="@{imageItemViewHolder.editTextListener}"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

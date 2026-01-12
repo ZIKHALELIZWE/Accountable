@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -43,6 +44,7 @@ import androidx.compose.material3.TextFieldLabelScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -262,50 +264,85 @@ fun TextCard(
     modifier: Modifier = Modifier,
     teleprompterSettings: TeleprompterSettings? = null,
     description: Boolean = false,
-    filename: String? = null,
+    contentFileName: String? = null,
     textAlign: TextAlign = TextAlign.Start
 ){
-    val textSize by teleprompterSettings?.textSize?.collectAsStateWithLifecycle()
+    val textSize by teleprompterSettings?.textSize?.let { remember { it } }
         ?:MutableStateFlow(appSettings?.textSize?:24).collectAsStateWithLifecycle()
     val textColour by teleprompterSettings?.textColour?.collectAsStateWithLifecycle()
         ?: MutableStateFlow(Color.Black.toArgb()).collectAsStateWithLifecycle()
-    val contentFilename = remember { content.filename }
+    val teleprompterBackgroundColour by teleprompterSettings?.backgroundColour?.collectAsStateWithLifecycle()?:remember { mutableStateOf(null) }
+    val backgroundModifier = teleprompterBackgroundColour?.let { modifier.background(Color(it)) }?:modifier
+    val fileName = remember { content.filename }
+    var useAnnotatedString by remember { mutableStateOf(false) }
+    var useFileNameAnnotatedString by remember { mutableStateOf(false) }
     val text =
-        if (filename!=null){
-            if (contentFilename.text.isNotEmpty()) remember { content.filename }
-            else remember{ TextFieldState(filename) }
+        if (contentFileName!=null){
+            useAnnotatedString = false
+            useFileNameAnnotatedString = false
+            if (fileName.text.isNotEmpty()) {
+                useFileNameAnnotatedString = true
+                remember { content.filename }
+            }
+            else remember{ TextFieldState(contentFileName) }
         }
-        else if (description) remember { content.description }
-        else remember { content.content }
+        else if (description){
+            useAnnotatedString = true
+            useFileNameAnnotatedString = false
+            remember { content.description }
+        }
+        else{
+            useAnnotatedString = true
+            useFileNameAnnotatedString = false
+            remember { content.content }
+        }
+    val contentAnnotatedString by content.spannedString.spannableAnnotatedString.collectAsStateWithLifecycle()
+    val contentFileNameAnnotatedString by content.spannedStringFileName.spannableAnnotatedString.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    content.getText(markupLanguage,context, textSize.toFloat())
+    LaunchedEffect(markupLanguage, textSize, context, text.text.toString(), teleprompterSettings?.specialCharactersList) {
+        content.replace(
+            specialCharactersList = teleprompterSettings?.specialCharactersList?: mutableStateListOf(),
+            context,
+            markupLanguage,
+            isEditingScript,
+            scope,
+            textSize.toFloat()
+        )
+    }
 
     if (!isEditingScript) {
         if ((description && text.text.isNotEmpty()) || (!description)){
-            content.getText(markupLanguage,context, textSize.toFloat())
             Text(
-                text = run{
-                    val annotatedString by SpannedString(
-                        text.text.toString(),
-                        context,
-                        markupLanguage,
-                        textSize.toFloat()
-                    ).spannableAnnotatedString.collectAsStateWithLifecycle()
-                    annotatedString
+                text =  if (useAnnotatedString) contentAnnotatedString
+                        else if (useFileNameAnnotatedString) contentFileNameAnnotatedString
+                        else run{
+                            val annotatedString by SpannedString(
+                                content.getNewStringWithModifications(
+                                    newInputString = text.text.toString(),
+                                    specialCharactersList = teleprompterSettings?.specialCharactersList?: mutableStateListOf(),
+                                    isEditing = isEditingScript,
+                                    markupLanguage = markupLanguage,
+                                ),
+                                context,
+                                markupLanguage,
+                                textSize.toFloat()
+                            ).spannableAnnotatedString.collectAsStateWithLifecycle()
+                            annotatedString
                 },
                 style = TextStyle(
                     textAlign = textAlign,
                     fontSize = textSize.sp,
                     color = Color(textColour)
                 ),
-                modifier = modifier.fillMaxWidth()
+                modifier = backgroundModifier.fillMaxWidth()
             )
         }
     }
     else {
         TextFieldAccountable(
-            state = if (filename!=null) contentFilename else text,
+            state = if (contentFileName!=null) fileName else text,
             onTextSelect = { textFieldState, updateTextFieldState ->
                 textIndex(
                     Triple(
@@ -324,7 +361,7 @@ fun TextCard(
                 .onFocusChanged { focusState ->
                     if (!focusState.isFocused) textIndex(null)
             },
-            placeholder = { Text(stringResource(if (filename!=null) R.string.video_name
+            placeholder = { Text(stringResource(if (contentFileName!=null) R.string.video_name
             else if (description) R.string.image_description
                     else R.string.edit_script)) },
             textStyle = TextStyle(
@@ -468,7 +505,7 @@ fun VideoCard(
                                 markupLanguage,
                                 teleprompterSettings = teleprompterSettings,
                                 description = false,
-                                filename = trackItem.title + " : " + trackItem.artistName
+                                contentFileName = trackItem.title + " : " + trackItem.artistName
                             )
                         }
                     }
@@ -621,7 +658,7 @@ fun AudioCard(
                                     modifier = Modifier.weight(1f),
                                     teleprompterSettings = teleprompterSettings,
                                     description = false,
-                                    filename = trackItem.title + " : " + trackItem.artistName,
+                                    contentFileName = trackItem.title + " : " + trackItem.artistName,
                                     textAlign = TextAlign.Center
                                 )
                                 Text(
@@ -703,7 +740,7 @@ fun DocumentCard(
                             markupLanguage,
                             teleprompterSettings = teleprompterSettings,
                             description = false,
-                            filename = trackItem.title + " : " + trackItem.artistName
+                            contentFileName = trackItem.title + " : " + trackItem.artistName
                         )
                     }
                     TextCard(

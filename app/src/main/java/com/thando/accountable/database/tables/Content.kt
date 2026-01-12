@@ -5,11 +5,13 @@ import android.content.Context
 import android.net.Uri
 import android.util.Range
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.runtime.remember
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.SpannedString
 import com.thando.accountable.player.TrackItem
 import kotlinx.coroutines.CoroutineScope
@@ -92,7 +94,10 @@ data class Content(
     })
 
     @Ignore
-    var replaceAsync: Deferred<String>? = null
+    var spannedStringFileName: SpannedString = SpannedString( filename.text.toString())
+
+    @Ignore
+    var replaceAsync: Deferred<Pair<String,String>>? = null
 
     @Ignore
     val isPlaying = MutableStateFlow(false)
@@ -194,6 +199,12 @@ data class Content(
                 ContentType.AUDIO -> description.text.toString()
             }, context, textSize,markupLanguage
         )
+        spannedStringFileName.setText(
+            filename.text.toString(),
+            context,
+            textSize,
+            markupLanguage
+        )
     }
 
     fun replace(
@@ -215,7 +226,7 @@ data class Content(
                 try {
                     // Perform an asynchronous operation
                     replaceAsync = async {
-                        var newString = when(type){
+                        val newString = when(type){
                             ContentType.TEXT -> content.text.toString()
                             ContentType.IMAGE,
                             ContentType.SCRIPT,
@@ -224,103 +235,30 @@ data class Content(
                             ContentType.AUDIO -> description.text.toString()
                         }
 
-                        // Find markup ranges
-                        var markupRanges: List<MarkupLanguage.Tag>? = null
-                        markupLanguage?.let { markupLanguage ->
-                            markupRanges = markupLanguage.getTagRanges(newString).first
-                        }
-
-                        if (!isEditing) {
-                            val occurrences = arrayListOf<Pair<SpecialCharacters, ArrayList<Int>>>()
-                            specialCharactersList.forEach { specialCharacters ->
-                                if (specialCharacters.canUpdateList() &&
-                                    !(
-                                            specialCharacters.character.value.isEmpty() ||
-                                                    content.text.isEmpty() ||
-                                                    specialCharacters.editingAfterChar.value.isEmpty()
-                                            )
-                                ) {
-                                    occurrences.add(
-                                        Pair(
-                                            specialCharacters,
-                                            findAllOccurrences(
-                                                content.text.toString(),
-                                                specialCharacters.character.value
-                                            )
-                                        )
-                                    )
-                                }
-                            }
-
-                            occurrences.forEach { firstPair ->
-                                occurrences.forEach { secondPair ->
-                                    val secondChar = secondPair.first.character.value
-                                    val firstChar = firstPair.first.character.value
-                                    if (secondChar != firstChar) {
-                                        if (secondChar.contains(firstChar)) {
-                                            secondPair.second.forEach {
-                                                firstPair.second.remove(
-                                                    it + secondChar.indexOf(
-                                                        firstChar
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            val sortedArrayList = arrayListOf<Pair<SpecialCharacters, Int>>()
-                            occurrences.forEach {
-                                val charLength = it.first.character.value.length
-                                it.second.forEach { int ->
-                                    var doesNotOverlapSpan = true
-                                    markupRanges?.let { markupRanges ->
-                                        var index = 0
-                                        while (doesNotOverlapSpan && index < markupRanges.size) {
-                                            if (markupRanges[index].overlapsTag(
-                                                    Range(
-                                                        int,
-                                                        int + charLength
-                                                    )
-                                                )
-                                            ) doesNotOverlapSpan = false
-                                            index++
-                                        }
-                                    }
-                                    if (doesNotOverlapSpan) {
-                                        sortedArrayList.add(
-                                            Pair(
-                                                it.first,
-                                                int
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                            sortedArrayList.sortBy { it.second }
-
-                            var addedDifference = 0
-                            sortedArrayList.forEach {
-                                val charLength = it.first.character.value.length
-                                val replacementString = it.first.editingAfterChar.value
-                                val index = it.second + addedDifference
-                                newString = newString.replaceRange(
-                                    index,
-                                    index + charLength,
-                                    replacementString
-                                )
-                                addedDifference += replacementString.length - charLength
-                            }
-                        }
-                        newString
+                        (( if (newString.isNotEmpty()) getNewStringWithModifications(
+                            newString,
+                            markupLanguage,
+                            isEditing,
+                            specialCharactersList
+                        ) else newString) to (if (filename.text.isNotEmpty()) getNewStringWithModifications(
+                            filename.text.toString(),
+                            markupLanguage,
+                            isEditing,
+                            specialCharactersList
+                        ) else filename.text.toString()))
                     }
                     val result = replaceAsync!!.await()
 
                     // Switch to the Main thread to update UI
                     withContext(Dispatchers.Main) {
                         spannedString.setText(
-                            result,
+                            result.first,
+                            context,
+                            textSize,
+                            markupLanguage
+                        )
+                        spannedStringFileName.setText(
+                            result.second,
                             context,
                             textSize,
                             markupLanguage
@@ -335,6 +273,105 @@ data class Content(
                 }
             }
         }
+    }
+
+    fun getNewStringWithModifications(
+        newInputString: String,
+        markupLanguage: MarkupLanguage?,
+        isEditing: Boolean,
+        specialCharactersList: MutableList<SpecialCharacters>
+    ): String{
+        var newString = newInputString
+        // Find markup ranges
+        var markupRanges: List<MarkupLanguage.Tag>? = null
+        markupLanguage?.let { markupLanguage ->
+            markupRanges = markupLanguage.getTagRanges(newString).first
+        }
+
+        if (!isEditing) {
+            val occurrences = arrayListOf<Pair<SpecialCharacters, ArrayList<Int>>>()
+            specialCharactersList.forEach { specialCharacters ->
+                if (specialCharacters.canUpdateList() &&
+                    !(
+                            specialCharacters.character.text.isEmpty() ||
+                                    content.text.isEmpty() ||
+                                    specialCharacters.editingAfterChar.text.isEmpty()
+                            )
+                ) {
+                    occurrences.add(
+                        Pair(
+                            specialCharacters,
+                            findAllOccurrences(
+                                content.text.toString(),
+                                specialCharacters.character.text.toString()
+                            )
+                        )
+                    )
+                }
+            }
+
+            occurrences.forEach { firstPair ->
+                occurrences.forEach { secondPair ->
+                    val secondChar = secondPair.first.character.text.toString()
+                    val firstChar = firstPair.first.character.text.toString()
+                    if (secondChar != firstChar) {
+                        if (secondChar.contains(firstChar)) {
+                            secondPair.second.forEach {
+                                firstPair.second.remove(
+                                    it + secondChar.indexOf(
+                                        firstChar
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            val sortedArrayList = arrayListOf<Pair<SpecialCharacters, Int>>()
+            occurrences.forEach {
+                val charLength = it.first.character.text.length
+                it.second.forEach { int ->
+                    var doesNotOverlapSpan = true
+                    markupRanges?.let { markupRanges ->
+                        var index = 0
+                        while (doesNotOverlapSpan && index < markupRanges.size) {
+                            if (markupRanges[index].overlapsTag(
+                                    Range(
+                                        int,
+                                        int + charLength
+                                    )
+                                )
+                            ) doesNotOverlapSpan = false
+                            index++
+                        }
+                    }
+                    if (doesNotOverlapSpan) {
+                        sortedArrayList.add(
+                            Pair(
+                                it.first,
+                                int
+                            )
+                        )
+                    }
+                }
+            }
+            sortedArrayList.sortBy { it.second }
+
+            var addedDifference = 0
+            sortedArrayList.forEach {
+                val charLength = it.first.character.text.length
+                val replacementString = it.first.editingAfterChar.text.toString()
+                val index = it.second + addedDifference
+                newString = newString.replaceRange(
+                    index,
+                    index + charLength,
+                    replacementString
+                )
+                addedDifference += replacementString.length - charLength
+            }
+        }
+        return newString
     }
 
     private fun findAllOccurrences(mainString: String, subString: String): ArrayList<Int> {
