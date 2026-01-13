@@ -270,7 +270,7 @@ fun TextCard(
     textAlign: TextAlign = TextAlign.Start
 ){
     val textSize by teleprompterSettings?.textSize?.let { remember { it } }
-        ?:MutableStateFlow(appSettings?.textSize?:24).collectAsStateWithLifecycle()
+        ?:(appSettings?.textSize?:MutableStateFlow(24)).collectAsStateWithLifecycle()
     val textColour by teleprompterSettings?.textColour?.collectAsStateWithLifecycle()
         ?: MutableStateFlow(Color.Black.toArgb()).collectAsStateWithLifecycle()
     val teleprompterBackgroundColour by teleprompterSettings?.backgroundColour?.collectAsStateWithLifecycle()?:remember { mutableStateOf(null) }

@@ -1,9 +1,37 @@
 package com.thando.accountable
 
-import androidx.fragment.app.FragmentManager
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import com.thando.accountable.database.tables.Folder
-import com.thando.accountable.fragments.AppSettingsFragment
+import com.thando.accountable.fragments.AppSettingsView
+import com.thando.accountable.fragments.BooksView
+import com.thando.accountable.fragments.EditFolderView
+import com.thando.accountable.fragments.EditGoalView
+import com.thando.accountable.fragments.GoalsView
+import com.thando.accountable.fragments.HelpView
+import com.thando.accountable.fragments.HomeView
+import com.thando.accountable.fragments.MarkupLanguageView
+import com.thando.accountable.fragments.ScriptView
+import com.thando.accountable.fragments.SearchView
+import com.thando.accountable.fragments.TaskView
+import com.thando.accountable.fragments.TeleprompterView
+import com.thando.accountable.fragments.viewmodels.AppSettingsViewModel
+import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.fragments.viewmodels.BooksViewModel.Companion.INITIAL_FOLDER_ID
+import com.thando.accountable.fragments.viewmodels.EditFolderViewModel
+import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
+import com.thando.accountable.fragments.viewmodels.GoalsViewModel
+import com.thando.accountable.fragments.viewmodels.HelpViewModel
+import com.thando.accountable.fragments.viewmodels.HomeViewModel
+import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel
+import com.thando.accountable.fragments.viewmodels.ScriptViewModel
+import com.thando.accountable.fragments.viewmodels.SearchViewModel
+import com.thando.accountable.fragments.viewmodels.TaskViewModel
+import com.thando.accountable.fragments.viewmodels.TeleprompterViewModel
 
 class AccountableNavigationController {
 
@@ -188,18 +216,73 @@ class AccountableNavigationController {
         }
     }
 
-    fun navigateTo(
-        containerId: Int,
-        fragment: AccountableFragment,
-        supportFragmentManager: FragmentManager
-    ) {
-
-        (0 until supportFragmentManager.backStackEntryCount).forEach { _ ->
-            supportFragmentManager.popBackStack()
+    @Composable
+    fun getAccountableActivity(
+        navController: NavHostController,
+        startFragment: String,
+        mainActivityViewModel: MainActivityViewModel,
+        modifier: Modifier = Modifier
+    ){
+        NavHost(
+            modifier = modifier,
+            navController = navController,
+            startDestination = startFragment
+        ) {
+            composable(AccountableFragment.HomeFragment.name) {
+                val viewModel = viewModel<HomeViewModel>(factory = HomeViewModel.Factory)
+                HomeView( viewModel, mainActivityViewModel)
+            }
+            composable(AccountableFragment.GoalsFragment.name) {
+                val viewModel = viewModel<GoalsViewModel>(factory = GoalsViewModel.Factory)
+                GoalsView( viewModel, mainActivityViewModel)
+            }
+            composable(AccountableFragment.BooksFragment.name) {
+                val viewModel = viewModel<BooksViewModel>(factory = BooksViewModel.Factory)
+                BooksView( viewModel, mainActivityViewModel)
+            }
+            composable(AccountableFragment.AppSettingsFragment.name) {
+                val viewModel =
+                    viewModel<AppSettingsViewModel>(factory = AppSettingsViewModel.Factory)
+                AppSettingsView(viewModel,mainActivityViewModel)
+            }
+            composable(AccountableFragment.HelpFragment.name) {
+                val viewModel = viewModel<HelpViewModel>(factory = HelpViewModel.Factory)
+                HelpView(viewModel, mainActivityViewModel)
+            }
+            composable(AccountableFragment.EditFolderFragment.name) {
+                val viewModel =
+                    viewModel<EditFolderViewModel>(factory = EditFolderViewModel.Factory)
+                EditFolderView(viewModel, mainActivityViewModel)
+            }
+            composable(AccountableFragment.EditGoalFragment.name) {
+                val viewModel =
+                    viewModel<EditGoalViewModel>(factory = EditGoalViewModel.Factory)
+                EditGoalView( viewModel, mainActivityViewModel)
+            }
+            composable(AccountableFragment.TaskFragment.name) {
+                val viewModel = viewModel<TaskViewModel>(factory = TaskViewModel.Factory)
+                TaskView(viewModel, mainActivityViewModel)
+            }
+            composable(AccountableFragment.MarkupLanguageFragment.name) {
+                val viewModel =
+                    viewModel<MarkupLanguageViewModel>(factory = MarkupLanguageViewModel.Factory)
+                MarkupLanguageView(viewModel)
+            }
+            composable(AccountableFragment.ScriptFragment.name) {
+                val viewModel =
+                    viewModel<ScriptViewModel>(factory = ScriptViewModel.Factory)
+                ScriptView( viewModel, mainActivityViewModel)
+            }
+            composable(AccountableFragment.TeleprompterFragment.name) {
+                val viewModel =
+                    viewModel<TeleprompterViewModel>(factory = TeleprompterViewModel.Factory)
+                TeleprompterView( viewModel, mainActivityViewModel)
+            }
+            composable(AccountableFragment.SearchFragment.name) {
+                val viewModel =
+                    viewModel<SearchViewModel>(factory = SearchViewModel.Factory)
+                SearchView( viewModel, mainActivityViewModel).searchView()
+            }
         }
-
-        val transaction = supportFragmentManager.beginTransaction()
-        //transaction.replace(containerId, getFragmentClass(fragment))
-        transaction.commit()
     }
 }

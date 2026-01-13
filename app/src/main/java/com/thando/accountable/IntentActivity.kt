@@ -1,27 +1,35 @@
 package com.thando.accountable
 
-import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.fragment.app.viewModels
-import com.thando.accountable.MainActivity.Companion.collectFlow
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
+import androidx.navigation.compose.rememberNavController
+import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.MainActivity.ResourceProvider
-import com.thando.accountable.database.tables.AppSettings
-import com.thando.accountable.databinding.StringIntentDialogBinding
-import com.thando.accountable.fragments.AppSettingsFragment
-import com.thando.accountable.fragments.viewmodels.AppSettingsViewModel
+import com.thando.accountable.ui.theme.AccountableTheme
 
 
-class IntentActivity : AppCompatActivity() {
+class IntentActivity : ComponentActivity() {
 
     val viewModel: IntentActivityViewModel by viewModels {
         IntentActivityViewModel.Factory(
@@ -30,90 +38,84 @@ class IntentActivity : AppCompatActivity() {
             } else null
         )
     }
-    lateinit var dialogFragment: DialogFragment
+    val mainActivityViewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ResourceProvider.init(this.applicationContext)
 
-        val view = ConstraintLayout(applicationContext)
-        view.setBackgroundColor(Color.Transparent.toArgb())
-        setContentView(view)
-        dialogFragment = DialogFragment(intent,viewModel){
-            this.finishAndRemoveTask()
-        }
-        dialogFragment.show(supportFragmentManager, DialogFragment.TAG)
-    }
-
-    class DialogFragment(
-        private val intent: Intent,
-        private val viewModel: IntentActivityViewModel,
-        private val onDismissed:()->Unit
-    ) : androidx.fragment.app.DialogFragment() {
-        companion object{ const val TAG = "IntentDialogFragment" }
-        private var _binding: StringIntentDialogBinding? = null
-        private val binding get() = _binding!!
-
-        private lateinit var booksFragment : AppSettingsFragment//BooksFragment
-
-        override fun onCreate(savedInstanceState: Bundle?) {
-            super.onCreate(savedInstanceState)
-            _binding = StringIntentDialogBinding.inflate(layoutInflater)
-            binding.lifecycleOwner = this
-
+        setContent {
+            val navController = rememberNavController()
+            var initialized by remember { mutableStateOf(false) }
+            var currentFragment by remember { mutableStateOf<AccountableFragment?>(null) }
+            val context = LocalContext.current
             if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
                 if(!intent.getStringExtra(Intent.EXTRA_TEXT).isNullOrEmpty()) {
-                    for (i in 0 until childFragmentManager.backStackEntryCount) {
-                        childFragmentManager.popBackStack()
+                    LaunchedEffect(Unit) {
+                        viewModel.currentFragment.collect { fragment ->
+                            if (fragment!=null){
+                                if (!initialized){
+                                    (0 until navController.currentBackStack.value.size).forEach { _ ->
+                                        navController.popBackStack()
+                                    }
+                                    currentFragment =
+                                        if (
+                                            fragment == AccountableFragment.BooksFragment ||
+                                            fragment == AccountableFragment.SearchFragment
+                                        ) fragment else AccountableFragment.BooksFragment
+                                }
+                            }
+                        }
                     }
-                    val viewModelApp: AppSettingsViewModel by viewModels { AppSettingsViewModel.Factory }
-                    booksFragment = AppSettingsFragment(viewModelApp)
-                    val transaction = childFragmentManager.beginTransaction()
-                    transaction.replace(R.id.fragment_container, booksFragment)
-                    transaction.commit()
+
+                    LaunchedEffect(Unit) {
+                        viewModel.direction.collect { direction ->
+                            if (direction != null){
+                                (0 until navController.currentBackStack.value.size).forEach { _ ->
+                                    navController.popBackStack()
+                                }
+                                navController.navigate(
+                                    direction.name
+                                ){launchSingleTop = true}
+                            }
+                        }
+                    }
+
+                    AccountableTheme {
+                        val height = LocalResources.current.displayMetrics.heightPixels*0.8f
+                        val width = LocalResources.current.displayMetrics.widthPixels*0.8f
+                        val density = LocalDensity.current
+                        Box(
+                            modifier = Modifier.fillMaxSize().background(Color.Transparent)
+                                .combinedClickable(onClick = { finish() }),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            currentFragment?.name?.let { startFragment ->
+                                mainActivityViewModel.accountableNavigationController.getAccountableActivity(
+                                    navController,
+                                    startFragment,
+                                    mainActivityViewModel,
+                                    modifier = Modifier.height(
+                                        with(density){height.toDp()}
+                                    ).width(
+                                        with(density){width.toDp()}
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
                 else {
-                    Toast.makeText(requireContext(),
+                    Toast.makeText(context,
                         getString(R.string.no_text_shared),Toast.LENGTH_LONG).show()
-                    this.dismiss()
-                }
-
-                collectFlow(this, viewModel.direction) { direction ->
-                    if (direction != null){
-                        viewModel.navController.navigateTo( R.id.fragment_container, direction,childFragmentManager)
-                    }
+                    finish()
                 }
             }
             else{
-                Toast.makeText(requireContext(),
+                Toast.makeText(context,
                     getString(R.string.no_text_shared),Toast.LENGTH_LONG).show()
-                this.dismiss()
+                finish()
             }
-        }
-
-        override fun onCreateView(
-            inflater: LayoutInflater,
-            container: ViewGroup?,
-            savedInstanceState: Bundle?
-        ): View {
-            return binding.root
-        }
-
-        override fun onResume() {
-            val width = resources.displayMetrics.widthPixels
-            val height = resources.displayMetrics.heightPixels*0.9
-            dialog?.window?.setLayout(width, height.toInt())
-            super.onResume()
-        }
-
-        override fun onDismiss(dialog: DialogInterface) {
-            super.onDismiss(dialog)
-            onDismissed.invoke()
-        }
-
-        override fun onDestroy() {
-            super.onDestroy()
-            _binding = null
         }
     }
 

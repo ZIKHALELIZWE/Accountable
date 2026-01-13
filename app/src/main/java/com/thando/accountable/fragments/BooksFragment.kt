@@ -129,7 +129,6 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
     var navigationIcon by remember { mutableStateOf<(@Composable (Modifier) -> Unit)?>(null) }
     if (viewModel.intentString == null) {
         //WindowCompat.setDecorFitsSystemWindows(mainActivity.window, false)
-
         navigationIcon = {
             IconButton(
                 modifier = Modifier,
@@ -142,17 +141,12 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
                 )
             }
         }
-
     } else {
         val activity = LocalActivity.current
+        coroutineScope.launch { mainActivityViewModel.disableDrawer() }
         activity?.let { activity ->
             val intentActivity by remember { mutableStateOf(activity as IntentActivity) }
-            WindowCompat.setDecorFitsSystemWindows(intentActivity.window, false)
-            intentActivity.dialogFragment.dialog?.setOnKeyListener { _, keyCode, event ->
-                if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
-                    viewModel.onBackPressed()
-                } else false
-            }
+            //WindowCompat.setDecorFitsSystemWindows(intentActivity.window, false)
         }
     }
 
@@ -340,6 +334,7 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
         var folderHeight by remember { mutableStateOf(0.dp) }
         var scriptHeight by remember { mutableStateOf(0.dp) }
         val density = LocalResources.current.displayMetrics.density
+        val activity = LocalActivity.current
 
         when (listShown) {
             Folder.FolderListType.FOLDERS -> {
@@ -408,7 +403,7 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
                                 }
                             },
                             onClick = {
-                                script.scriptId?.let { viewModel.onScriptClick(it) }
+                                script.scriptId?.let { viewModel.onScriptClick(it, activity) }
                             }
                         )
                     }

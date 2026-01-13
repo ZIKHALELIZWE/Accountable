@@ -20,8 +20,8 @@ import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.SpannedString
 import com.thando.accountable.database.tables.MarkupLanguage
-import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Companion.EXAMPLE_SPAN
-import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Companion.EXAMPLE_TEXT
+import com.thando.accountable.database.tables.MarkupLanguage.Companion.EXAMPLE_SPAN
+import com.thando.accountable.database.tables.MarkupLanguage.Companion.EXAMPLE_TEXT
 import com.thando.accountable.ui.cards.MarkupLanguageCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow

@@ -3,9 +3,6 @@ package com.thando.accountable.fragments.viewmodels
 import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
-import androidx.fragment.app.FragmentActivity
-import androidx.fragment.app.FragmentManager
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -14,7 +11,6 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AccountableRepository
 import com.thando.accountable.database.tables.Folder
-import com.thando.accountable.recyclerviewadapters.GoalItemAdapter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -62,20 +58,6 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         initialized.value = true
     }
 
-    fun getGoalAdapter(
-        viewModelLifecycleOwner: LifecycleOwner,
-        childFragmentManager: FragmentManager
-    ): GoalItemAdapter{
-        return GoalItemAdapter(
-            repository.intentString==null,
-            viewModelLifecycleOwner,
-            childFragmentManager,
-            { goal -> onGoalClick(goal) },
-            { goalId -> onGoalEdit(goalId) },
-            { goalId -> onDeleteGoal(goalId) }
-        )
-    }
-
     fun onFolderClick(folderId: Long?) {
         viewModelScope.launch {
             folderId?.let { id ->
@@ -109,11 +91,11 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         repository.loadEditGoal(goalId)
     }
 
-    fun onScriptClick(scriptId: Long) {
+    fun onScriptClick(scriptId: Long, activity: Activity?) {
         viewModelScope.launch {
             updateFolderScrollPosition{
                 updateFolderShowScripts {
-                    loadAndOpenScript(scriptId,null/*activity*/)
+                    loadAndOpenScript( scriptId, activity)
                 }
             }
         }
@@ -168,7 +150,7 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         showScripts.value?.let {
             if (it.value) {
                 // Add a script
-                if (repository.folderIsScripts()) onScriptClick(id)
+                if (repository.folderIsScripts()) onScriptClick(id, null)
                 else onGoalEdit(id)
             } else {
                 // Add a folder

@@ -72,8 +72,6 @@ import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
 import com.thando.accountable.R
-import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Companion.EXAMPLE_PARAGRAPH
-import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Companion.EXAMPLE_TEXT
 import com.thando.accountable.ui.cards.MarkupLanguageCard
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -174,39 +172,10 @@ data class MarkupLanguage(
         const val VALUE_CLOSING = ")"
         const val CLOSING_INDICATOR = "/"
 
-        fun getAlignmentMenuOnClick(
-            context: Context,
-            view: View,
-            alignNormal: () -> Unit,
-            alignCenter: () -> Unit,
-            alignOpposite: () -> Unit
-        ):()->Unit {
-            return {
-                val popup = PopupMenu(context, view)
-                popup.menuInflater.inflate(R.menu.text_alignment_menu, popup.menu)
-                popup.setOnMenuItemClickListener { item: MenuItem ->
-                    when (item.itemId) {
-                        R.id.alignment_menu_normal -> {
-                            alignNormal()
-                            true
-                        }
+        const val EXAMPLE_SPAN = "bi"
+        const val EXAMPLE_TEXT = "This is example text."
+        const val EXAMPLE_PARAGRAPH = "This\t is the first paragraph.\n\nThis\t is the second paragraph.\n\nThis\t is the third paragraph."
 
-                        R.id.alignment_menu_center -> {
-                            alignCenter()
-                            true
-                        }
-
-                        R.id.alignment_menu_opposite -> {
-                            alignOpposite()
-                            true
-                        }
-
-                        else -> false
-                    }
-                }
-                popup.show()
-            }
-        }
 
         fun getFloat(inputFloat: TextFieldState): Float? {
             return inputFloat.text.toString().toFloatOrNull()

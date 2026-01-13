@@ -182,7 +182,7 @@ class SearchView(
         val numScripts by viewModel.numScripts.collectAsStateWithLifecycle()
         val occurrences by viewModel.occurrences.collectAsStateWithLifecycle()
         val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
-        val textSize by MutableStateFlow(appSettings?.textSize?:24).collectAsStateWithLifecycle()
+        val textSize by (appSettings?.textSize?:MutableStateFlow(24)).collectAsStateWithLifecycle()
 
         var initialized by remember { viewModel.initialized }
         val initScrollValues by remember { mutableStateOf(Pair(

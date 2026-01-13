@@ -1234,7 +1234,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         repositoryScope.launch {
             withContext(Dispatchers.IO){
                 if (appSettings.value != null) {
-                    appSettings.value!!.textSize = textSize
+                    appSettings.value!!.textSize.update { textSize }
                     dao.update(appSettings.value!!)
                 }
             }

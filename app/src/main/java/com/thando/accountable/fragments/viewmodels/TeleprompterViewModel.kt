@@ -7,8 +7,6 @@ import android.os.Looper
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
-import androidx.fragment.app.FragmentManager
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -22,7 +20,6 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel.Companion.showMarkupLanguageNameDialog
-import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
 import com.thando.accountable.ui.cards.Colour
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,8 +61,6 @@ class TeleprompterViewModel(
     private val _countDownButtonVisibility = MutableStateFlow(false)
     val countDownButtonVisibility: StateFlow<Boolean> get() = _countDownButtonVisibility
 
-
-
     // Click Events
     private val _navigateToScript = MutableSharedFlow<Boolean>()
     val navigateToScript: SharedFlow<Boolean> get() = _navigateToScript
@@ -92,30 +87,6 @@ class TeleprompterViewModel(
 
     // animation values
     private var animationDuration = 500L
-
-    fun getContentAdapter(
-        context: Context,
-        viewLifecycleOwner: LifecycleOwner,
-        childFragmentManager: FragmentManager,
-        textSize: Float,
-        markupLanguageInitializeScrollUnit:(()->Unit)
-    ): ContentItemAdapter {
-        return ContentItemAdapter(
-            context,
-            viewLifecycleOwner,
-            childFragmentManager,
-            null,
-            markupLanguageInitializeScrollUnit,
-            script,
-            appSettings,
-            markupLanguage,
-            MutableStateFlow(false),
-            viewModelScope,
-            repository,
-            MutableStateFlow(null),
-            textSize
-        )
-    }
 
     fun setCountDownText(countDownTextAfterTick: String){
         countDownText.update { countDownTextAfterTick }

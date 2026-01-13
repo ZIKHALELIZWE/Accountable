@@ -30,7 +30,9 @@ data class Colour(
     }
 
     companion object{
-        fun showColorPickerDialog(context: Context, processSelectedColour:(selectedColour:Int)->Unit) {
+        fun showColorPickerDialog(
+            context: Context, processSelectedColour:(selectedColour:Int)->Unit
+        ) {
             lateinit var colorPickerDialog: AlertDialog
             val density = context.resources.displayMetrics.density
             val colors = listOf(

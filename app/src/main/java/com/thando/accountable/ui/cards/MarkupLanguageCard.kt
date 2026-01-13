@@ -1,15 +1,14 @@
 package com.thando.accountable.ui.cards
 
 import android.content.Context
-import android.view.View
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.thando.accountable.SpannedString
 import com.thando.accountable.database.tables.MarkupLanguage
+import com.thando.accountable.database.tables.MarkupLanguage.Companion.EXAMPLE_PARAGRAPH
+import com.thando.accountable.database.tables.MarkupLanguage.Companion.EXAMPLE_TEXT
 import com.thando.accountable.database.tables.SpecialCharacters.State
-import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Companion.EXAMPLE_PARAGRAPH
-import com.thando.accountable.recyclerviewadapters.MarkupLanguageCardAdapter.Companion.EXAMPLE_TEXT
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update

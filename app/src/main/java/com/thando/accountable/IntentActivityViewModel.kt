@@ -9,7 +9,7 @@ class IntentActivityViewModel(
     val repository: AccountableRepository
 ) : ViewModel() {
     val direction = repository.getDirection()
-    var navController = AccountableNavigationController()
+    val currentFragment = repository.getCurrentFragment()
 
     class Factory(private val intentString: String? = null): ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

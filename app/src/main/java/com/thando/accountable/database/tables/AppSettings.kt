@@ -12,14 +12,14 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 
 @Entity(tableName = "app_settings_table")
 data class AppSettings(
     @PrimaryKey
     var appSettingId: Long = 1L,
 
-    @ColumnInfo(name = "main_picture")
-    private var mainPicture: String = "app_picture",
+    @ColumnInfo(name = "main_picture") var mainPicture: MutableStateFlow<String> = MutableStateFlow("app_picture"),
 
     @ColumnInfo (name = "scroll_position")
     var scrollPosition: LazyListState = LazyListState(),
@@ -40,7 +40,7 @@ data class AppSettings(
     var scriptsOrder: MutableStateFlow<Boolean> = MutableStateFlow(true),
 
     @ColumnInfo (name = "text_size")
-    var textSize: Int = 50
+    var textSize: MutableStateFlow<Int> = MutableStateFlow(50)
 ) {
 
     companion object {
@@ -51,16 +51,20 @@ data class AppSettings(
     }
 
     @Ignore
-    val imageResource = AppResources.ImageResource(mainPicture)
+    val imageResource = AppResources.ImageResource(mainPicture.value)
 
-    fun getMainPicture(): String { return mainPicture }
+    fun getMainPicture(): String { return mainPicture.value }
 
     suspend fun saveImage(context: Context, inputUri: Uri?) {
-        mainPicture = imageResource.saveFile(context, inputUri, FOLDER_IMAGE_ID, appSettingId) ?: DEFAULT_IMAGE_ID
+        mainPicture.update {
+            imageResource.saveFile(context, inputUri, FOLDER_IMAGE_ID, appSettingId) ?: DEFAULT_IMAGE_ID
+        }
     }
 
     suspend fun restoreDefaultFile(context: Context) {
-        mainPicture = imageResource.setDefaultImage(context)
+        mainPicture.update {
+            imageResource.setDefaultImage(context)
+        }
     }
 
     fun getUri(context: Context): StateFlow<Uri?>  = imageResource.getUri(context)
