@@ -39,7 +39,7 @@ import com.thando.accountable.databinding.ImageItemBinding
 import com.thando.accountable.databinding.ScriptContentItemBinding
 import com.thando.accountable.databinding.TextItemBinding
 import com.thando.accountable.databinding.VideoItemBinding
-import com.thando.accountable.fragments.ScriptFragment
+import com.thando.accountable.fragments.ContentPosition
 import com.thando.accountable.fragments.dialogs.AddMediaDialog
 import com.thando.accountable.player.TrackItem
 import com.thando.accountable.recyclerviewadapters.diffutils.ContentDiffItemCallback
@@ -702,14 +702,14 @@ class ContentItemAdapter(
         else return false
     }
 
-    private fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:ScriptFragment.ContentPosition, item: Content, binding: TextItemBinding?){
+    private fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition:ContentPosition, item: Content, binding: TextItemBinding?){
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val inputIndex = when (contentPosition) {
-                    ScriptFragment.ContentPosition.ABOVE ->
+                    ContentPosition.ABOVE ->
                         scriptContentList.value.indexOf(item)
 
-                    ScriptFragment.ContentPosition.AT_CURSOR_POINT -> {
+                    ContentPosition.AT_CURSOR_POINT -> {
                         val inputIndex =
                             scriptContentList.value.indexOf(item) + 1
                         if (binding != null) {
@@ -735,7 +735,7 @@ class ContentItemAdapter(
                         inputIndex
                     }
 
-                    ScriptFragment.ContentPosition.BELOW ->
+                    ContentPosition.BELOW ->
                         scriptContentList.value.indexOf(item) + 1
                 }
                 multipleContentList?.forEach {

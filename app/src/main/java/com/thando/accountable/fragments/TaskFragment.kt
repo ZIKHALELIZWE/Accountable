@@ -1,22 +1,13 @@
 package com.thando.accountable.fragments
 
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import androidx.fragment.app.Fragment
-import com.thando.accountable.MainActivity
+import androidx.compose.runtime.Composable
+import com.thando.accountable.MainActivityViewModel
+import com.thando.accountable.fragments.viewmodels.TaskViewModel
 
-class TaskFragment : Fragment() {
-
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-
-        val mainActivity = (requireActivity() as MainActivity)
-        return super.onCreateView(inflater, container, savedInstanceState)
-    }
+@Composable
+fun TaskView(
+    viewModel: TaskViewModel,
+    mainActivityViewModel: MainActivityViewModel
+) {
 
 }

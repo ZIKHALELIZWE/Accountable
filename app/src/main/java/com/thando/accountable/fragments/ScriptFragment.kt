@@ -1,15 +1,8 @@
 package com.thando.accountable.fragments
 
 import android.content.Intent
-import android.net.Uri
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -49,6 +42,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -67,7 +61,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -76,15 +69,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import com.thando.accountable.AccountableRepository.Companion.accountablePlayer
 import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivity.Companion.collectFlow
+import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
@@ -92,7 +82,6 @@ import com.thando.accountable.database.tables.Content.ContentType
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.TeleprompterSettings
-import com.thando.accountable.fragments.ScriptFragment.ContentPosition
 import com.thando.accountable.fragments.viewmodels.ScriptViewModel
 import com.thando.accountable.ui.cards.GetContentCard
 import com.thando.accountable.ui.cards.TextFieldAccountable
@@ -101,22 +90,28 @@ import com.thando.accountable.ui.screens.basicDropdownMenu
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.random.Random
 
-class ScriptFragment : Fragment() {
-    val viewModel : ScriptViewModel by viewModels { ScriptViewModel.Factory }
-    private val galleryLauncherMultiple = registerForActivityResult(
-        ActivityResultContracts.GetMultipleContents()
-    ){
-        list -> multipleContentsStateFlow.value = list
+@Composable
+fun ScriptView(
+    viewModel: ScriptViewModel,
+    mainActivityViewModel: MainActivityViewModel
+) {
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.prepareToClose {}
+        }
     }
-    private val galleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { galleryUri ->
+
+    mainActivityViewModel.setGalleryLauncherMultipleReturn { list ->
+        viewModel.multipleContentsStateFlow.update { list }
+    }
+
+    mainActivityViewModel.setGalleryLauncherReturn { galleryUri ->
         try{
             if (galleryUri!=null){
                 when (viewModel.chooseContent) {
@@ -139,63 +134,30 @@ class ScriptFragment : Fragment() {
         viewModel.contentRetrieved()
     }
 
-    private val multipleContentsStateFlow: MutableStateFlow<List<@JvmSuppressWildcards Uri>?> = MutableStateFlow(null)
-    private val multipleContentsJob = AtomicReference<Job?>(null)
-
-    enum class ContentPosition{ ABOVE, AT_CURSOR_POINT, BELOW }
-
-    @OptIn(ExperimentalMaterial3Api::class)
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        val mainActivity = (requireActivity() as MainActivity)
-        mainActivity.viewModel.toolbarVisible.value = false
-
-        return ComposeView(requireContext()).apply {
-            WindowCompat.setDecorFitsSystemWindows(mainActivity.window, false)
-            setContent {
-                mainActivity.onBackPressedDispatcher.addCallback(viewLifecycleOwner,
-                    object : OnBackPressedCallback(true) {
-                        override fun handleOnBackPressed() {
-                            viewModel.onBackPressed()
-                        }
-                    }
-                )
-                viewModel.setIsScriptFragment(true)
-                ScriptFragmentView(
-                    modifier = Modifier.fillMaxSize(),
-                    viewModel,
-                    teleprompterSettings = null,
-                    galleryLauncher,
-                    galleryLauncherMultiple,
-                    multipleContentsJob,
-                    multipleContentsStateFlow
-                )
-            }
-        }
+    BackHandler {
+        viewModel.onBackPressed()
     }
 
-    override fun onPause() {
-        activity?.lifecycleScope?.launch {
-            withContext(Dispatchers.IO) {
-                viewModel.prepareToClose {}
-            }
-        }
-        super.onPause()
+    viewModel.setIsScriptFragment(true)
+    AccountableTheme {
+        ScriptFragmentView(
+            modifier = Modifier.fillMaxSize(),
+            viewModel,
+            mainActivityViewModel,
+            teleprompterSettings = null
+        )
     }
 }
+
+enum class ContentPosition{ ABOVE, AT_CURSOR_POINT, BELOW }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScriptFragmentView(
     modifier: Modifier = Modifier.fillMaxSize(),
     viewModel: ScriptViewModel,
-    teleprompterSettings: TeleprompterSettings? = null,
-    galleryLauncher: ActivityResultLauncher<String>? = null,
-    galleryLauncherMultiple: ActivityResultLauncher<String>? = null,
-    multipleContentsJob: AtomicReference<Job?>? = null ,
-    multipleContentsStateFlow: MutableStateFlow<List<@JvmSuppressWildcards Uri>?>? = null
+    mainActivityViewModel: MainActivityViewModel,
+    teleprompterSettings: TeleprompterSettings? = null
 ) {
     val script by viewModel.script.collectAsStateWithLifecycle()
     val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
@@ -281,8 +243,8 @@ fun ScriptFragmentView(
                     text = scriptUri?.let { stringResource(R.string.remove_image) }
                         ?: stringResource(R.string.choose_image),
                     onClick = {
-                        viewModel.chooseTopImage { accessorString ->
-                            galleryLauncher?.launch(accessorString)
+                        viewModel.chooseTopImage { contentType ->
+                            mainActivityViewModel.launchGalleryLauncher(contentType)
                         }
                     }
                 ),
@@ -311,8 +273,8 @@ fun ScriptFragmentView(
                 MenuItemData(
                     text = stringResource(R.string.load_document),
                     onClick = {
-                        viewModel.loadText { accessorString ->
-                            galleryLauncher?.launch(accessorString)
+                        viewModel.loadText { contentType ->
+                            mainActivityViewModel.launchGalleryLauncher(contentType)
                         }
                     }
                 ),
@@ -529,9 +491,7 @@ fun ScriptFragmentView(
                                                         bottomSheet.first,
                                                         scope,
                                                         viewModel,
-                                                        galleryLauncherMultiple,
-                                                        multipleContentsJob,
-                                                        multipleContentsStateFlow
+                                                        mainActivityViewModel
                                                     )
                                                 }
                                                 bottomSheet = null
@@ -562,9 +522,7 @@ fun ScriptFragmentView(
                                                         bottomSheet.first,
                                                         scope,
                                                         viewModel,
-                                                        galleryLauncherMultiple,
-                                                        multipleContentsJob,
-                                                        multipleContentsStateFlow
+                                                        mainActivityViewModel
                                                     )
                                                 }
                                                 bottomSheet = null
@@ -595,9 +553,7 @@ fun ScriptFragmentView(
                                                         bottomSheet.first,
                                                         scope,
                                                         viewModel,
-                                                        galleryLauncherMultiple,
-                                                        multipleContentsJob,
-                                                        multipleContentsStateFlow
+                                                        mainActivityViewModel
                                                     )
                                                 }
                                                 bottomSheet = null
@@ -902,14 +858,14 @@ fun ScriptFragmentCatalog(
     }
 }
 
-private fun addContentView(chosenContentType: ContentType):Pair<String?,Content.NonMediaType?>{
+private fun addContentView(chosenContentType: ContentType):Pair<AppResources.ContentType?,Content.NonMediaType?>{
     val accessor = when(chosenContentType){
         ContentType.TEXT -> null
-        ContentType.IMAGE -> AppResources.ContentTypeAccessor[AppResources.ContentType.IMAGE]
+        ContentType.IMAGE -> AppResources.ContentType.IMAGE
         ContentType.SCRIPT -> null
-        ContentType.VIDEO -> AppResources.ContentTypeAccessor[AppResources.ContentType.VIDEO]
-        ContentType.DOCUMENT -> AppResources.ContentTypeAccessor[AppResources.ContentType.DOCUMENT]
-        ContentType.AUDIO -> AppResources.ContentTypeAccessor[AppResources.ContentType.AUDIO]
+        ContentType.VIDEO -> AppResources.ContentType.VIDEO
+        ContentType.DOCUMENT -> AppResources.ContentType.DOCUMENT
+        ContentType.AUDIO -> AppResources.ContentType.AUDIO
     }
     val nonMediaType = when(chosenContentType){
         ContentType.TEXT -> Content.NonMediaType.TEXT
@@ -923,20 +879,18 @@ private fun addContentView(chosenContentType: ContentType):Pair<String?,Content.
 }
 
 private fun getMultipleContent(
-    mediaType:String?,
+    mediaType: AppResources.ContentType?,
     contentType: ContentType,
     position: ContentPosition,
     content: Content,
     cursorPosition: Int?,
     lifecycleScope: CoroutineScope,
     viewModel: ScriptViewModel,
-    galleryLauncherMultiple: ActivityResultLauncher<String>? = null,
-    multipleContentsJob: AtomicReference<Job?> ? = null,
-    multipleContentsStateFlow: MutableStateFlow<List<@JvmSuppressWildcards Uri>?>?=null
+    mainActivityViewModel: MainActivityViewModel
 ){
     if (mediaType!=null){
-        multipleContentsStateFlow?.let { multipleContentsStateFlow ->
-            multipleContentsJob?.set(
+        viewModel.multipleContentsStateFlow.let { multipleContentsStateFlow ->
+            viewModel.multipleContentsJob.set(
                 collectFlow(
                     lifecycleScope,
                     multipleContentsStateFlow
@@ -944,15 +898,15 @@ private fun getMultipleContent(
                     if (list != null) {
                         viewModel.addContent(list, contentType, position, content, cursorPosition)
                         multipleContentsStateFlow.value = null
-                        multipleContentsJob.get()?.cancel()
+                        viewModel.multipleContentsJob.get()?.cancel()
                     }
                 })
-            galleryLauncherMultiple?.launch(mediaType)
+            mainActivityViewModel.launchGalleryLauncherMultiple(mediaType)
         }
     }
     else {
         viewModel.addContent( null, contentType, position, content, cursorPosition)
-        multipleContentsJob?.get()?.cancel()
-        multipleContentsStateFlow?.value = null
+        viewModel.multipleContentsJob.get()?.cancel()
+        viewModel.multipleContentsStateFlow.value = null
     }
 }

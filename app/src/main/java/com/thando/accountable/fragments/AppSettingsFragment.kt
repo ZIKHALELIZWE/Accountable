@@ -25,9 +25,7 @@ import com.thando.accountable.ui.NumberPickerPreferenceDialog
 import kotlinx.coroutines.launch
 import kotlin.text.get
 
-class AppSettingsFragment : PreferenceFragmentCompat() {
-
-    private val viewModel : AppSettingsViewModel by viewModels { AppSettingsViewModel.Factory }
+class AppSettingsFragment(val viewModel: AppSettingsViewModel) : PreferenceFragmentCompat() {
     private val galleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { galleryUri ->
         try{
             viewModel.setCustomImage(galleryUri)
@@ -61,9 +59,6 @@ class AppSettingsFragment : PreferenceFragmentCompat() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-
-        val mainActivity = (requireActivity() as MainActivity)
-        mainActivity.viewModel.toolbarVisible.value = true
 
         collectFlow(this,viewModel.appSettings) { appSettings ->
             val mainDisplayImagePreference = findPreference<ListPreference>("main_image_setting")
@@ -113,10 +108,10 @@ class AppSettingsFragment : PreferenceFragmentCompat() {
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
                     lifecycleScope.launch {
-                        if (!mainActivity.viewModel.toggleDrawer(false)){
+                        /*if (!mainActivity.viewModel.toggleDrawer(false)){
                             isEnabled = false
                             mainActivity.onBackPressedDispatcher.onBackPressed()
-                        }
+                        }*/
                     }
                 }
             }

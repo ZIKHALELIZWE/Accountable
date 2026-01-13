@@ -1,5 +1,6 @@
 package com.thando.accountable.fragments.viewmodels
 
+import android.app.Activity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -130,7 +131,7 @@ class SearchViewModel(
         repository.searchFragmentSearch(searchComplete)
     }
 
-    fun loadAndOpenScript(scriptId: Long, activity: FragmentActivity?) {
+    fun loadAndOpenScript(scriptId: Long, activity: Activity?) {
         if (repository.intentString==null) {
             repository.setIsFromSearchFolderToTrue {
                 repository.loadAndOpenScript(scriptId)

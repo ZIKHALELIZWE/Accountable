@@ -6,6 +6,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -72,6 +74,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.IntentActivity
 import com.thando.accountable.MainActivity
+import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import com.thando.accountable.ui.cards.TextFieldAccountable
@@ -79,115 +82,93 @@ import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
-class SearchFragment : Fragment() {
-
-    private val viewModel: SearchViewModel by viewModels { SearchViewModel.Factory }
-
+class SearchView(
+    val viewModel: SearchViewModel,
+    val mainActivityViewModel: MainActivityViewModel
+) {
     @OptIn(ExperimentalMaterial3Api::class)
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        return ComposeView(requireContext()).apply {
-            WindowCompat.setDecorFitsSystemWindows(
-                if (viewModel.intentString==null) (requireActivity() as MainActivity).window
-                else (requireActivity() as IntentActivity).window,
-                false
-            )
-            setContent {
-                if (viewModel.intentString==null) {
-                    val mainActivity = (requireActivity() as MainActivity)
-                    mainActivity.viewModel.toolbarVisible.value = false
-                    mainActivity.onBackPressedDispatcher.addCallback(viewLifecycleOwner,
-                        object : OnBackPressedCallback(true) {
-                            override fun handleOnBackPressed() {
-                                viewModel.navigateToFoldersAndScripts()
+    @Composable
+    fun searchView(){
+        if (viewModel.intentString==null) {
+            BackHandler {
+                viewModel.navigateToFoldersAndScripts()
+            }
+        }
+        else{
+            BackHandler {
+                viewModel.navigateToFoldersAndScripts()
+            }
+        }
+
+        val resources = LocalResources.current
+        var menuOpen by remember { viewModel.searchMenuOpen }
+        val scope = rememberCoroutineScope()
+        var matchCaseCheck by remember { viewModel.matchCaseCheck }
+        var wordCheck by remember { viewModel.wordCheck }
+        AccountableTheme {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                topBar = {
+                    CenterAlignedTopAppBar(
+                        title = { Text(stringResource(R.string.search)) },
+                        navigationIcon = { IconButton(onClick = {
+                            scope.launch{ viewModel.navigateToFoldersAndScripts() }
+                        }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.search_navigate_back_button)
+                            )
+                        } },
+                        actions = {
+                            IconButton(onClick = {viewModel.toggleMenuOpen()}) {
+                                Icon(
+                                    if (menuOpen) Icons.Default.KeyboardArrowUp
+                                    else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = stringResource(R.string.open_search_input_view)
+                                )
                             }
+                            val selectableColors = SelectableChipColors(
+                                containerColor = Color.Transparent,
+                                disabledContainerColor = Color.LightGray,
+                                disabledLeadingIconColor = Color.Gray,
+                                disabledSelectedContainerColor = Color(
+                                    resources.getColor(
+                                        R.color.purple_700, null
+                                    )
+                                ),
+                                selectedContainerColor = Color(
+                                    resources.getColor(
+                                        R.color.purple_200, null
+                                    )
+                                ),
+                                selectedLeadingIconColor = Color.Black,
+                                labelColor = Color.Black,
+                                leadingIconColor = Color.Black,
+                                trailingIconColor = Color.Black,
+                                disabledLabelColor = Color.Gray,
+                                disabledTrailingIconColor = Color.Gray,
+                                selectedLabelColor = Color.Black,
+                                selectedTrailingIconColor = Color.Black
+                            )
+                            FilterChip(
+                                selected = matchCaseCheck,
+                                onClick = { viewModel.toggleMatchCaseCheck() },
+                                label = { Text(stringResource(R.string.case_string)) },
+                                leadingIcon = null,
+                                colors = selectableColors
+                            )
+                            FilterChip(
+                                selected = wordCheck,
+                                onClick = { viewModel.toggleWordCheck() },
+                                label = { Text(stringResource(R.string.word)) },
+                                leadingIcon = null,
+                                colors = selectableColors
+                            )
                         }
                     )
                 }
-                else{
-                    val intentActivity = (requireActivity() as IntentActivity)
-                    intentActivity.dialogFragment.dialog?.setOnKeyListener { _, keyCode, event ->
-                        if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
-                            viewModel.navigateToFoldersAndScripts()
-                            true
-                        }
-                        else false
-                    }
-                }
-
-                var menuOpen by remember { viewModel.searchMenuOpen }
-                val scope = rememberCoroutineScope()
-                var matchCaseCheck by remember { viewModel.matchCaseCheck }
-                var wordCheck by remember { viewModel.wordCheck }
-                AccountableTheme {
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        topBar = {
-                            CenterAlignedTopAppBar(
-                                title = { Text(stringResource(R.string.search)) },
-                                navigationIcon = { IconButton(onClick = {
-                                    scope.launch{ viewModel.navigateToFoldersAndScripts() }
-                                }) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = stringResource(R.string.search_navigate_back_button)
-                                    )
-                                } },
-                                actions = {
-                                    IconButton(onClick = {viewModel.toggleMenuOpen()}) {
-                                        Icon(
-                                            if (menuOpen) Icons.Default.KeyboardArrowUp
-                                            else Icons.Default.KeyboardArrowDown,
-                                            contentDescription = stringResource(R.string.open_search_input_view)
-                                        )
-                                    }
-                                    val selectableColors = SelectableChipColors(
-                                        containerColor = Color.Transparent,
-                                        disabledContainerColor = Color.LightGray,
-                                        disabledLeadingIconColor = Color.Gray,
-                                        disabledSelectedContainerColor = Color(
-                                            context.resources.getColor(
-                                                R.color.purple_700, null
-                                            )
-                                        ),
-                                        selectedContainerColor = Color(
-                                            context.resources.getColor(
-                                                R.color.purple_200, null
-                                            )
-                                        ),
-                                        selectedLeadingIconColor = Color.Black,
-                                        labelColor = Color.Black,
-                                        leadingIconColor = Color.Black,
-                                        trailingIconColor = Color.Black,
-                                        disabledLabelColor = Color.Gray,
-                                        disabledTrailingIconColor = Color.Gray,
-                                        selectedLabelColor = Color.Black,
-                                        selectedTrailingIconColor = Color.Black
-                                    )
-                                    FilterChip(
-                                        selected = matchCaseCheck,
-                                        onClick = { viewModel.toggleMatchCaseCheck() },
-                                        label = { Text(stringResource(R.string.case_string)) },
-                                        leadingIcon = null,
-                                        colors = selectableColors
-                                    )
-                                    FilterChip(
-                                        selected = wordCheck,
-                                        onClick = { viewModel.toggleWordCheck() },
-                                        label = { Text(stringResource(R.string.word)) },
-                                        leadingIcon = null,
-                                        colors = selectableColors
-                                    )
-                                }
-                            )
-                        }
-                    ) { innerPadding ->
-                        SearchFragmentView(modifier = Modifier.padding(innerPadding), menuOpen)
-                    }
-                }
+            ) { innerPadding ->
+                SearchFragmentView(modifier = Modifier.padding(innerPadding), menuOpen)
             }
         }
     }
@@ -343,6 +324,7 @@ class SearchFragment : Fragment() {
         val leftButtonVisibility by item.leftButtonVisibility.collectAsStateWithLifecycle()
         val rightButtonVisibility by item.rightButtonVisibility.collectAsStateWithLifecycle()
         val snippetIndex by item.snippetIndex.collectAsStateWithLifecycle()
+        val activity = LocalActivity.current
 
         Column(modifier = Modifier.fillMaxSize()) {
             ScriptCard(script = item.script,
@@ -353,7 +335,9 @@ class SearchFragment : Fragment() {
                 onLongClick = {},
                 onClick = {
                     item.script.scriptId?.let {
-                        viewModel.loadAndOpenScript( it,activity)
+                        activity?.let { activity ->
+                            viewModel.loadAndOpenScript(it, activity)
+                        }
                     }
                 }
             )

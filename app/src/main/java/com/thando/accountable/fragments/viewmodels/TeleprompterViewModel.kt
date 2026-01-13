@@ -2,14 +2,13 @@ package com.thando.accountable.fragments.viewmodels
 
 import android.content.Context
 import android.os.CountDownTimer
-import android.view.View
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -22,7 +21,6 @@ import com.thando.accountable.R
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.TeleprompterSettings
-import com.thando.accountable.fragments.TeleprompterFragment
 import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel.Companion.showMarkupLanguageNameDialog
 import com.thando.accountable.recyclerviewadapters.ContentItemAdapter
 import com.thando.accountable.ui.cards.Colour
@@ -32,7 +30,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -89,6 +86,9 @@ class TeleprompterViewModel(
 
     private var _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> get() = _isPlaying
+
+    var listState: LazyListState? = null
+    val handler = Handler(Looper.getMainLooper())
 
     // animation values
     private var animationDuration = 500L

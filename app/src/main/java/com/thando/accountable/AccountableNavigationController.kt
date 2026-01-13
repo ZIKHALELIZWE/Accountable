@@ -3,18 +3,7 @@ package com.thando.accountable
 import androidx.fragment.app.FragmentManager
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.fragments.AppSettingsFragment
-import com.thando.accountable.fragments.EditFolderFragment
-import com.thando.accountable.fragments.EditGoalFragment
-import com.thando.accountable.fragments.FoldersAndScriptsFragment
-import com.thando.accountable.fragments.GoalsFragment
-import com.thando.accountable.fragments.HelpFragment
-import com.thando.accountable.fragments.HomeFragment
-import com.thando.accountable.fragments.MarkupLanguageFragment
-import com.thando.accountable.fragments.ScriptFragment
-import com.thando.accountable.fragments.TaskFragment
-import com.thando.accountable.fragments.TeleprompterFragment
-import com.thando.accountable.fragments.viewmodels.FoldersAndScriptsViewModel.Companion.INITIAL_FOLDER_ID
-import com.thando.accountable.fragments.SearchFragment
+import com.thando.accountable.fragments.viewmodels.BooksViewModel.Companion.INITIAL_FOLDER_ID
 
 class AccountableNavigationController {
 
@@ -70,6 +59,22 @@ class AccountableNavigationController {
             else -> false
         }
 
+        fun getFragmentFromName(fragment: String) = when(fragment) {
+            AccountableFragment.HomeFragment.name -> AccountableFragment.HomeFragment
+            AccountableFragment.GoalsFragment.name -> AccountableFragment.GoalsFragment
+            AccountableFragment.BooksFragment.name -> AccountableFragment.BooksFragment
+            AccountableFragment.AppSettingsFragment.name -> AccountableFragment.AppSettingsFragment
+            AccountableFragment.HelpFragment.name -> AccountableFragment.HelpFragment
+            AccountableFragment.EditFolderFragment.name -> AccountableFragment.EditFolderFragment
+            AccountableFragment.EditGoalFragment.name -> AccountableFragment.EditGoalFragment
+            AccountableFragment.TaskFragment.name -> AccountableFragment.TaskFragment
+            AccountableFragment.MarkupLanguageFragment.name -> AccountableFragment.MarkupLanguageFragment
+            AccountableFragment.ScriptFragment.name -> AccountableFragment.ScriptFragment
+            AccountableFragment.TeleprompterFragment.name -> AccountableFragment.TeleprompterFragment
+            AccountableFragment.SearchFragment.name -> AccountableFragment.SearchFragment
+            else -> AccountableFragment.HomeFragment
+        }
+
         fun getFragmentFromId(fragment: Int) = when(fragment) {
             HOME_FRAGMENT_ID -> AccountableFragment.HomeFragment
             GOAL_FRAGMENT_ID -> AccountableFragment.GoalsFragment
@@ -84,21 +89,6 @@ class AccountableNavigationController {
             TELEPROMPTER_FRAGMENT_ID -> AccountableFragment.TeleprompterFragment
             SEARCH_FRAGMENT_ID -> AccountableFragment.SearchFragment
             else -> AccountableFragment.HomeFragment
-        }
-
-        fun getFragmentClassString(fragment: AccountableFragment) = when(fragment){
-            AccountableFragment.HomeFragment -> HomeFragment::class.toString()
-            AccountableFragment.GoalsFragment -> FoldersAndScriptsFragment::class.toString()
-            AccountableFragment.BooksFragment -> FoldersAndScriptsFragment::class.toString()
-            AccountableFragment.AppSettingsFragment -> AppSettingsFragment::class.toString()
-            AccountableFragment.HelpFragment -> HelpFragment::class.toString()
-            AccountableFragment.EditFolderFragment -> EditFolderFragment::class.toString()
-            AccountableFragment.EditGoalFragment -> EditGoalFragment::class.toString()
-            AccountableFragment.TaskFragment -> TaskFragment::class.toString()
-            AccountableFragment.MarkupLanguageFragment -> MarkupLanguageFragment::class.toString()
-            AccountableFragment.ScriptFragment -> ScriptFragment::class.toString()
-            AccountableFragment.TeleprompterFragment -> TeleprompterFragment::class.toString()
-            AccountableFragment.SearchFragment -> SearchFragment::class.toString()
         }
 
         fun getFragmentDirections(currentFragment: AccountableFragment, newFragment: AccountableFragment):Pair<AccountableFragment?,AccountableRepository.NavigationArguments>{
@@ -196,21 +186,6 @@ class AccountableNavigationController {
             }
             return navArgs
         }
-
-        fun getFragmentClass(fragment: AccountableFragment) = when(fragment){
-            AccountableFragment.HomeFragment -> HomeFragment()
-            AccountableFragment.GoalsFragment -> GoalsFragment()
-            AccountableFragment.BooksFragment -> FoldersAndScriptsFragment()
-            AccountableFragment.AppSettingsFragment -> AppSettingsFragment()
-            AccountableFragment.HelpFragment -> HelpFragment()
-            AccountableFragment.EditFolderFragment -> EditFolderFragment()
-            AccountableFragment.EditGoalFragment -> EditGoalFragment()
-            AccountableFragment.TaskFragment -> TaskFragment()
-            AccountableFragment.MarkupLanguageFragment -> MarkupLanguageFragment()
-            AccountableFragment.ScriptFragment -> ScriptFragment()
-            AccountableFragment.TeleprompterFragment -> TeleprompterFragment()
-            AccountableFragment.SearchFragment -> SearchFragment()
-        }
     }
 
     fun navigateTo(
@@ -224,7 +199,7 @@ class AccountableNavigationController {
         }
 
         val transaction = supportFragmentManager.beginTransaction()
-        transaction.replace(containerId, getFragmentClass(fragment))
+        //transaction.replace(containerId, getFragmentClass(fragment))
         transaction.commit()
     }
 }

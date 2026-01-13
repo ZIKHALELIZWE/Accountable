@@ -1,5 +1,6 @@
 package com.thando.accountable.fragments.viewmodels
 
+import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.fragment.app.FragmentActivity
@@ -19,7 +20,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 
-class FoldersAndScriptsViewModel(private val repository: AccountableRepository): ViewModel() {
+class BooksViewModel(private val repository: AccountableRepository): ViewModel() {
     // Data
     val intentString = repository.intentString
     val folder = repository.getFolder()
@@ -128,7 +129,7 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
         }
     }
 
-    fun loadAndOpenScript(scriptId: Long, activity: FragmentActivity?) {
+    fun loadAndOpenScript(scriptId: Long, activity: Activity?) {
         if (repository.intentString==null) {
             repository.loadAndOpenScript(scriptId)
         }
@@ -201,13 +202,7 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
         repository.loadFolder(folderId)
     }
 
-    fun getFolderId(): Long?{
-        return folder.value?.folderId?: appSettings.value?.appSettingId
-    }
-
     fun folderIsScripts(): Boolean { return repository.folderIsScripts() }
-
-    fun getFolderType(): Folder.FolderType{ return folderType.value!! }
 
     fun updateFolderScrollPosition(appendedUnit:(()->Unit)? = null){
         repository.updateScriptsOrGoalsFolderScrollPosition(
@@ -229,10 +224,6 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
 
     companion object {
         const val INITIAL_FOLDER_ID: Long = -1L
-        const val FOLDER_ID_BUNDLE: String = "folder_id_bundle"
-        const val FOLDER_TYPE_BUNDLE: String = "folder_type_bundle"
-        const val GOAL_ID_BUNDLE: String = "goal_id_bundle"
-        const val GOAL_PARENT_ID_BUNDLE = "goal_parent_id_bundle"
 
         val Factory : ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -243,7 +234,7 @@ class FoldersAndScriptsViewModel(private val repository: AccountableRepository):
 
                 val accountableRepository = AccountableRepository.getInstance(application)
 
-                return FoldersAndScriptsViewModel(
+                return BooksViewModel(
                     accountableRepository
                 ) as T
             }

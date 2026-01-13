@@ -1,5 +1,6 @@
 package com.thando.accountable
 
+import android.app.Activity
 import android.app.Application
 import android.content.ContentValues
 import android.content.Intent
@@ -32,8 +33,8 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.TeleprompterSettings
-import com.thando.accountable.fragments.ScriptFragment
-import com.thando.accountable.fragments.viewmodels.FoldersAndScriptsViewModel.Companion.INITIAL_FOLDER_ID
+import com.thando.accountable.fragments.ContentPosition
+import com.thando.accountable.fragments.viewmodels.BooksViewModel.Companion.INITIAL_FOLDER_ID
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import com.thando.accountable.player.AccountablePlayer
 import com.thando.accountable.ui.AccountableNotification
@@ -663,7 +664,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun appendIntentStringToScript(scriptId:Long, activity: FragmentActivity?){
+    fun appendIntentStringToScript(scriptId:Long, activity: Activity?){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 if (scriptId != INITIAL_FOLDER_ID) {
@@ -900,14 +901,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return position+1
     }
 
-    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ScriptFragment.ContentPosition, item: Content, cursorPosition:Int?){
+    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ContentPosition, item: Content, cursorPosition:Int?){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 val inputIndex = when (contentPosition) {
-                    ScriptFragment.ContentPosition.ABOVE ->
+                    ContentPosition.ABOVE ->
                         scriptContentList.indexOf(item)
 
-                    ScriptFragment.ContentPosition.AT_CURSOR_POINT -> {
+                    ContentPosition.AT_CURSOR_POINT -> {
                         val inputIndex = scriptContentList.indexOf(item) + 1
                         if (cursorPosition != null) {
                             // split the string
@@ -931,7 +932,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         inputIndex
                     }
 
-                    ScriptFragment.ContentPosition.BELOW -> scriptContentList.indexOf(item) + 1
+                    ContentPosition.BELOW -> scriptContentList.indexOf(item) + 1
                 }
                 multipleContentList?.forEach {
                     val newContent = Content(

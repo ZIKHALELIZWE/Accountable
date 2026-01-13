@@ -2,18 +2,21 @@ package com.thando.accountable
 
 import android.content.Context
 import android.content.res.Resources
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
+import android.widget.FrameLayout
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -23,23 +26,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.outlined.Help
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.Typography
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,34 +44,105 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentContainerView
+import androidx.fragment.app.FragmentManager
+import androidx.fragment.app.commit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleCoroutineScope
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.thando.accountable.fragments.TeleprompterFragment
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.thando.accountable.ui.theme.AccountableTheme
+import com.thando.accountable.AccountableNavigationController.AccountableFragment
+import com.thando.accountable.fragments.AppSettingsFragment
+import com.thando.accountable.fragments.BooksView
+import com.thando.accountable.fragments.EditFolderView
+import com.thando.accountable.fragments.EditGoalView
+import com.thando.accountable.fragments.GoalsView
+import com.thando.accountable.fragments.HelpView
+import com.thando.accountable.fragments.HomeView
+import com.thando.accountable.fragments.MarkupLanguageView
+import com.thando.accountable.fragments.ScriptView
+import com.thando.accountable.fragments.SearchView
+import com.thando.accountable.fragments.TaskView
+import com.thando.accountable.fragments.TeleprompterController
+import com.thando.accountable.fragments.TeleprompterView
+import com.thando.accountable.fragments.viewmodels.AppSettingsViewModel
+import com.thando.accountable.fragments.viewmodels.BooksViewModel
+import com.thando.accountable.fragments.viewmodels.EditFolderViewModel
+import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
+import com.thando.accountable.fragments.viewmodels.GoalsViewModel
+import com.thando.accountable.fragments.viewmodels.HelpViewModel
+import com.thando.accountable.fragments.viewmodels.HomeViewModel
+import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel
+import com.thando.accountable.fragments.viewmodels.ScriptViewModel
+import com.thando.accountable.fragments.viewmodels.SearchViewModel
+import com.thando.accountable.fragments.viewmodels.TaskViewModel
+import com.thando.accountable.fragments.viewmodels.TeleprompterViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
+import kotlin.getValue
 
 class MainActivity : AppCompatActivity() {
+
     val viewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory }
-    private val fragmentContainerViewId = 123456
+    private val galleryLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { galleryUri ->
+        viewModel.processGalleryLauncherResult(galleryUri)
+    }
+
+    private val galleryLauncherMultiple = registerForActivityResult(
+        ActivityResultContracts.GetMultipleContents()
+    ) { list ->
+        viewModel.processGalleryLauncherMultipleReturn(list)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        ResourceProvider.init(this.applicationContext)
+
+        // Allow app to draw behind system bars ( This is for teleprompter)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        enableEdgeToEdge()
+        setContent {
+            LaunchedEffect(Unit) {
+                viewModel.galleryLauncherEvent.collect { accessorType ->
+                    galleryLauncher.launch(accessorType)
+                }
+            }
+            LaunchedEffect(Unit) {
+                viewModel.galleryLauncherMultipleEvent.collect { accessorType ->
+                    galleryLauncherMultiple.launch(accessorType)
+                }
+            }
+            BackHandler {
+                finish()
+            }
+            MainActivityView(viewModel, supportFragmentManager)
+        }
+    }
 
     companion object{
         fun log(message:String){
@@ -137,207 +205,257 @@ class MainActivity : AppCompatActivity() {
         }
         return super.onKeyDown(keyCode, event)
     }
+
     private fun skipBackAction() {
         // You can expose this via a shared ViewModel or state holder
-        TeleprompterFragment.TeleprompterController.skipBack()
+        TeleprompterController.skipBack()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainActivityView(
+    mainActivityViewModel: MainActivityViewModel,
+    fragmentManager: FragmentManager
+){
+    DisposableEffect(Unit) {
+        onDispose {
+            mainActivityViewModel.closeUpdateSettings()
+        }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    AccountableTheme {
+        val drawerState by remember { mainActivityViewModel.drawerState }
+        val drawerEnabled by remember { mainActivityViewModel.drawerEnabled }
 
-        // Allow app to draw behind system bars ( This is for teleprompter)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        var initialized by remember { mutableStateOf(false) }
+        var currentFragment by remember { mutableStateOf<AccountableFragment?>(null) }
+        val navController = rememberNavController()
 
-        enableEdgeToEdge()
-        ResourceProvider.init(this.applicationContext)
-        setContent {
-            AccountableTheme {
-                val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior (rememberTopAppBarState())
-                val drawerState by remember { viewModel.drawerState }
-                val toolbarVisible by remember { viewModel.toolbarVisible }
-                val scope = rememberCoroutineScope()
-                var initialized by remember { mutableStateOf(false) }
-                var currentFragment by remember { mutableStateOf<AccountableNavigationController.AccountableFragment?>(null) }
+        val scope = rememberCoroutineScope()
+        val context = LocalContext.current
 
-                // LaunchedEffect to collect SharedFlow
-                LaunchedEffect(Unit) {
-                    viewModel.currentFragment.collect { fragment ->
-                        if (fragment!=null){
-                            if (!initialized) viewModel.navController.navigateTo(fragmentContainerViewId, fragment, supportFragmentManager)
-                            currentFragment = fragment
-                            if (AccountableNavigationController.isDrawerFragment(fragment)) viewModel.enableDrawer()
-                            else viewModel.disableDrawer()
+        val appSettings by mainActivityViewModel.appSettings.collectAsStateWithLifecycle()
+
+        var result by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
+        LaunchedEffect(appSettings) {
+            result = if (appSettings!=null) appSettings!!.getUri(context)
+            else MutableStateFlow(null)
+        }
+        val imageUri by result.collectAsStateWithLifecycle(null)
+
+        var image by remember { mutableStateOf<ImageBitmap?>(null) }
+        LaunchedEffect(imageUri) {
+            image = imageUri?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri) }
+                ?.asImageBitmap()
+                ?: AppResources.getBitmapFromUri(
+                    context,
+                    AppResources.getUriFromDrawable(
+                        context,
+                        R.drawable.ic_stars_black_24dp
+                    )
+                )?.asImageBitmap()
+        }
+
+        // LaunchedEffect to collect SharedFlow
+        LaunchedEffect(Unit) {
+            mainActivityViewModel.currentFragment.collect { fragment ->
+                if (fragment!=null){
+                    if (!initialized){
+                        mainActivityViewModel.clearGalleryLaunchers()
+                        currentFragment = fragment
+                    }
+                    if (AccountableNavigationController.isDrawerFragment(fragment))
+                        mainActivityViewModel.enableDrawer()
+                    else mainActivityViewModel.disableDrawer()
+                }
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            mainActivityViewModel.direction.collect { direction ->
+                if (direction != null){
+                    scope.launch { mainActivityViewModel.toggleDrawer(false) }
+                    mainActivityViewModel.clearGalleryLaunchers()
+                    navController.navigate(
+                        direction.name
+                    ){launchSingleTop = true}
+                    navController.clearBackStack(direction.name)
+                }
+            }
+        }
+
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet {
+                    BackHandler(drawerState.isOpen) {
+                        scope.launch {
+                            mainActivityViewModel.toggleDrawer(false)
                         }
                     }
-                }
-
-                LaunchedEffect(Unit) {
-                    viewModel.direction.collect { direction ->
-                        if (direction != null){
-                            scope.launch { viewModel.toggleDrawer(false) }
-                            viewModel.navController.navigateTo( fragmentContainerViewId, direction,supportFragmentManager)
-                        }
-                    }
-                }
-
-                ModalNavigationDrawer(
-                    drawerState = drawerState,
-                    drawerContent = {
-                        ModalDrawerSheet {
-                            Column(
-                                modifier = Modifier
-                                    .padding(horizontal = 16.dp)
-                                    .verticalScroll(rememberScrollState())
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.ic_stars_black_24dp),
-                                    /*bitmap = AppResources.getBitmapFromUri(applicationContext, it)
-                                        ?.asImageBitmap()
-                                        ?: ImageBitmap(1, 1),*/
-                                    contentDescription = "Navigation Drawer Image",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                Spacer(Modifier.height(12.dp))
-                                Text(stringResource(R.string.app_name), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
-                                HorizontalDivider()
-
-                                Text(stringResource(R.string.activities), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)
-                                NavigationDrawerItem(
-                                    icon = {
-                                        Icon(
-                                            Icons.Default.Home,
-                                            contentDescription = stringResource(R.string.home)
-                                        )
-                                    },
-                                    label = { Text(stringResource(R.string.home)) },
-                                    selected = currentFragment == AccountableNavigationController.AccountableFragment.HomeFragment,
-                                    onClick = { viewModel.changeFragment(
-                                        AccountableNavigationController.AccountableFragment.HomeFragment
-                                    ) }
-                                )
-                                NavigationDrawerItem(
-                                    icon = {
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.LibraryBooks,
-                                            contentDescription = stringResource(R.string.books)
-                                        )
-                                    },
-                                    label = { Text(stringResource(R.string.books)) },
-                                    selected = currentFragment == AccountableNavigationController.AccountableFragment.BooksFragment,
-                                    onClick = { viewModel.changeFragment(
-                                        AccountableNavigationController.AccountableFragment.BooksFragment
-                                    ) }
-                                )
-
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                                Text(stringResource(R.string.support), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)
-                                NavigationDrawerItem(
-                                    label = { Text("Settings") },
-                                    selected = currentFragment == AccountableNavigationController.AccountableFragment.AppSettingsFragment,
-                                    icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
-                                    badge = { Text("20") }, // Placeholder
-                                    onClick = { viewModel.changeFragment(
-                                        AccountableNavigationController.AccountableFragment.AppSettingsFragment
-                                    ) }
-                                )
-                                NavigationDrawerItem(
-                                    label = { Text("Help and feedback") },
-                                    selected = currentFragment == AccountableNavigationController.AccountableFragment.HelpFragment,
-                                    icon = { Icon(Icons.AutoMirrored.Outlined.Help, contentDescription = null) },
-                                    onClick = { viewModel.changeFragment(
-                                        AccountableNavigationController.AccountableFragment.HelpFragment
-                                    ) }
-                                )
-                                Spacer(Modifier.height(12.dp))
-                            }
-                        }
-                    },
-                    gesturesEnabled = true
-                ) {
-                    Scaffold(
+                    Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .nestedScroll(scrollBehavior.nestedScrollConnection),
-                        topBar =
-                            if (toolbarVisible) {@Composable{
-                            CenterAlignedTopAppBar(
-                                colors = TopAppBarDefaults.topAppBarColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    titleContentColor = MaterialTheme.colorScheme.primary
-                                ),
-                                title = {
-                                    Text(
-                                        text = stringResource(R.string.app_name),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                navigationIcon = {
-                                    IconButton(onClick = { scope.launch { viewModel.toggleDrawer() } })
-                                    {
-                                        Icon(
-                                            imageVector = Icons.Filled.Menu,
-                                            contentDescription = stringResource(R.string.navigation_drawer_button)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        image?.let { image ->
+                            Image(
+                                bitmap = image,
+                                contentDescription = "Navigation Drawer Image",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text(stringResource(R.string.app_name), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
+                        HorizontalDivider(modifier = Modifier.padding(16.dp))
+
+                        Text(stringResource(R.string.activities), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)
+                        NavigationDrawerItem(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            icon = {
+                                Icon(
+                                    Icons.Default.Home,
+                                    contentDescription = stringResource(R.string.home)
+                                )
+                            },
+                            label = { Text(stringResource(R.string.home)) },
+                            selected = navController.currentDestination?.route == AccountableFragment.HomeFragment.name,
+                            onClick = { mainActivityViewModel.changeFragment(
+                                AccountableFragment.HomeFragment
+                            ) }
+                        )
+                        NavigationDrawerItem(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            icon = {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.LibraryBooks,
+                                    contentDescription = stringResource(R.string.books)
+                                )
+                            },
+                            label = { Text(stringResource(R.string.books)) },
+                            selected = navController.currentDestination?.route == AccountableFragment.BooksFragment.name,
+                            onClick = { mainActivityViewModel.changeFragment(
+                                AccountableFragment.BooksFragment
+                            ) }
+                        )
+
+                        HorizontalDivider(modifier = Modifier.padding(16.dp))
+
+                        Text(stringResource(R.string.support), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)
+                        NavigationDrawerItem(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            label = { Text("Settings") },
+                            selected = navController.currentDestination?.route == AccountableFragment.AppSettingsFragment.name,
+                            icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                            badge = { Text("20") }, // Placeholder
+                            onClick = { mainActivityViewModel.changeFragment(
+                                AccountableFragment.AppSettingsFragment
+                            ) }
+                        )
+                        NavigationDrawerItem(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            label = { Text("Help and feedback") },
+                            selected = navController.currentDestination?.route == AccountableFragment.HelpFragment.name,
+                            icon = { Icon(Icons.AutoMirrored.Outlined.Help, contentDescription = null) },
+                            onClick = { mainActivityViewModel.changeFragment(
+                                AccountableFragment.HelpFragment
+                            ) }
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
+                }
+            },
+            gesturesEnabled = drawerEnabled
+        ) {
+            currentFragment?.name?.let { startFragment ->
+                NavHost(
+                    navController = navController,
+                    startDestination = startFragment
+                ) {
+                    composable(AccountableFragment.HomeFragment.name) {
+                        val viewModel = viewModel<HomeViewModel>(factory = HomeViewModel.Factory)
+                        HomeView( viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.GoalsFragment.name) {
+                        val viewModel = viewModel<GoalsViewModel>(factory = GoalsViewModel.Factory)
+                        GoalsView( viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.BooksFragment.name) {
+                        val viewModel = viewModel<BooksViewModel>(factory = BooksViewModel.Factory)
+                        BooksView( viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.AppSettingsFragment.name) {
+                        val viewModel =
+                            viewModel<AppSettingsViewModel>(factory = AppSettingsViewModel.Factory)
+                        AndroidView(
+                            factory = { context ->
+                                FrameLayout(context).apply {
+                                    id = ViewCompat.generateViewId()
+                                }
+                            },
+                            update = {
+                                val fragmentAlreadyAdded = fragmentManager.findFragmentByTag(
+                                    AccountableFragment.AppSettingsFragment.name
+                                ) != null
+
+                                if (!fragmentAlreadyAdded) {
+                                    fragmentManager.commit {
+                                        add(it.id, AppSettingsFragment(viewModel),
+                                            AccountableFragment.AppSettingsFragment.name
                                         )
                                     }
-                                },
-                                actions = {},
-                                scrollBehavior = scrollBehavior
-                            )
-                        }} else { @Composable{}}
-                    ) { innerPadding ->
-                        MainActivityView(
-                            modifier = Modifier.padding(innerPadding)
+                                }
+                            }
                         )
+                        ComposeView(LocalContext.current).apply {
+                            setContent {
+                                MaterialTheme {
+                                    AppSettingsFragment(viewModel)
+                                }
+                            }
+                        }
+                    }
+                    composable(AccountableFragment.HelpFragment.name) {
+                        val viewModel = viewModel<HelpViewModel>(factory = HelpViewModel.Factory)
+                        HelpView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.EditFolderFragment.name) {
+                        val viewModel =
+                            viewModel<EditFolderViewModel>(factory = EditFolderViewModel.Factory)
+                        EditFolderView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.EditGoalFragment.name) {
+                        val viewModel =
+                            viewModel<EditGoalViewModel>(factory = EditGoalViewModel.Factory)
+                        EditGoalView( viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.TaskFragment.name) {
+                        val viewModel = viewModel<TaskViewModel>(factory = TaskViewModel.Factory)
+                        TaskView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.MarkupLanguageFragment.name) {
+                        val viewModel =
+                            viewModel<MarkupLanguageViewModel>(factory = MarkupLanguageViewModel.Factory)
+                        MarkupLanguageView(viewModel)
+                    }
+                    composable(AccountableFragment.ScriptFragment.name) {
+                        val viewModel =
+                            viewModel<ScriptViewModel>(factory = ScriptViewModel.Factory)
+                        ScriptView( viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.TeleprompterFragment.name) {
+                        val viewModel =
+                            viewModel<TeleprompterViewModel>(factory = TeleprompterViewModel.Factory)
+                        TeleprompterView( viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.SearchFragment.name) {
+                        val viewModel =
+                            viewModel<SearchViewModel>(factory = SearchViewModel.Factory)
+                        SearchView( viewModel, mainActivityViewModel).searchView()
                     }
                 }
             }
         }
-    }
-
-    @Composable
-    fun MainActivityView(
-        modifier: Modifier = Modifier
-    ){
-        MaterialTheme(
-            typography = Typography(headlineLarge = TextStyle(color = Color.Red))
-        ) {
-            AndroidViewFragment(
-                modifier = modifier
-            ){
-                // On Back Press Handler
-                finish()
-            }
-        }
-    }
-
-    @Composable
-    fun AndroidViewFragment(
-        modifier: Modifier = Modifier,
-        backPressHandler: () -> Unit
-    ) {
-        BackHandler {
-            backPressHandler()
-        }
-        AndroidView(
-            modifier = modifier,
-            factory = { context ->
-                val frgId = FragmentContainerView(context).apply {
-                    id = fragmentContainerViewId
-                }
-                frgId
-            },
-            update = {
-                //Do not put the fragment update here, the fragment will be created multiple times
-            }
-        )
-    }
-
-    override fun onPause() {
-        viewModel.closeUpdateSettings()
-        super.onPause()
     }
 }

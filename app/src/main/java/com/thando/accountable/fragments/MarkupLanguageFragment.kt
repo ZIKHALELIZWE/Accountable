@@ -1,13 +1,10 @@
 package com.thando.accountable.fragments
 
 
-import android.os.Bundle
 import android.text.Layout
-import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -21,7 +18,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
@@ -59,9 +55,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -69,89 +63,70 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.material.snackbar.Snackbar
-import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel
 import com.thando.accountable.ui.cards.Colour
 import com.thando.accountable.ui.cards.MarkupLanguageCard
-import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.screens.MenuItemData
-import com.thando.accountable.ui.screens.basicDropdownMenu
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.launch
 
-class MarkupLanguageFragment : Fragment() {
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MarkupLanguageView(
+    viewModel: MarkupLanguageViewModel
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    BackHandler {
+        scope.launch {
+            viewModel.closeMarkupLanguageFragment(true,context)
+        }
+    }
 
-    private val viewModel : MarkupLanguageViewModel by viewModels<MarkupLanguageViewModel> { MarkupLanguageViewModel.Factory }
-
-    @OptIn(ExperimentalMaterial3Api::class)
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setContent {
-                val mainActivity = (requireActivity() as MainActivity)
-                val scope = rememberCoroutineScope()
-                mainActivity.onBackPressedDispatcher.addCallback(viewLifecycleOwner,
-                    object : OnBackPressedCallback(true){
-                        override fun handleOnBackPressed() {
-                            scope.launch {
-                                viewModel.closeMarkupLanguageFragment(true,context)
-                            }
+    val menuOpen by viewModel.menuOpen.collectAsStateWithLifecycle()
+    AccountableTheme {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text(stringResource(R.string.markup_language)) },
+                    navigationIcon = { IconButton(onClick = {
+                        scope.launch {
+                            viewModel.closeMarkupLanguageFragment(true,context)
                         }
-                    }
-                )
-
-                val menuOpen by viewModel.menuOpen.collectAsStateWithLifecycle()
-                AccountableTheme {
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        topBar = {
-                            CenterAlignedTopAppBar(
-                                title = { Text(stringResource(R.string.markup_language)) },
-                                navigationIcon = { IconButton(onClick = {
-                                    scope.launch {
-                                        viewModel.closeMarkupLanguageFragment(true,context)
-                                    }
-                                })  {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = stringResource(R.string.navigate_back_to_script_fragment_button)
-                                    )
-                                }},
-                                actions = {
-                                    IconButton(onClick = { viewModel.toggleMenuOpen() }) {
-                                        Icon(
-                                            if (menuOpen) Icons.Default.KeyboardArrowUp
-                                            else Icons.Default.KeyboardArrowDown,
-                                            contentDescription = stringResource(R.string.open_search_input_view)
-                                        )
-                                    }
-                                },
-                                colors = TopAppBarDefaults.topAppBarColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
-                                )
+                    })  {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.navigate_back_to_script_fragment_button)
+                        )
+                    }},
+                    actions = {
+                        IconButton(onClick = { viewModel.toggleMenuOpen() }) {
+                            Icon(
+                                if (menuOpen) Icons.Default.KeyboardArrowUp
+                                else Icons.Default.KeyboardArrowDown,
+                                contentDescription = stringResource(R.string.open_search_input_view)
                             )
                         }
-                    ) { innerPadding ->
-                        MarkupLanguageFragmentView(
-                            modifier = Modifier.padding(innerPadding),
-                            viewModel = viewModel,
-                            menuOpen
-                        )
-                    }
-                }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
             }
+        ) { innerPadding ->
+            MarkupLanguageFragmentView(
+                modifier = Modifier.padding(innerPadding),
+                viewModel = viewModel,
+                menuOpen
+            )
         }
     }
 }

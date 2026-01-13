@@ -12,10 +12,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.fragment.app.viewModels
 import com.thando.accountable.MainActivity.Companion.collectFlow
 import com.thando.accountable.MainActivity.ResourceProvider
+import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.databinding.StringIntentDialogBinding
-import com.thando.accountable.fragments.FoldersAndScriptsFragment
+import com.thando.accountable.fragments.AppSettingsFragment
+import com.thando.accountable.fragments.viewmodels.AppSettingsViewModel
 
 
 class IntentActivity : AppCompatActivity() {
@@ -51,7 +54,7 @@ class IntentActivity : AppCompatActivity() {
         private var _binding: StringIntentDialogBinding? = null
         private val binding get() = _binding!!
 
-        private lateinit var foldersAndScriptsFragment : FoldersAndScriptsFragment
+        private lateinit var booksFragment : AppSettingsFragment//BooksFragment
 
         override fun onCreate(savedInstanceState: Bundle?) {
             super.onCreate(savedInstanceState)
@@ -63,9 +66,10 @@ class IntentActivity : AppCompatActivity() {
                     for (i in 0 until childFragmentManager.backStackEntryCount) {
                         childFragmentManager.popBackStack()
                     }
-                    foldersAndScriptsFragment = FoldersAndScriptsFragment()
+                    val viewModelApp: AppSettingsViewModel by viewModels { AppSettingsViewModel.Factory }
+                    booksFragment = AppSettingsFragment(viewModelApp)
                     val transaction = childFragmentManager.beginTransaction()
-                    transaction.replace(R.id.fragment_container, foldersAndScriptsFragment)
+                    transaction.replace(R.id.fragment_container, booksFragment)
                     transaction.commit()
                 }
                 else {

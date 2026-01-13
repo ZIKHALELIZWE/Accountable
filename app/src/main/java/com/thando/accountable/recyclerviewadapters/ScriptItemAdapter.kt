@@ -8,7 +8,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.databinding.ScriptItemBinding
-import com.thando.accountable.fragments.viewmodels.FoldersAndScriptsViewModel
+import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.recyclerviewadapters.diffutils.ScriptDiffItemCallback
 import kotlinx.coroutines.Job
 
@@ -18,7 +18,7 @@ class ScriptItemAdapter(
     private val childFragmentManager: FragmentManager,
     private val clickListener: (scriptId: Long) -> Unit,
     private val onDeleteClickListener: (scriptId: Long?) -> Unit,
-    private val viewModel: FoldersAndScriptsViewModel
+    private val viewModel: BooksViewModel
 ): ListAdapter<Script, ScriptItemAdapter.ScriptItemViewHolder>(ScriptDiffItemCallback()) {
     private var scriptList = mutableListOf<Script>()
     init {

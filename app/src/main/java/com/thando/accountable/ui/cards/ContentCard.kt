@@ -204,7 +204,9 @@ fun TextFieldAccountable(
 
     LaunchedEffect(state.selection) {
         val layout = lastLayout ?: return@LaunchedEffect
-        val offset = state.selection.start
+        var offset = state.selection.start
+        if (offset < 0) return@LaunchedEffect
+        if (offset>layout.size.height) offset = layout.size.height
         val caretRect = layout.getCursorRect(offset)
         // Ask parent scroll container(s) to bring this rect into view
         bringIntoViewRequester.bringIntoView(caretRect)

@@ -1,11 +1,6 @@
 package com.thando.accountable.fragments
 
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -17,155 +12,145 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
-import com.thando.accountable.MainActivity
+import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.EditFolderViewModel
 import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.theme.AccountableTheme
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-class EditFolderFragment : Fragment() {
-    val viewModel : EditFolderViewModel by viewModels { EditFolderViewModel.Factory }
-    private val galleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { galleryUri ->
+@Composable
+fun EditFolderView(
+    viewModel: EditFolderViewModel,
+    mainActivityViewModel: MainActivityViewModel
+) {
+    mainActivityViewModel.setGalleryLauncherReturn{ galleryUri ->
         try{
             viewModel.setImage(galleryUri)
         }catch(e:Exception){
             e.printStackTrace()
         }
     }
-    private var notInitialized = true
 
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setContent {
-                AccountableTheme {
-                    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                        EditFolderFragmentView(modifier = Modifier.padding(innerPadding))
-                    }
-                }
-            }
-        }
+    BackHandler {
+        viewModel.closeFolder()
     }
 
-    @Composable
-    fun EditFolderFragmentView(modifier: Modifier = Modifier){
-        val editFolder by viewModel.editFolder.collectAsStateWithLifecycle()
-        if (notInitialized) {
-            viewModel.initializeEditFolder(editFolder)
-            notInitialized = false
+    AccountableTheme {
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            EditFolderFragmentView(
+                viewModel,
+                mainActivityViewModel,
+                modifier = Modifier.padding(innerPadding)
+            )
         }
-        val newEditFolder by viewModel.newEditFolder.collectAsStateWithLifecycle()
-        val updateButtonTextResId by viewModel.updateButtonText.collectAsStateWithLifecycle()
-        val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    }
+}
 
-        if (newEditFolder != null) {
-            val uri by newEditFolder!!.getUri(requireContext()).collectAsStateWithLifecycle()
-            val folderName = remember { newEditFolder!!.folderName }
-            val scope = rememberCoroutineScope()
-            val listState = rememberScrollState()
-            Column(
-                modifier = modifier.imePadding().verticalScroll(listState),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // folder image
-                uri?.let {
-                    Image(
-                        bitmap = AppResources.getBitmapFromUri(requireContext(), it)?.asImageBitmap()
-                            ?: ImageBitmap(1,1),
-                        contentDescription = stringResource(R.string.folder_image),
-                        contentScale = ContentScale.FillWidth
-                    )
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                // folder name edit text
-                TextFieldAccountable(
-                    state = folderName,
-                    label = { Text(stringResource(R.string.enter_folder_name)) },
-                    modifier = Modifier
-                        .bringIntoViewRequester(bringIntoViewRequester).onFocusEvent { focusState ->
-                            if (focusState.isFocused) {
-                                scope.launch {
-                                    bringIntoViewRequester.bringIntoView()
-                                }
-                            }
-                        }
-                        .fillMaxWidth().padding(horizontal = 3.dp)
+@Composable
+fun EditFolderFragmentView(
+    viewModel: EditFolderViewModel,
+    mainActivityViewModel: MainActivityViewModel,
+    modifier: Modifier = Modifier
+){
+    val editFolder by viewModel.editFolder.collectAsStateWithLifecycle()
+    var notInitialized by remember { mutableStateOf(true) }
+
+    if (notInitialized) {
+        viewModel.initializeEditFolder(editFolder)
+        notInitialized = false
+    }
+    val newEditFolder by viewModel.newEditFolder.collectAsStateWithLifecycle()
+    val updateButtonTextResId by viewModel.updateButtonText.collectAsStateWithLifecycle()
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val context = LocalContext.current
+
+    if (newEditFolder != null) {
+        val uri by newEditFolder!!.getUri(context).collectAsStateWithLifecycle()
+        val folderName = remember { newEditFolder!!.folderName }
+        val scope = rememberCoroutineScope()
+        val listState = rememberScrollState()
+        Column(
+            modifier = modifier.imePadding().verticalScroll(listState),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // folder image
+            uri?.let {
+                Image(
+                    bitmap = AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
+                        ?: ImageBitmap(1,1),
+                    contentDescription = stringResource(R.string.folder_image),
+                    contentScale = ContentScale.FillWidth
                 )
                 Spacer(modifier = Modifier.width(2.dp))
-                // choose image button
+            }
+            // folder name edit text
+            TextFieldAccountable(
+                state = folderName,
+                label = { Text(stringResource(R.string.enter_folder_name)) },
+                modifier = Modifier
+                    .bringIntoViewRequester(bringIntoViewRequester).onFocusEvent { focusState ->
+                        if (focusState.isFocused) {
+                            scope.launch {
+                                bringIntoViewRequester.bringIntoView()
+                            }
+                        }
+                    }
+                    .fillMaxWidth().padding(horizontal = 3.dp)
+            )
+            Spacer(modifier = Modifier.width(2.dp))
+            // choose image button
+            Button(
+                onClick = {
+                    mainActivityViewModel.launchGalleryLauncher(AppResources.ContentType.IMAGE)
+                },
+                enabled = viewModel.newEditFolderViewEnabled(newEditFolder)
+            ) {
+                Text(stringResource(R.string.choose_image))
+            }
+            Spacer(modifier = Modifier.width(2.dp))
+            // remove image button
+            if (uri != null) {
                 Button(
                     onClick = {
-                        galleryLauncher.launch("image/*")
+                        viewModel.removeImage()
                     },
                     enabled = viewModel.newEditFolderViewEnabled(newEditFolder)
                 ) {
-                    Text(stringResource(R.string.choose_image))
+                    Text(stringResource(R.string.remove_image))
                 }
                 Spacer(modifier = Modifier.width(2.dp))
-                // remove image button
-                if (uri != null) {
-                    Button(
-                        onClick = {
-                            viewModel.removeImage()
-                        },
-                        enabled = viewModel.newEditFolderViewEnabled(newEditFolder)
-                    ) {
-                        Text(stringResource(R.string.remove_image))
-                    }
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                // update folder button
-                Button(
-                    onClick = {
-                        viewModel.saveAndCloseFolder()
-                    },
-                    enabled = viewModel.setUpdateFolderButtonEnabled(if(folderName.text.isNotEmpty()) folderName.text.toString() else null)
-                ) {
-                    Text(stringResource(updateButtonTextResId?.resId ?: R.string.add_folder))
-                }
+            }
+            // update folder button
+            Button(
+                onClick = {
+                    viewModel.saveAndCloseFolder()
+                },
+                enabled = viewModel.setUpdateFolderButtonEnabled(if(folderName.text.isNotEmpty()) folderName.text.toString() else null)
+            ) {
+                Text(stringResource(updateButtonTextResId?.resId ?: R.string.add_folder))
             }
         }
-    }
-
-    override fun onResume() {
-        val mainActivity = (requireActivity() as MainActivity)
-        mainActivity.onBackPressedDispatcher.addCallback(viewLifecycleOwner,
-            object : OnBackPressedCallback(true){
-                override fun handleOnBackPressed() {
-                    viewModel.closeFolder()
-                }
-            }
-        )
-        super.onResume()
     }
 }

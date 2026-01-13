@@ -15,11 +15,14 @@ import com.thando.accountable.AppResources
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Content.ContentType
-import com.thando.accountable.fragments.ScriptFragment
+import com.thando.accountable.fragments.ContentPosition
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.util.Calendar
+import java.util.concurrent.atomic.AtomicReference
 
 class ScriptViewModel(
     private val repository: AccountableRepository
@@ -44,6 +47,9 @@ class ScriptViewModel(
         ifTrueRun(0f)
     }
 
+    val multipleContentsStateFlow: MutableStateFlow<List<@JvmSuppressWildcards Uri>?> = MutableStateFlow(null)
+    val multipleContentsJob = AtomicReference<Job?>(null)
+
     fun setIsScriptFragment(isScriptFragment: Boolean) {
         this.isScriptFragment = isScriptFragment
     }
@@ -58,14 +64,14 @@ class ScriptViewModel(
         }
     }
 
-    fun chooseTopImage(chooseImage:(String)->Unit) {
+    fun chooseTopImage(chooseImage:(AppResources.ContentType)->Unit) {
         if (!(script.value?.scriptPicture.isNullOrEmpty())){
             repository.deleteScriptImage()
         }
         else{
             chooseContent = AppResources.ContentType.IMAGE
             AppResources.ContentTypeAccessor[chooseContent]?.let {
-                chooseImage(it)
+                chooseImage(AppResources.ContentType.IMAGE)
             }?:{
                 contentRetrieved()
             }
@@ -80,10 +86,10 @@ class ScriptViewModel(
         repository.saveScriptImage(inputUri)
     }
 
-    fun loadText(loadTextUnit: (String)->Unit){
+    fun loadText(loadTextUnit: (AppResources.ContentType)->Unit){
         chooseContent = AppResources.ContentType.DOCUMENT
         AppResources.ContentTypeAccessor[chooseContent]?.let {
-            loadTextUnit(it)
+            loadTextUnit(AppResources.ContentType.DOCUMENT)
         }?:{
             contentRetrieved()
         }
@@ -93,7 +99,7 @@ class ScriptViewModel(
         repository.appendFileToScript(uri)
     }
 
-    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ScriptFragment.ContentPosition, item: Content, cursorPosition:Int?){
+    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ContentPosition, item: Content, cursorPosition:Int?){
         repository.addContent(
             multipleContentList,
             contentType,

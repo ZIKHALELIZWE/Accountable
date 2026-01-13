@@ -1,37 +1,8 @@
 package com.thando.accountable
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
-import android.net.Uri
-import android.view.View
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.core.content.res.ResourcesCompat
-import androidx.core.net.toFile
-import androidx.core.view.GravityCompat
-import androidx.core.view.get
-import androidx.core.view.size
-import androidx.lifecycle.viewModelScope
-import com.thando.accountable.AccountableNavigationController.AccountableFragment
-import com.thando.accountable.database.tables.Folder
-import com.thando.accountable.databinding.ActivityMainBinding
-import com.thando.accountable.databinding.FragmentFoldersAndScriptsBinding
-import com.thando.accountable.fragments.EditFolderFragment
-import com.thando.accountable.fragments.FoldersAndScriptsFragment
-import com.thando.accountable.fragments.viewmodels.FoldersAndScriptsViewModel
-import com.thando.accountable.fragments.viewmodels.FoldersAndScriptsViewModel.Companion.INITIAL_FOLDER_ID
-import kotlinx.coroutines.launch
-import org.junit.Assert.assertEquals
-import org.junit.Rule
-import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.LooperMode
-import java.io.File
-import java.io.FileOutputStream
-import kotlin.reflect.KFunction2
-import kotlin.reflect.KFunction3
 
 
 @RunWith(RobolectricTestRunner::class)
@@ -509,7 +480,7 @@ class MainActivityTest {/*
                 notNull,
                 areEqual)
 
-            var foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+            var foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
 
             notNull(foldersAndScriptsFragment,"Folders And Scripts Fragment Retrieval")
             notNull(foldersAndScriptsFragment.binding,"Folders And Scripts Fragment Binding")
@@ -585,7 +556,7 @@ class MainActivityTest {/*
                 "Edit Folder ViewModel Folder Type")
             activity.onBackPressedDispatcher.onBackPressed()
 
-            foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+            foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
 
             notNull(foldersAndScriptsFragment,"Folders And Scripts Fragment Retrieval")
             notNull(foldersAndScriptsFragment.binding,"Folders And Scripts Fragment Binding")
@@ -610,7 +581,7 @@ class MainActivityTest {/*
         MActivityTest.AddFolderTest -> MTest(
             "Add Folder Test", false
         ){ notNull, isNull, areEqual, _ ->
-            var foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+            var foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
             // Switch to Edit Folder Fragment
             foldersAndScriptsFragment.binding.addFolderScriptButton.performClick()
             var editFolderFragment = activity.navController.currentFragmentClass as EditFolderFragment
@@ -730,7 +701,7 @@ class MainActivityTest {/*
                 "Previous Image Deleted")
 
             activity.onBackPressedDispatcher.onBackPressed()
-            foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+            foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
             notNull(foldersAndScriptsFragment,"Back To Books")
             foldersAndScriptsFragment.viewModel.viewModelScope.launch {
                 newEditFolder = repository.dao.getFolderNow(newEditFolderId)
@@ -757,7 +728,7 @@ class MainActivityTest {/*
 
             editFolderBinding.updateFolderButton.performClick()
 
-            foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+            foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
             notNull(foldersAndScriptsFragment,"Back To Books")
 
             foldersAndScriptsFragment.viewModel.viewModelScope.launch {
@@ -770,7 +741,7 @@ class MainActivityTest {/*
         MActivityTest.FolderDialogTest -> MTest(
             "Folder Dialog Test", false
         ){ notNull, isNull, areEqual, notEqual ->
-            var foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+            var foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
             val foldersAndScriptsViewModel = foldersAndScriptsFragment.viewModel
             var foldersAndScriptsBinding = foldersAndScriptsFragment.binding
 
@@ -929,7 +900,7 @@ class MainActivityTest {/*
             var folderTitle = folder?.folderName?.value
             activity.onBackPressedDispatcher.onBackPressed()
 
-            foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+            foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
             foldersAndScriptsBinding = foldersAndScriptsFragment.binding
 
             notNull(foldersAndScriptsFragment,"Folders And Scripts Fragment Retrieval")
@@ -972,7 +943,7 @@ class MainActivityTest {/*
 
             editFolderBinding.updateFolderButton.performClick()
 
-            foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+            foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
             foldersAndScriptsBinding = foldersAndScriptsFragment.binding
 
             notNull(foldersAndScriptsFragment,"Folders And Scripts Fragment Retrieval")
@@ -985,7 +956,7 @@ class MainActivityTest {/*
         MActivityTest.FoldersAndScriptsFolderNavigation -> MTest(
             "Folders And Scripts Folder Navigation", true
         ){ notNull, isNull, areEqual, notEqual ->
-            var foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+            var foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
             var foldersAndScriptsViewModel = foldersAndScriptsFragment.viewModel
             var foldersAndScriptsBinding = foldersAndScriptsFragment.binding
 
@@ -1074,13 +1045,13 @@ class MainActivityTest {/*
         return Triple(folderItemAdapter,viewHolder,folders)
     }
 
-    private fun createBookFolder(foldersAndScriptsFragmentInput: FoldersAndScriptsFragment,
+    private fun createBookFolder(foldersAndScriptsFragmentInput: BooksFragment,
                                  folderName:String,
                                  drawableId: Int,
                                  notNull: KFunction2<Any?, String?, Unit>,
                                  isNull: KFunction2<Any?, String?, Unit>,
                                  areEqual: KFunction3<Any?, Any?, String?, Unit>
-    ):Pair<FoldersAndScriptsFragment,FragmentFoldersAndScriptsBinding>{
+    ):Pair<BooksFragment,FragmentFoldersAndScriptsBinding>{
         var foldersAndScriptsFragment = foldersAndScriptsFragmentInput
         foldersAndScriptsFragment.binding.executePendingBindings()
         if (repository.getCurrentFragment().value != AccountableFragment.BooksFragment) return Pair(foldersAndScriptsFragment,foldersAndScriptsFragment.binding)
@@ -1104,7 +1075,7 @@ class MainActivityTest {/*
 
         editFolderBinding.updateFolderButton.performClick()
 
-        foldersAndScriptsFragment = activity.navController.currentFragmentClass as FoldersAndScriptsFragment
+        foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
         notNull(foldersAndScriptsFragment,"Back To Books")
 
         foldersAndScriptsFragment.viewModel.viewModelScope.launch {
