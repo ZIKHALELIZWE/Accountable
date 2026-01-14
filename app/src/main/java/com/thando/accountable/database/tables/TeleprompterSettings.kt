@@ -21,10 +21,10 @@ data class TeleprompterSettings(
     var name: MutableStateFlow<String> = MutableStateFlow(MainActivity.ResourceProvider.getString(R.string.default_settings)),
 
     @ColumnInfo (name = "text_size")
-    var textSize: MutableState<Int> = mutableIntStateOf(24),
+    var textSize: MutableStateFlow<Int> = MutableStateFlow(24),
 
     @ColumnInfo (name = "scroll_speed")
-    var scrollSpeed: MutableState<Int> = mutableIntStateOf(4),
+    var scrollSpeed: MutableStateFlow<Int> = MutableStateFlow(4),
 
     @ColumnInfo (name = "text_colour")
     var textColour: MutableStateFlow<Int> = MutableStateFlow(Color.BLACK),
@@ -36,13 +36,13 @@ data class TeleprompterSettings(
     var controlsPositionBottom: MutableStateFlow<Boolean> = MutableStateFlow(false),
 
     @ColumnInfo (name = "start_countdown")
-    var startCountDown: MutableState<Int> = mutableIntStateOf(0),
+    var startCountDown: MutableStateFlow<Int> = MutableStateFlow(0),
 
     @ColumnInfo (name = "scroll_countdown")
-    var scrollCountDown: MutableState<Int> = mutableIntStateOf(0),
+    var scrollCountDown: MutableStateFlow<Int> = MutableStateFlow(0),
 
     @ColumnInfo (name = "skip_size")
-    var skipSize: MutableState<Int> = mutableIntStateOf(0)
+    var skipSize: MutableStateFlow<Int> = MutableStateFlow(0)
 ){
     @Ignore
     val specialCharactersList = mutableStateListOf<SpecialCharacters>()

@@ -269,8 +269,8 @@ fun TextCard(
     contentFileName: String? = null,
     textAlign: TextAlign = TextAlign.Start
 ){
-    val textSize by teleprompterSettings?.textSize?.let { remember { it } }
-        ?:(appSettings?.textSize?:MutableStateFlow(24)).collectAsStateWithLifecycle()
+    val textSize by (teleprompterSettings?.textSize
+        ?:appSettings?.textSize?:MutableStateFlow(24)).collectAsStateWithLifecycle()
     val textColour by teleprompterSettings?.textColour?.collectAsStateWithLifecycle()
         ?: MutableStateFlow(Color.Black.toArgb()).collectAsStateWithLifecycle()
     val teleprompterBackgroundColour by teleprompterSettings?.backgroundColour?.collectAsStateWithLifecycle()?:remember { mutableStateOf(null) }
@@ -303,7 +303,14 @@ fun TextCard(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(markupLanguage, textSize, context, text.text.toString(), teleprompterSettings?.specialCharactersList) {
+    LaunchedEffect(
+        markupLanguage,
+        textSize,
+        context,
+        text.text.toString(),
+        teleprompterSettings,
+        teleprompterSettings?.specialCharactersList
+    ) {
         content.replace(
             specialCharactersList = teleprompterSettings?.specialCharactersList?: mutableStateListOf(),
             context,

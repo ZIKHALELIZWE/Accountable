@@ -109,7 +109,6 @@
     <string name="replacement">Replacement</string>
     <string name="add_special_character">Add Special Character</string>
     <string name="change_name">Change Name</string>
-    <string name="change_name_to_save">Change Name To Save</string>
     <string name="restore_default_settings">Restore Default Settings</string>
     <string name="default_settings">Default Settings</string>
     <string name="enter_teleprompter_setting_name">Enter Teleprompter Setting Name</string>
@@ -251,4 +250,5 @@
     <string name="select_text_size">Select Text Size</string>
     <string name="ok">Ok</string>
     <string name="text_size_preview">Text Size Preview</string>
+    <string name="change_name_to_save">%1$s (Change Name To Save)</string>
 </resources>

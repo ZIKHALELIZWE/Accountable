@@ -34,10 +34,7 @@ import kotlinx.coroutines.withContext
 class TeleprompterViewModel(
     private val repository: AccountableRepository
 ): ViewModel() {
-    // Data
-    private val appSettings = repository.getAppSettings()
     val script = repository.getScript()
-    private val scriptContentList = repository.getScriptContentList()
     val markupLanguage = repository.getScriptMarkupLanguage()
 
     val teleprompterSettings = repository.getScriptTeleprompterSetting()
@@ -52,14 +49,6 @@ class TeleprompterViewModel(
     private var deleteButtonFunction: ()->Unit = {}
     private val _showNameNotUniqueSnackBar = MutableSharedFlow<String>()
     val showNameNotUniqueSnackBar: SharedFlow<String> get() = _showNameNotUniqueSnackBar
-    private val _notifySpinnerDataChanged = MutableSharedFlow<Unit>()
-    val notifySpinnerDataChanged: SharedFlow<Unit> get() = _notifySpinnerDataChanged
-    private val _updateContentAdapterSpecialCharacters = MutableSharedFlow<MutableList<SpecialCharacters>>()
-    val updateContentAdapterSpecialCharacters: SharedFlow<MutableList<SpecialCharacters>> get() = _updateContentAdapterSpecialCharacters
-    private val _addSpecialCharacterUpdate = MutableSharedFlow<Int>()
-    val addSpecialCharacterUpdate: SharedFlow<Int> get() = _addSpecialCharacterUpdate
-    private val _countDownButtonVisibility = MutableStateFlow(false)
-    val countDownButtonVisibility: StateFlow<Boolean> get() = _countDownButtonVisibility
 
     // Click Events
     private val _navigateToScript = MutableSharedFlow<Boolean>()
@@ -85,9 +74,6 @@ class TeleprompterViewModel(
     var listState: LazyListState? = null
     val handler = Handler(Looper.getMainLooper())
 
-    // animation values
-    private var animationDuration = 500L
-
     fun setCountDownText(countDownTextAfterTick: String){
         countDownText.update { countDownTextAfterTick }
     }
@@ -100,11 +86,8 @@ class TeleprompterViewModel(
         index: Int
     ){
         if (index<0 || teleprompterSettingsList.isEmpty()) return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                repository.saveTeleprompterSettings()
-                repository.setRepositoryTeleprompterSetting(teleprompterSettingsList[index])
-            }
+        repository.saveTeleprompterSettings{
+            repository.setRepositoryTeleprompterSetting(teleprompterSettingsList[index])
         }
     }
 
@@ -127,10 +110,7 @@ class TeleprompterViewModel(
                     }
                 }
                 if (nameUnique) {
-                    teleprompterSetting.name.value = name
-                    viewModelScope.launch {
-                        _notifySpinnerDataChanged.emit(Unit)
-                    }
+                    teleprompterSetting.name.update { name }
                 }
             }
         }
@@ -202,7 +182,6 @@ class TeleprompterViewModel(
                             teleprompterSettings.specialCharactersList
                         )
                     }
-                    _updateContentAdapterSpecialCharacters.emit(teleprompterSettings.specialCharactersList)
                 }
             }
         }
@@ -214,12 +193,8 @@ class TeleprompterViewModel(
         scriptTitle.value = newTitle
     }
 
-    fun loadSpecialCharacters(){
-        repository.loadTeleprompterSpecialCharacters()
-    }
-
     fun addSpecialCharacter(){
-        repository.addSpecialCharacter(_addSpecialCharacterUpdate)
+        repository.addSpecialCharacter()
     }
 
     fun deleteSpecialCharacter(
@@ -284,14 +259,6 @@ class TeleprompterViewModel(
         _controlsVisible.value = true
     }
 
-    fun showCountDownButton(){
-        _countDownButtonVisibility.update { true }
-    }
-
-    fun hideCountDownButton(){
-        _countDownButtonVisibility.update { false }
-    }
-
     fun playPause(){
         _isPlaying.value = _isPlaying.value.not()
     }
@@ -307,8 +274,6 @@ class TeleprompterViewModel(
     fun getIsPlaying() : Boolean{
         return _isPlaying.value
     }
-
-    fun getAnimationDuration():Long{ return animationDuration }
 
     fun scrolled(){
         if (isTouching) scrolled = true
@@ -328,8 +293,6 @@ class TeleprompterViewModel(
         isTouching = false
         scrolled = false
     }
-
-    fun isTouchingValue() = isTouching
 
     fun getScrollSpeedValue(): Int{
         return teleprompterSettings.value?.scrollSpeed?.value?:6
@@ -353,7 +316,6 @@ class TeleprompterViewModel(
     }
 
     fun getSkipSizeValue(rootHeight:Int): Int{
-        //setSkipSizeValue(rootHeight)
         return teleprompterSettings.value?.skipSize?.value?:(rootHeight/3)
     }
 
@@ -386,14 +348,17 @@ class TeleprompterViewModel(
         deleteButtonFunction.invoke()
     }
 
-    fun closeTeleprompterFragment() {
+    fun closeTeleprompterFragment(backToScript:Boolean = true) {
         teleprompterSettings.value?.let { teleprompterSettings ->
-            if (teleprompterSettingsList.isNotEmpty() && teleprompterSettings != teleprompterSettingsList.last()) {
+            if (teleprompterSettingsList.isNotEmpty()
+                && teleprompterSettings != teleprompterSettingsList.last()
+                && teleprompterSettings.name.value != TeleprompterSettings().name.value
+            ) {
                 repository.deleteTeleprompterSetting(teleprompterSettingsList.last()){
                     repository.resetDefaultTeleprompterSetting{
                         repository.saveTeleprompterSettings{
                             repository.setTeleprompterSettingToScript(true){
-                                repository.changeFragment(AccountableFragment.ScriptFragment)
+                                if (backToScript) repository.changeFragment(AccountableFragment.ScriptFragment)
                             }
                         }
                     }
@@ -402,16 +367,18 @@ class TeleprompterViewModel(
                 repository.saveTeleprompterSettings{
                     repository.setTeleprompterSettingToScript(true){
                         repository.resetDefaultTeleprompterSetting{
-                            repository.changeFragment(AccountableFragment.ScriptFragment)
+                            if (backToScript) repository.changeFragment(AccountableFragment.ScriptFragment)
                         }
                     }
                 }
             }
             else{
-                repository.deleteTeleprompterSetting(teleprompterSettingsList.last()){
-                    repository.resetDefaultTeleprompterSetting{
-                        repository.setTeleprompterSettingToScript(false){
-                            repository.changeFragment(AccountableFragment.ScriptFragment)
+                repository.deleteTeleprompterSetting(teleprompterSettings){
+                    repository.deleteTeleprompterSetting(teleprompterSettingsList.last()) {
+                        repository.resetDefaultTeleprompterSetting {
+                            repository.setTeleprompterSettingToScript(false) {
+                                if (backToScript) repository.changeFragment(AccountableFragment.ScriptFragment)
+                            }
                         }
                     }
                 }
@@ -419,7 +386,7 @@ class TeleprompterViewModel(
         }?:run {
             repository.setTeleprompterSettingToScript(false){
                 repository.resetDefaultTeleprompterSetting{
-                    repository.changeFragment(AccountableFragment.ScriptFragment)
+                    if (backToScript) repository.changeFragment(AccountableFragment.ScriptFragment)
                 }
             }
         }
@@ -433,6 +400,11 @@ class TeleprompterViewModel(
         }?:run {
             repository.setTeleprompterSettingToScript(false)
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        closeTeleprompterFragment(true)
     }
 
     companion object{

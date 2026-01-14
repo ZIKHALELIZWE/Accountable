@@ -2,11 +2,8 @@ package com.thando.accountable
 
 import android.content.Context
 import android.text.SpannableStringBuilder
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
-import com.thando.accountable.MainActivity.Companion.collectFlow
 import com.thando.accountable.database.tables.MarkupLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update

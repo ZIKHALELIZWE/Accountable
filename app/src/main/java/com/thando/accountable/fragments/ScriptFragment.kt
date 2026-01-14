@@ -73,7 +73,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AccountableRepository.Companion.accountablePlayer
 import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
-import com.thando.accountable.MainActivity.Companion.collectFlow
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.AppSettings
@@ -90,6 +89,8 @@ import com.thando.accountable.ui.screens.basicDropdownMenu
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -733,7 +734,8 @@ fun ScriptFragmentCatalog(
     val scriptMonthYear by script.scriptDateTime.getMonthYearStateFlow(LocalContext.current).collectAsStateWithLifecycle()
     val teleprompterBackgroundColour by teleprompterSettings?.backgroundColour?.collectAsStateWithLifecycle()?:remember { mutableStateOf(null) }
     val teleprompterTextColor by teleprompterSettings?.textColour?.collectAsStateWithLifecycle()?:remember { mutableStateOf(null) }
-    val teleprompterTextSize by teleprompterSettings?.textSize?.let { remember { it } }?:remember { mutableStateOf(null) }
+    val teleprompterTextSize by (teleprompterSettings?.textSize?:MutableStateFlow(null)).collectAsStateWithLifecycle()
+
 
     val scriptContentList = remember { viewModel.scriptContentList }
     LazyColumn(
@@ -891,14 +893,13 @@ private fun getMultipleContent(
     if (mediaType!=null){
         viewModel.multipleContentsStateFlow.let { multipleContentsStateFlow ->
             viewModel.multipleContentsJob.set(
-                collectFlow(
-                    lifecycleScope,
-                    multipleContentsStateFlow
-                ) { list ->
-                    if (list != null) {
-                        viewModel.addContent(list, contentType, position, content, cursorPosition)
-                        multipleContentsStateFlow.value = null
-                        viewModel.multipleContentsJob.get()?.cancel()
+                lifecycleScope.launch {
+                    multipleContentsStateFlow.collectLatest { list ->
+                        if (list != null) {
+                            viewModel.addContent(list, contentType, position, content, cursorPosition)
+                            multipleContentsStateFlow.value = null
+                            viewModel.multipleContentsJob.get()?.cancel()
+                        }
                     }
                 })
             mainActivityViewModel.launchGalleryLauncherMultiple(mediaType)

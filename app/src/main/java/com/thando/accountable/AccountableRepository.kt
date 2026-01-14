@@ -1398,6 +1398,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun setRepositoryTeleprompterSetting(teleprompterSettings: TeleprompterSettings?){
         scriptTeleprompterSetting.value = teleprompterSettings
+        loadTeleprompterSpecialCharacters(teleprompterSettings)
     }
 
     fun resetDefaultTeleprompterSetting(appendedUnit: (() -> Unit)? = null){
@@ -1424,15 +1425,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    private fun saveSpecialCharactersToDatabase(newId:Long){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                scriptTeleprompterSetting.value?.specialCharactersList?.forEach {
-                    if (it.canUpdateList()) {
-                        it.teleprompterSettingsId = newId
-                        dao.upsert(it)
-                    }
-                }
+    private suspend fun saveSpecialCharactersToDatabase(newId:Long){
+        scriptTeleprompterSetting.value?.specialCharactersList?.forEach {
+            if (it.canUpdateList()) {
+                it.teleprompterSettingsId = newId
+                dao.upsert(it)
             }
         }
     }
@@ -1475,16 +1472,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun loadTeleprompterSpecialCharacters(){
-        scriptTeleprompterSetting.value?.let { teleprompterSettings ->
+    fun loadTeleprompterSpecialCharacters(teleprompterSettings: TeleprompterSettings?){
+        teleprompterSettings?.let { teleprompterSettings ->
             repositoryScope.launch {
                 teleprompterSettings.specialCharactersList.clear()
-                teleprompterSettings.specialCharactersList.addAll(withContext(Dispatchers.IO) {
-                    dao.getScriptSpecialCharacters(teleprompterSettings.id).toMutableList()
-                })
+                teleprompterSettings.specialCharactersList.addAll(
+                    withContext(Dispatchers.IO) {
+                        dao.getScriptSpecialCharacters(
+                            teleprompterSettings.id
+                        )
+                    }
+                )
             }
-        }?:run {
-            scriptTeleprompterSetting.value?.specialCharactersList?.clear()
         }
     }
 
@@ -1500,7 +1499,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun addSpecialCharacter(emitAddSpecialCharacterUpdate:MutableSharedFlow<Int>){
+    fun addSpecialCharacter(){
         scriptTeleprompterSetting.value?.let { scriptTeleprompterSetting ->
             repositoryScope.launch {
                 withContext(Dispatchers.IO) {
@@ -1508,14 +1507,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     if (id == null) saveTeleprompterSettings { savedId ->
                         val specialCharactersInput = SpecialCharacters(savedId!!)
                         scriptTeleprompterSetting.specialCharactersList.add(specialCharactersInput)
-                        repositoryScope.launch {
-                            emitAddSpecialCharacterUpdate.emit(scriptTeleprompterSetting.specialCharactersList.indexOf(specialCharactersInput))
-                        }
                     }
                     else {
                         val specialCharactersInput = SpecialCharacters(id)
                         scriptTeleprompterSetting.specialCharactersList.add(specialCharactersInput)
-                        emitAddSpecialCharacterUpdate.emit(scriptTeleprompterSetting.specialCharactersList.indexOf(specialCharactersInput))
                     }
                 }
             }

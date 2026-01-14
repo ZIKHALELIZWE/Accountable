@@ -49,25 +49,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleCoroutineScope
-import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.fragments.TeleprompterController
 import com.thando.accountable.ui.theme.AccountableTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.coroutines.CoroutineContext
 
 class MainActivity : ComponentActivity() {
 
@@ -146,33 +136,6 @@ class MainActivity : ComponentActivity() {
     companion object{
         fun log(message:String){
             Log.i("FATAL EXCEPTION",message)
-        }
-
-        fun <T> collectFlow(lifecycleScope: LifecycleCoroutineScope, flow: Flow<T>, collect: suspend(T) -> Unit): Job {
-            return lifecycleScope.launch {
-                flow.collectLatest(collect)
-            }
-        }
-
-        fun <T> collectFlow(lifecycleScope: CoroutineScope, flow: Flow<T>, collect: suspend(T) -> Unit): Job {
-            return lifecycleScope.launch {
-                flow.collectLatest(collect)
-            }
-        }
-
-        fun <T> collectFlow(currentCoroutineContext: CoroutineContext, flow: Flow<T>, collect: suspend(T) -> Unit): Job {
-            val lifecycleScope = CoroutineScope(currentCoroutineContext)
-            return lifecycleScope.launch {
-                flow.collectLatest(collect)
-            }
-        }
-
-        fun <T> collectFlow( viewLifecycleOwner: LifecycleOwner, flow: Flow<T>, collect: suspend(T) -> Unit): Job {
-            return viewLifecycleOwner.lifecycleScope.launch {
-                viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED){
-                    flow.collectLatest(collect)
-                }
-            }
         }
     }
 

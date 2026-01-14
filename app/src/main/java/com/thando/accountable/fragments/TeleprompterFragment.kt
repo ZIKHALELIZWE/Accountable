@@ -39,7 +39,6 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -48,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.material.snackbar.Snackbar
+import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.MarkupLanguage
@@ -82,6 +83,8 @@ import com.thando.accountable.fragments.viewmodels.TeleprompterViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -125,386 +128,6 @@ fun TeleprompterView(
     }
 }
 
-// Controller object to bridge Activity and Compose
-object TeleprompterController {
-    private var skipBackHandler: (() -> Unit)? = null
-    fun registerSkipBack(handler: () -> Unit) {
-        skipBackHandler = handler
-    }
-    fun skipBack() {
-        skipBackHandler?.invoke()
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ControlsSection(
-    viewModel: TeleprompterViewModel,
-    scriptViewModel: ScriptViewModel,
-    isPlaying: Boolean,
-    markupLanguage: MarkupLanguage?,
-    spinnerEnabled: Boolean,
-    teleprompterSettings: TeleprompterSettings?,
-    teleprompterSettingsList: SnapshotStateList<TeleprompterSettings>,
-    specialCharactersList: SnapshotStateList<SpecialCharacters>?,
-    deleteButtonText: String,
-    spinnerExpanded: Boolean,
-    onSpinnerExpandedChanged: (Boolean) -> Unit,
-    setSpinnerView: (View) -> Unit,
-    togglePlayPause: () -> Unit,
-    remoteConnected: Boolean,
-    controlsAtTop: Boolean,
-    countDownTimer: CountDownTimer?,
-    onCountDownTimerChanged: (CountDownTimer?) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val resources = LocalResources.current
-    val height = (LocalResources.current.displayMetrics.heightPixels*2)/5
-    val scope = rememberCoroutineScope()
-    LazyColumn(modifier = modifier
-        .padding(16.dp)
-        .height((height / LocalResources.current.displayMetrics.density).dp),
-        state = rememberLazyListState(), reverseLayout = controlsAtTop
-    ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(onClick = {skip(
-                    viewModel,
-                    scriptViewModel,
-                    resources.displayMetrics.heightPixels,
-                    false,
-                    scope,
-                    countDownTimer,
-                    onCountDownTimerChanged
-                )},
-                    shape = RectangleShape) { Text("Backward") }
-                Button(onClick = togglePlayPause,
-                    shape = RectangleShape) { if (isPlaying) Text("Pause") else Text("Play") }
-                Button(onClick = {skip(
-                    viewModel,
-                    scriptViewModel,
-                    resources.displayMetrics.heightPixels,
-                    true,
-                    scope,
-                    countDownTimer,
-                    onCountDownTimerChanged
-                )},
-                    shape = RectangleShape) { Text("Forward") }
-            }
-        }
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-        item {
-            val selectedOptionName by teleprompterSettings?.name?.collectAsStateWithLifecycle()
-                ?:remember { mutableStateOf("") }
-            ExposedDropdownMenuBox(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.primary),
-                expanded = spinnerExpanded,
-                onExpandedChange = { if (spinnerEnabled) onSpinnerExpandedChanged(!spinnerExpanded) },
-            ) {
-                setSpinnerView(LocalView.current)
-                val fillMaxWidth = Modifier.fillMaxWidth()
-                TextField(
-                    value = selectedOptionName,
-                    onValueChange = {},
-                    readOnly = true,
-                    enabled = spinnerEnabled,
-                    label = {
-                        Text(
-                            "Choose an option",
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    },
-                    trailingIcon = {
-                        Icon(
-                            imageVector = if (spinnerExpanded)
-                                Icons.Filled.ArrowDropUp
-                            else Icons.Filled.ArrowDropDown,
-                            contentDescription = null,
-                            tint = if (spinnerEnabled) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
-                        )
-                    },
-                    modifier = fillMaxWidth.menuAnchor(
-                        ExposedDropdownMenuAnchorType.PrimaryNotEditable,
-                        spinnerEnabled
-                    ),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.primary,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = MaterialTheme.colorScheme.onPrimary,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onPrimary,
-                        focusedIndicatorColor = MaterialTheme.colorScheme.surface,
-                        unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
-                        cursorColor = MaterialTheme.colorScheme.surface
-                    )
-                )
-
-                if (spinnerEnabled) {
-                    ExposedDropdownMenu(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.primary),
-                        expanded = spinnerExpanded,
-                        onDismissRequest = { onSpinnerExpandedChanged(false) }
-                    ) {
-                        teleprompterSettingsList.forEach { selectionOption ->
-                            val selectionOptionName by selectionOption.name.collectAsStateWithLifecycle()
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        selectionOptionName,
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                },
-                                onClick = {
-                                    viewModel.setSelectedIndex(
-                                        teleprompterSettingsList.indexOf(selectionOption)
-                                    )
-                                    onSpinnerExpandedChanged(false)
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        teleprompterSettings?.let { teleprompterSettings ->
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-                    Button(
-                        onClick = { viewModel.changeTeleprompterSettingsName() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .fillMaxHeight()
-                            .padding(1.dp),
-                        shape = RectangleShape,
-                        colors = ButtonColors(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.onPrimary,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Text(
-                            stringResource(R.string.change_name),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.restoreToDefaultTeleprompterSettings() },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .fillMaxHeight()
-                            .padding(1.dp),
-                        shape = RectangleShape,
-                        colors = ButtonColors(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.onPrimary,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Text(
-                            deleteButtonText,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                val scrollSpeed by remember {
-                    teleprompterSettings.scrollSpeed
-                }
-                Text(stringResource(R.string.scroll_speed, scrollSpeed))
-            }
-            item {
-                var scrollSpeed by remember {
-                    teleprompterSettings.scrollSpeed
-                }
-                Slider(
-                    value = scrollSpeed.toFloat(),
-                    onValueChange = { scrollSpeed = it.toInt() },
-                    valueRange = 1f..60f
-                )
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                val skipSize by remember {
-                    teleprompterSettings.skipSize
-                }
-                Text(stringResource(R.string.skip_size, skipSize))
-            }
-            item {
-                var skipSize by remember {
-                    teleprompterSettings.skipSize
-                }
-                Slider(
-                    value = skipSize.toFloat(),
-                    onValueChange = { skipSize = it.toInt() },
-                    valueRange = 100f..3000f
-                )
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                val textSize by remember {
-                    teleprompterSettings.textSize
-                }
-                Text(stringResource(R.string.text_size, textSize))
-            }
-            item {
-                var textSize by remember {
-                    teleprompterSettings.textSize
-                }
-                Slider(
-                    value = textSize.toFloat(),
-                    onValueChange = { textSize = it.toInt() },
-                    valueRange = 12f..70f
-                )
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                val startCountDown by remember {
-                    teleprompterSettings.startCountDown
-                }
-                Text(stringResource(R.string.start_count_down, startCountDown))
-            }
-            item {
-                var startCountDown by remember {
-                    teleprompterSettings.startCountDown
-                }
-                Slider(
-                    value = startCountDown.toFloat(),
-                    onValueChange = { startCountDown = it.toInt() },
-                    valueRange = 0f..10f
-                )
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                var scrollCountDown by remember {
-                    teleprompterSettings.scrollCountDown
-                }
-                Text(stringResource(R.string.scroll_count_down, scrollCountDown))
-            }
-            item {
-                var scrollCountDown by remember {
-                    teleprompterSettings.scrollCountDown
-                }
-                val range: ClosedFloatingPointRange<Float> = 0f..10f
-                Slider(
-                    value = scrollCountDown.toFloat(),
-                    onValueChange = { scrollCountDown = it.toInt() },
-                    valueRange = range
-                )
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                val textColor by teleprompterSettings.textColour.collectAsStateWithLifecycle()
-                Button(
-                    onClick = { viewModel.chooseTextColour(context) },
-                    shape = RectangleShape, modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Change Text Color (Current: $textColor)")
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            item {
-                val backgroundColour by teleprompterSettings.backgroundColour.collectAsStateWithLifecycle()
-                Button(
-                    onClick = { viewModel.chooseBackgroundColour(context) },
-                    shape = RectangleShape, modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Change Background Color (Current: $backgroundColour)")
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                Button(
-                    onClick = { viewModel.toggleControlsPosition() },
-                    shape = RectangleShape, modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(if (controlsAtTop) "Move Controls to Bottom" else "Move Controls to Top")
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                // Remote connection button
-                Button(
-                    enabled = remoteConnected,
-                    onClick = {
-                        // Change what the button does
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RectangleShape
-                ) {
-                    Text(
-                        if (remoteConnected) "Remote: Connected (Skip Back)"
-                        else "Remote: Not Connected"
-                    )
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            item {
-                Button(
-                    onClick = { viewModel.addSpecialCharacter() },
-                    shape = RectangleShape, modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.add_special_character))
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            if (specialCharactersList!=null) {
-                items(specialCharactersList) { specialCharacter ->
-                    var textSize by remember { teleprompterSettings.textSize }
-                    SpecialCharacterCard(
-                        viewModel,
-                        specialCharacter,
-                        context,
-                        scope,
-                        markupLanguage,
-                        textSize.toFloat()
-                    )
-                }
-            }
-        }
-    }
-}
-
 @Composable
 fun TeleprompterFragmentView(
     modifier: Modifier = Modifier,
@@ -521,9 +144,7 @@ fun TeleprompterFragmentView(
     val finishCountdown by viewModel.finishCountdown.collectAsStateWithLifecycle(false)
     val teleprompterSettings by viewModel.teleprompterSettings.collectAsStateWithLifecycle()
     val teleprompterSettingsList = remember { viewModel.teleprompterSettingsList }
-    val specialCharactersList = teleprompterSettings?.let { teleprompterSettings ->
-        remember { teleprompterSettings.specialCharactersList }
-    }
+
     val selectedIndex by viewModel.selectedIndex.collectAsStateWithLifecycle()
     val deleteButtonText by viewModel.deleteButtonText.collectAsStateWithLifecycle()
     val controlsAtTop by teleprompterSettings?.controlsPositionBottom?.collectAsStateWithLifecycle()
@@ -571,7 +192,7 @@ fun TeleprompterFragmentView(
         }
     }
 
-    LaunchedEffect(specialCharactersList){
+    LaunchedEffect(teleprompterSettings?.specialCharactersList){
         viewModel.updateStates()
         viewModel.emitUpdateContentAdapterSpecialCharacters()
     }
@@ -639,18 +260,16 @@ fun TeleprompterFragmentView(
                     scriptViewModel,
                     false,
                     coroutineScope,
-                    countDownTimer,
-                    {countDownTimer = it}
-                )
+                    countDownTimer
+                ) { countDownTimer = it }
             }
         }
         else{
             stopAutoScroll(
                 viewModel,
                 true,
-                countDownTimer,
-                {countDownTimer = it}
-            )
+                countDownTimer
+            ) { countDownTimer = it }
         }
     }
 
@@ -670,9 +289,8 @@ fun TeleprompterFragmentView(
                 resources.displayMetrics.heightPixels,
                 false,
                 coroutineScope,
-                countDownTimer,
-                {countDownTimer = it}
-            )
+                countDownTimer
+            ) { countDownTimer = it }
         }
     }
 
@@ -709,7 +327,6 @@ fun TeleprompterFragmentView(
                 markupLanguage = markupLanguage,
                 teleprompterSettings = teleprompterSettings,
                 teleprompterSettingsList = teleprompterSettingsList,
-                specialCharactersList = specialCharactersList,
                 deleteButtonText = deleteButtonText,
                 spinnerEnabled = spinnerEnabled,
                 spinnerExpanded = spinnerExpanded,
@@ -794,268 +411,6 @@ fun TeleprompterFragmentView(
         // Controls at bottom (only if not full screen)
         if (!controlsAtTop && controlsVisible && !isFullScreen) controls()
     }
-    /*
-
-    collectFlow(this,viewModel.script){ script ->
-        script?.scriptTitle?.let { title ->
-            viewModel.setScriptTitleEdited(title.text.toString())
-        }
-    }
-
-    collectFlow(this,viewModel.teleprompterSettingsList){ settingsList ->
-        if (settingsList.isEmpty()) return@collectFlow
-        binding.rootConstraintLayoutHeight = binding.rootConstraintLayout.height
-
-        val adapter = ArrayAdapter(requireContext(),android.R.layout.simple_list_item_1,settingsList)
-        binding.teleprompterSettingsSpinner.adapter = adapter
-
-        var initializing = 0
-        binding.teleprompterSettingsSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener{
-            override fun onItemSelected(
-                parent: AdapterView<*>?,
-                view: View?, position: Int, id: Long
-            ) {
-                if (initializing == 0){
-                    initializing++
-                    if (viewModel.script.value?.scriptTeleprompterSettings == null){
-                        binding.teleprompterSettingsSpinner.setSelection(settingsList.size-1)
-                        viewModel.setSelectedIndex(
-                            settingsList.size-1
-                        )
-                        if (settingsList.size-1==0) initializing++
-                    }
-                    else{
-                        for ((index,setting) in settingsList.withIndex()){
-                            if (setting.id == viewModel.script.value?.scriptTeleprompterSettings){
-                                binding.teleprompterSettingsSpinner.setSelection(index)
-                                viewModel.setSelectedIndex(
-                                    index
-                                )
-                                if(index == 0) initializing++
-                                break
-                            }
-                        }
-                    }
-                }
-                else{
-                    if(initializing == 1){
-                        initializing++
-                    }
-                    else if (initializing>1){
-                        viewModel.setSelectedIndex(
-                            position
-                        )
-                    }
-                }
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) {
-
-            }
-        }
-    }
-
-    var controlsPositionBottomJob:Job? = null
-    var backgroundColourJob:Job? = null
-    var settingsNameJob:Job? = null
-    collectFlow(this,viewModel.teleprompterSettings){ teleprompterSettings ->
-        if (teleprompterSettings!=null && viewModel.teleprompterSettingsList.value.isNotEmpty()){
-            viewModel.setTeleprompterSettingsFunctions(teleprompterSettings, requireContext(),
-                binding.rootConstraintLayout.height)
-            contentAdapter.setTeleprompterSettings(viewModel.teleprompterSettings)
-            viewModel.setSkipSizeValue(binding.rootConstraintLayout.height)
-
-            binding.restoreToDefaultSettingsButton.isEnabled = true
-            binding.restoreToDefaultSettingsButton.text =
-                if (teleprompterSettings == viewModel.teleprompterSettingsList.value.last())
-                    getString(R.string.restore_default_settings)
-                else
-                    getString(R.string.delete)
-
-            binding.changeSettingsNameButton.isEnabled = true
-            settingsNameJob?.cancel()
-            settingsNameJob = collectFlow(this,teleprompterSettings.name){
-                binding.changeSettingsNameButton.text =
-                    if (it == TeleprompterSettings().name.value) getString(R.string.change_name_to_save)
-                    else getString(R.string.change_name)
-            }
-
-            backgroundColourJob?.cancel()
-            backgroundColourJob = collectFlow(this,teleprompterSettings.backgroundColour){
-                binding.root.setBackgroundColor(it)
-            }
-
-            controlsPositionBottomJob?.cancel()
-            controlsPositionBottomJob = collectFlow(this,teleprompterSettings.controlsPositionBottom){ positionBottom ->
-                if (positionBottom){
-                    binding.controlsPositionButton.text = getString(R.string.move_controls_to_top)
-                    binding.contentSheet.layoutParams = ConstraintLayout.LayoutParams(
-                        ConstraintLayout.LayoutParams.MATCH_PARENT,
-                        ConstraintLayout.LayoutParams.WRAP_CONTENT
-                    ).apply{
-                        startToStart = binding.rootConstraintLayout.id
-                        endToEnd = binding.rootConstraintLayout.id
-                        bottomToBottom = binding.rootConstraintLayout.id
-                    }
-                    binding.teleprompterCoordinatorLayout.layoutParams = ConstraintLayout.LayoutParams(
-                        ConstraintLayout.LayoutParams.MATCH_PARENT,
-                        ConstraintLayout.LayoutParams.MATCH_CONSTRAINT
-                    ).apply {
-                        topToTop = binding.rootConstraintLayout.id
-                        startToStart = binding.rootConstraintLayout.id
-                        endToEnd = binding.rootConstraintLayout.id
-                        bottomToTop = binding.contentSheet.id
-                    }
-                    viewModel.triggerContentSheet()
-                }
-                else{
-                    binding.controlsPositionButton.text = getString(R.string.move_controls_to_bottom)
-                    binding.contentSheet.layoutParams = ConstraintLayout.LayoutParams(
-                        ConstraintLayout.LayoutParams.MATCH_PARENT,
-                        ConstraintLayout.LayoutParams.WRAP_CONTENT
-                    ).apply{
-                        startToStart = binding.rootConstraintLayout.id
-                        endToEnd = binding.rootConstraintLayout.id
-                        topToTop = binding.rootConstraintLayout.id
-                    }
-                    binding.teleprompterCoordinatorLayout.layoutParams = ConstraintLayout.LayoutParams(
-                        ConstraintLayout.LayoutParams.MATCH_PARENT,
-                        ConstraintLayout.LayoutParams.MATCH_CONSTRAINT
-                    ).apply {
-                        bottomToBottom = binding.rootConstraintLayout.id
-                        startToStart = binding.rootConstraintLayout.id
-                        endToEnd = binding.rootConstraintLayout.id
-                        topToBottom = binding.contentSheet.id
-                    }
-                    viewModel.triggerContentSheet()
-                }
-            }
-
-            viewModel.loadSpecialCharacters()
-        }
-        else{
-            binding.changeSettingsNameButton.isEnabled = false
-            binding.restoreToDefaultSettingsButton.isEnabled = false
-            binding.restoreToDefaultSettingsButton.text = getString(R.string.restore_default_settings)
-        }
-    }
-
-    collectFlow(this,viewModel.showNameNotUniqueSnackBar){ name ->
-        Snackbar.make(
-            binding.teleprompterSettingsSpinner,
-            requireContext().getString(R.string.name_is_not_unique, name),
-            Snackbar.LENGTH_SHORT
-        ).show()
-    }
-
-    collectFlow(this,viewModel.notifySpinnerDataChanged){
-        (binding.teleprompterSettingsSpinner.adapter as ArrayAdapter<*>).notifyDataSetChanged()
-    }
-
-    collectFlow(this,viewModel.selectedIndex){ index ->
-        viewModel.loadTeleprompterSetting(index)
-    }
-
-    collectFlow(this,viewModel.updateContentAdapterSpecialCharacters){
-        specialCharactersList ->  contentAdapter.updateSpecialCharacters(specialCharactersList, textSize.toFloat())
-    }
-
-    collectFlow(this, viewModel.addSpecialCharacterUpdate){
-        position -> specialCharactersAdapter.notifyAddSpecialCharacter(position)
-    }
-
-    collectFlow(this,viewModel.isPlaying){ playing ->
-        if (playing){
-            if (isAtEndOfRecyclerView(binding.teleprompterRecyclerView)){
-                viewModel.pause()
-            }
-            else{
-                startAutoScrollRunnable(false)
-            }
-        }
-        else{
-            stopAutoScroll()
-        }
-    }
-
-    collectFlow(this,viewModel.contentSheetExpanded){ isExpanded ->
-        if (isExpanded){
-            if (binding.contentSheet.contains(binding.buttonsContainer)){
-
-                binding.contentSheet.removeView(binding.buttonsContainer)
-                binding.nestedScrollViewConstraintLayout.addView(binding.buttonsContainer)
-
-                binding.buttonsContainer.layoutParams = ConstraintLayout.LayoutParams(
-                    ConstraintLayout.LayoutParams.MATCH_PARENT,
-                    ConstraintLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topToTop = binding.rootConstraintLayout.id
-                    startToStart = binding.rootConstraintLayout.id
-                    endToEnd = binding.rootConstraintLayout.id
-                }
-                binding.teleprompterSettingsSpinner.updateLayoutParams<ConstraintLayout.LayoutParams> {
-                    topToBottom = binding.buttonsContainer.id
-                }
-                binding.nestedScrollView.updateLayoutParams<ConstraintLayout.LayoutParams> {
-                    topToBottom = binding.contentSheetButton.id
-                }
-            }
-        }
-        else{
-            binding.nestedScrollView.smoothScrollTo(0,0)
-
-            if (binding.nestedScrollViewConstraintLayout.contains(binding.buttonsContainer)){
-
-                binding.nestedScrollViewConstraintLayout.removeView(binding.buttonsContainer)
-                binding.contentSheet.addView(binding.buttonsContainer)
-
-                binding.buttonsContainer.layoutParams = ConstraintLayout.LayoutParams(
-                    ConstraintLayout.LayoutParams.MATCH_PARENT,
-                    ConstraintLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topToBottom = binding.contentSheetButton.id
-                    startToStart = binding.rootConstraintLayout.id
-                    endToEnd = binding.rootConstraintLayout.id
-                }
-                binding.teleprompterSettingsSpinner.updateLayoutParams<ConstraintLayout.LayoutParams> {
-                    topToBottom = binding.nestedScrollViewConstraintLayout.id
-                }
-                binding.nestedScrollView.updateLayoutParams<ConstraintLayout.LayoutParams> {
-                    topToBottom = binding.buttonsContainer.id
-                }
-            }
-        }
-        animateHeightChange(
-            binding.contentSheet,
-            getControlsHeight(),
-            viewModel.getAnimationDuration()
-        )
-    }
-
-    collectFlow(this,viewModel.cancelCountdown){ cancelUnitPair ->
-        if (cancelUnitPair.first){
-            viewModel.countdownTimer.value?.cancel()
-            viewModel.countdownTimer.value = null
-            cancelUnitPair.second?.invoke()
-        }
-    }
-
-    collectFlow(this,viewModel.finishCountdown){ finish ->
-        if (finish){
-            viewModel.countdownTimer.value?.onFinish()
-        }
-    }
-
-    contentAdapter = viewModel.getContentAdapter(
-        requireContext(),
-        viewLifecycleOwner,
-        childFragmentManager,
-        textSize.toFloat()
-    ) {
-        setScrollPosition(viewModel.getScrollPosition())
-        viewModel.loadTeleprompterSettings()
-    }
-    specialCharactersAdapter = SpecialCharacterItemAdapter(viewLifecycleOwner, viewModel)*/
 }
 
 @Composable
@@ -1155,13 +510,408 @@ fun SpecialCharacterCard(
     }
 }
 
-fun cancelCountDown(
+// Controller object to bridge Activity and Compose
+object TeleprompterController {
+    private var skipBackHandler: (() -> Unit)? = null
+    fun registerSkipBack(handler: () -> Unit) {
+        skipBackHandler = handler
+    }
+    fun skipBack() {
+        skipBackHandler?.invoke()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ControlsSection(
     viewModel: TeleprompterViewModel,
+    scriptViewModel: ScriptViewModel,
+    isPlaying: Boolean,
+    markupLanguage: MarkupLanguage?,
+    spinnerEnabled: Boolean,
+    teleprompterSettings: TeleprompterSettings?,
+    teleprompterSettingsList: SnapshotStateList<TeleprompterSettings>,
+    deleteButtonText: String,
+    spinnerExpanded: Boolean,
+    onSpinnerExpandedChanged: (Boolean) -> Unit,
+    setSpinnerView: (View) -> Unit,
+    togglePlayPause: () -> Unit,
+    remoteConnected: Boolean,
+    controlsAtTop: Boolean,
+    countDownTimer: CountDownTimer?,
+    onCountDownTimerChanged: (CountDownTimer?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    val height = (LocalResources.current.displayMetrics.heightPixels*2)/5
+    val scope = rememberCoroutineScope()
+    val specialCharactersList = teleprompterSettings?.specialCharactersList?.let {
+        remember { it }
+    }?: remember { mutableStateListOf() }
+    LazyColumn(modifier = modifier
+        .padding(16.dp)
+        .height((height / LocalResources.current.displayMetrics.density).dp),
+        state = rememberLazyListState(), reverseLayout = controlsAtTop
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button(onClick = {skip(
+                    viewModel,
+                    scriptViewModel,
+                    resources.displayMetrics.heightPixels,
+                    false,
+                    scope,
+                    countDownTimer,
+                    onCountDownTimerChanged
+                )},
+                    shape = RectangleShape) { Text("Backward") }
+                Button(onClick = togglePlayPause,
+                    shape = RectangleShape) { if (isPlaying) Text("Pause") else Text("Play") }
+                Button(onClick = {skip(
+                    viewModel,
+                    scriptViewModel,
+                    resources.displayMetrics.heightPixels,
+                    true,
+                    scope,
+                    countDownTimer,
+                    onCountDownTimerChanged
+                )},
+                    shape = RectangleShape) { Text("Forward") }
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            val selectedOptionName by teleprompterSettings?.name?.collectAsStateWithLifecycle()
+                ?:remember { mutableStateOf("") }
+            ExposedDropdownMenuBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primary),
+                expanded = spinnerExpanded,
+                onExpandedChange = { if (spinnerEnabled) onSpinnerExpandedChanged(!spinnerExpanded) },
+            ) {
+                setSpinnerView(LocalView.current)
+                val fillMaxWidth = Modifier.fillMaxWidth()
+                TextField(
+                    value = if (selectedOptionName == TeleprompterSettings().name.value)
+                        stringResource(
+                            R.string.change_name_to_save,
+                            selectedOptionName
+                        )
+                    else selectedOptionName,
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = spinnerEnabled,
+                    label = {
+                        Text(
+                            "Choose an option",
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = if (spinnerExpanded)
+                                Icons.Filled.ArrowDropUp
+                            else Icons.Filled.ArrowDropDown,
+                            contentDescription = null,
+                            tint = if (spinnerEnabled) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
+                        )
+                    },
+                    modifier = fillMaxWidth.menuAnchor(
+                        ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                        spinnerEnabled
+                    ),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.primary,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = if (selectedOptionName == TeleprompterSettings().name.value)
+                            Color.Red
+                        else MaterialTheme.colorScheme.onPrimary,
+                        unfocusedTextColor = if (selectedOptionName == TeleprompterSettings().name.value)
+                            Color.Red
+                        else MaterialTheme.colorScheme.onPrimary,
+                        focusedIndicatorColor = MaterialTheme.colorScheme.surface,
+                        unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                        cursorColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+
+                if (spinnerEnabled) {
+                    ExposedDropdownMenu(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.primary),
+                        expanded = spinnerExpanded,
+                        onDismissRequest = { onSpinnerExpandedChanged(false) }
+                    ) {
+                        teleprompterSettingsList.forEach { selectionOption ->
+                            val selectionOptionName by selectionOption.name.collectAsStateWithLifecycle()
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = if (selectionOptionName == TeleprompterSettings().name.value)
+                                            stringResource(
+                                                R.string.change_name_to_save,
+                                                selectionOptionName
+                                            )
+                                        else selectionOptionName,
+                                        color = if (selectionOptionName == TeleprompterSettings().name.value)
+                                                Color.Red
+                                            else MaterialTheme.colorScheme.onPrimary
+                                    )
+                                },
+                                onClick = {
+                                    viewModel.setSelectedIndex(
+                                        teleprompterSettingsList.indexOf(selectionOption)
+                                    )
+                                    onSpinnerExpandedChanged(false)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+                Button(
+                    onClick = { viewModel.changeTeleprompterSettingsName() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(1.dp),
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.onPrimary,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Text(
+                        stringResource(R.string.change_name),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+                Button(
+                    onClick = { viewModel.restoreToDefaultTeleprompterSettings() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(1.dp),
+                    shape = RectangleShape,
+                    colors = ButtonColors(
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.onPrimary,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Text(
+                        deleteButtonText,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            val scrollSpeed by (teleprompterSettings?.scrollSpeed?: MutableStateFlow(4))
+                .collectAsStateWithLifecycle()
+            Text(stringResource(R.string.scroll_speed, scrollSpeed))
+        }
+        item {
+            val scrollSpeed by (teleprompterSettings?.scrollSpeed?: MutableStateFlow(4))
+                .collectAsStateWithLifecycle()
+            Slider(
+                value = scrollSpeed.toFloat(),
+                onValueChange = { teleprompterSettings?.scrollSpeed?.update { it } },
+                valueRange = 1f..60f
+            )
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            val skipSize by (
+                teleprompterSettings?.skipSize?:MutableStateFlow(0)
+                    ).collectAsStateWithLifecycle()
+            Text(stringResource(R.string.skip_size, skipSize))
+        }
+        item {
+            val skipSize by (
+                teleprompterSettings?.skipSize?:MutableStateFlow(0)
+                    ).collectAsStateWithLifecycle()
+            Slider(
+                value = skipSize.toFloat(),
+                onValueChange = { teleprompterSettings?.skipSize?.update { it } },
+                valueRange = 100f..3000f
+            )
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            val textSize by (
+                teleprompterSettings?.textSize?:MutableStateFlow(24)
+                    ).collectAsStateWithLifecycle()
+            Text(stringResource(R.string.text_size, textSize))
+        }
+        item {
+            val textSize by (
+                teleprompterSettings?.textSize?:MutableStateFlow(24)
+                    ).collectAsStateWithLifecycle()
+            Slider(
+                value = textSize.toFloat(),
+                onValueChange = { teleprompterSettings?.textSize?.update { it } },
+                valueRange = 12f..70f
+            )
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            val startCountDown by (
+                        teleprompterSettings?.startCountDown?:MutableStateFlow(0)
+                    ).collectAsStateWithLifecycle()
+            Text(stringResource(R.string.start_count_down, startCountDown))
+        }
+        item {
+            val startCountDown by (
+                teleprompterSettings?.startCountDown?:MutableStateFlow(0)
+                    ).collectAsStateWithLifecycle()
+            Slider(
+                value = startCountDown.toFloat(),
+                onValueChange = { teleprompterSettings?.startCountDown?.update { it } },
+                valueRange = 0f..10f
+            )
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            val scrollCountDown by (
+                teleprompterSettings?.scrollCountDown?:MutableStateFlow(0)
+                    ).collectAsStateWithLifecycle()
+            Text(stringResource(R.string.scroll_count_down, scrollCountDown))
+        }
+        item {
+            val scrollCountDown by (
+                    teleprompterSettings?.scrollCountDown?:MutableStateFlow(0)
+                ).collectAsStateWithLifecycle()
+            val range: ClosedFloatingPointRange<Float> = 0f..10f
+            Slider(
+                value = scrollCountDown.toFloat(),
+                onValueChange = { teleprompterSettings?.scrollCountDown?.update { it } },
+                valueRange = range
+            )
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            val textColor by (teleprompterSettings?.textColour?:MutableStateFlow(android.graphics.Color.BLACK)).collectAsStateWithLifecycle()
+            Button(
+                onClick = { viewModel.chooseTextColour(context) },
+                shape = RectangleShape, modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Change Text Color (Current: $textColor)")
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        item {
+            val backgroundColour by (teleprompterSettings?.backgroundColour?:MutableStateFlow(
+                android.graphics.Color.WHITE)).collectAsStateWithLifecycle()
+            Button(
+                onClick = { viewModel.chooseBackgroundColour(context) },
+                shape = RectangleShape, modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Change Background Color (Current: $backgroundColour)")
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            Button(
+                onClick = { viewModel.toggleControlsPosition() },
+                shape = RectangleShape, modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (controlsAtTop) "Move Controls to Bottom" else "Move Controls to Top")
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            // Remote connection button
+            Button(
+                enabled = remoteConnected,
+                onClick = {
+                    // Change what the button does
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RectangleShape
+            ) {
+                Text(
+                    if (remoteConnected) "Remote: Connected (Skip Back)"
+                    else "Remote: Not Connected"
+                )
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            Button(
+                onClick = { viewModel.addSpecialCharacter() },
+                shape = RectangleShape, modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.add_special_character))
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        items(
+            teleprompterSettings?.specialCharactersList?:mutableStateListOf()
+        ) { specialCharacter ->
+            val textSize by (teleprompterSettings?.textSize?:MutableStateFlow(24))
+                .collectAsStateWithLifecycle()
+            SpecialCharacterCard(
+                viewModel,
+                specialCharacter,
+                context,
+                scope,
+                markupLanguage,
+                textSize.toFloat()
+            )
+        }
+    }
+}
+
+fun cancelCountDown(
     countDownTimer: CountDownTimer?,
     onCountDownTimerChanged: (CountDownTimer?)->Unit
 ){
     countDownTimer?.cancel()
-    viewModel.hideCountDownButton()
     onCountDownTimerChanged(null)
 }
 
@@ -1183,7 +933,7 @@ private fun startAutoScrollRunnable(
     countDownTimer: CountDownTimer?,
     onCountDownTimerChanged: (CountDownTimer?)->Unit
 ){
-    cancelCountDown(viewModel,countDownTimer,onCountDownTimerChanged)
+    cancelCountDown(countDownTimer,onCountDownTimerChanged)
     val newCountDownTimer = object : CountDownTimer(
         if (isScroll) viewModel.getScrollCountdown()
         else viewModel.getStartCountdown(),
@@ -1200,12 +950,10 @@ private fun startAutoScrollRunnable(
                 coroutineScope,
                 countDownTimer,
                 onCountDownTimerChanged)
-            viewModel.hideCountDownButton()
             onCountDownTimerChanged(null)
         }
     }
     onCountDownTimerChanged(newCountDownTimer)
-    viewModel.showCountDownButton()
     newCountDownTimer.start()
 }
 
@@ -1218,8 +966,7 @@ private fun skip(
     onCountDownTimerChanged: (CountDownTimer?)->Unit
 ){
     coroutineScope.launch {
-        val height = displayHeight
-        var skipSize = viewModel.getSkipSizeValue(height)
+        var skipSize = viewModel.getSkipSizeValue(displayHeight)
         if (!skipForward) skipSize *= -1
         if (viewModel.getIsPlaying()) stopAutoScroll(
             viewModel,
@@ -1290,7 +1037,6 @@ private fun stopAutoScroll(
     onCountDownTimerChanged: (CountDownTimer?) -> Unit
 ) {
     if (cancelCountDown) cancelCountDown(
-        viewModel,
         countDownTimer,
         onCountDownTimerChanged
     )

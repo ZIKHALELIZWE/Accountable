@@ -12,7 +12,9 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -149,9 +151,7 @@ class MainActivityViewModel(
         drawerEnabled.value = true
     }
 
-    suspend fun disableDrawer(){
-        drawerEnabled.value = true
-        toggleDrawer(false)
+    fun disableDrawer(){
         drawerEnabled.value = false
     }
 
