@@ -340,7 +340,7 @@ fun MainActivityView(
             gesturesEnabled = drawerEnabled
         ) {
             currentFragment?.name?.let { startFragment ->
-                mainActivityViewModel.accountableNavigationController.getAccountableActivity(
+                mainActivityViewModel.accountableNavigationController.GetAccountableActivity(
                     navController,
                     startFragment,
                     mainActivityViewModel

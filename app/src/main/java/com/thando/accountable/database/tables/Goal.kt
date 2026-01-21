@@ -10,11 +10,13 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Calendar
 
@@ -57,7 +59,7 @@ data class Goal(
     val numScripts: MutableState<Int> = mutableIntStateOf(0),
 
     @ColumnInfo (name = "goal_goal")
-    val goal : MutableState<String> = mutableStateOf(""),
+    val goal : TextFieldState = TextFieldState(""),
 
     @ColumnInfo (name = "goal_date_of_completion")
     var dateOfCompletion : AppResources.CalendarResource? = null,
@@ -89,7 +91,7 @@ data class Goal(
     }
 
     @Ignore
-    val times: MutableList<GoalTaskDeliverableTime> = mutableStateListOf()
+    val times: SnapshotStateList<GoalTaskDeliverableTime> = mutableStateListOf()
 
     @Ignore
     val imageResource = AppResources.ImageResource(goalPicture?:"")
@@ -107,6 +109,4 @@ data class Goal(
     }
 
     fun getUri(context: Context): StateFlow<Uri?> = imageResource.getUri(context)
-
-    fun getStateUri(context: Context): MutableState<Uri?> = imageResource.getStateUri(context)
 }

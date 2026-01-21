@@ -38,6 +38,7 @@ import com.thando.accountable.fragments.viewmodels.BooksViewModel.Companion.INIT
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import com.thando.accountable.player.AccountablePlayer
 import com.thando.accountable.ui.AccountableNotification
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,6 +63,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
     var dao: RepositoryDao = AccountableDatabase.getInstance(application).repositoryDao
     private val repositoryJob = Job()
     private val repositoryScope = CoroutineScope(Dispatchers.Main + repositoryJob)
+    private var loadFoldersListJob: CompletableJob? = null
+    private var loadGoalsListJob: CompletableJob? = null
+    private var loadScriptsListJob: CompletableJob? = null
 
     private val folder = MutableStateFlow<Folder?>(null)
     val showScripts = MutableStateFlow<MutableStateFlow<Boolean>?>(null)
@@ -80,8 +84,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val newEditFolder = MutableStateFlow<Folder?>(null)
 
     private val goal = MutableStateFlow<Goal?>(null)
-    private val editGoal: MutableState<Goal?> = mutableStateOf(null)
-    private val newGoal: MutableState<Goal?> = mutableStateOf(null)
+    private val editGoal = MutableStateFlow<Goal?>(null)
+    private val newGoal = MutableStateFlow<Goal?>(null)
 
     private val scriptsOrGoalsFolderType = MutableStateFlow(Folder.FolderType.SCRIPTS)
 
@@ -152,7 +156,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getGoalsList(): SnapshotStateList<Goal> { return goalsList }
     fun getEditFolder(): StateFlow<Folder?>{ return editFolder }
     fun getNewEditFolder(): StateFlow<Folder?>{ return newEditFolder }
-    fun getNewGoal():MutableState<Goal?> { return newGoal }
+    fun getNewGoal():StateFlow<Goal?> { return newGoal }
     fun getDirection(): SharedFlow<AccountableFragment?>{ return direction }
     fun getScriptsOrGoalsFolderType(): StateFlow<Folder.FolderType?> { return scriptsOrGoalsFolderType }
     fun getCurrentFragment(): SharedFlow<AccountableFragment?>{ return currentFragment }
@@ -189,61 +193,65 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun loadScriptsList(ascendingOrder:Boolean, folderNotAppSettings:Boolean,
                         appendedUnit: (() -> Unit)? = null){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
-                if (id != null) {
-                    withContext(Dispatchers.Main) {
-                        if (ascendingOrder) {
-                            scriptsList.clear()
-                            scriptsList.addAll(
-                                withContext(Dispatchers.IO) {
-                                    dao.getScriptsNow(id)
-                                }
-                            )
-                        }
-                        else {
-                            scriptsList.clear()
-                            scriptsList.addAll(
-                                withContext(Dispatchers.IO) {
-                                    dao.getScriptsNowDESC(id)
-                                }
-                            )
-                        }
+        loadScriptsListJob?.cancel()
+        loadScriptsListJob = Job()
+        CoroutineScope(Dispatchers.IO + loadScriptsListJob!!).launch {
+            val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
+            if (id != null) {
+                withContext(Dispatchers.Main) {
+                    if (ascendingOrder) {
+                        scriptsList.clear()
+                        scriptsList.addAll(
+                            withContext(Dispatchers.IO) {
+                                dao.getScriptsNow(id)
+                            }
+                        )
+                    }
+                    else {
+                        scriptsList.clear()
+                        scriptsList.addAll(
+                            withContext(Dispatchers.IO) {
+                                dao.getScriptsNowDESC(id)
+                            }
+                        )
                     }
                 }
-                withContext(Dispatchers.Main){ appendedUnit?.invoke() }
             }
+            withContext(Dispatchers.Main){ appendedUnit?.invoke() }
+            loadScriptsListJob?.complete()
+            loadScriptsListJob = null
         }
     }
 
     fun loadGoalsList(ascendingOrder:Boolean, folderNotAppSettings:Boolean,
                       appendedUnit: (() -> Unit)? = null){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
-                if (id != null) {
-                    withContext(Dispatchers.Main) {
-                        if (ascendingOrder) {
-                            goalsList.clear()
-                            goalsList.addAll(
-                                withContext(Dispatchers.IO) {
-                                    dao.getGoalsNow(id)
-                                }
-                            )
-                        }
-                        else {
-                            goalsList.clear()
-                            goalsList.addAll(
-                                withContext(Dispatchers.IO) {
-                                    dao.getGoalsNowDESC(id)
-                                }
-                            )
-                        }
+        loadGoalsListJob?.cancel()
+        loadGoalsListJob = Job()
+        CoroutineScope(Dispatchers.IO + loadGoalsListJob!!).launch {
+            val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
+            if (id != null) {
+                withContext(Dispatchers.Main) {
+                    if (ascendingOrder) {
+                        goalsList.clear()
+                        goalsList.addAll(
+                            withContext(Dispatchers.IO) {
+                                dao.getGoalsNow(id)
+                            }
+                        )
+                    }
+                    else {
+                        goalsList.clear()
+                        goalsList.addAll(
+                            withContext(Dispatchers.IO) {
+                                dao.getGoalsNowDESC(id)
+                            }
+                        )
                     }
                 }
-                withContext(Dispatchers.Main){ appendedUnit?.invoke() }
             }
+            withContext(Dispatchers.Main){ appendedUnit?.invoke() }
+            loadGoalsListJob?.complete()
+            loadGoalsListJob = null
         }
     }
 
@@ -251,33 +259,37 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         folderNotAppSettings:Boolean,
                         folderTypeScriptsNotGoals:Boolean,
                         appendedUnit: (() -> Unit)? = null){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
-                val type =
-                    if (folderTypeScriptsNotGoals) Folder.FolderType.SCRIPTS else Folder.FolderType.GOALS
-                withContext(Dispatchers.Main) {
-                    if (ascendingOrder){
-                        foldersList.clear()
-                        foldersList.addAll(
-                            withContext(Dispatchers.IO) {
-                                val list = dao.getFoldersNow(id, type)
-                                list
-                            }
-                        )
-                    }
-                    else{
-                        foldersList.clear()
-                        foldersList.addAll(
-                            withContext(Dispatchers.IO) {
-                                val list = dao.getFoldersNowDESC(id, type)
-                                list
-                            }
-                        )
-                    }
+        loadFoldersListJob?.cancel()
+        loadFoldersListJob = Job()
+        CoroutineScope(Dispatchers.IO + loadFoldersListJob!!).launch {
+            val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
+            val type =
+                if (folderTypeScriptsNotGoals)
+                    Folder.FolderType.SCRIPTS
+                else Folder.FolderType.GOALS
+            withContext(Dispatchers.Main) {
+                if (ascendingOrder){
+                    foldersList.clear()
+                    foldersList.addAll(
+                        withContext(Dispatchers.IO) {
+                            val list = dao.getFoldersNow(id, type)
+                            list
+                        }
+                    )
                 }
-                withContext(Dispatchers.Main){ appendedUnit?.invoke() }
+                else{
+                    foldersList.clear()
+                    foldersList.addAll(
+                        withContext(Dispatchers.IO) {
+                            val list = dao.getFoldersNowDESC(id, type)
+                            list
+                        }
+                    )
+                }
+                appendedUnit?.invoke()
             }
+            loadFoldersListJob?.complete()
+            loadFoldersListJob = null
         }
     }
 
@@ -335,7 +347,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 }
                 folderOrder.value?.value?.let { loadContent(it) }
             }
-            else if(scriptsOrGoalsFolderType.value == Folder.FolderType.GOALS){ // Folder.FolderType.GOALS
+            else if(scriptsOrGoalsFolderType.value == Folder.FolderType.GOALS){
                 if (appSettings.value!!.showGoals.value)
                     folderOrder.update {
                         appSettings.value!!.scriptsOrder
@@ -491,10 +503,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         }
                     }
                 }
-                if (navArgs.scriptsOrGoalsFolderId != null) {
-                    navArgs.scriptsOrGoalsFolderType?.let { scriptsOrGoalsFolderType.value = it }
-                    loadFolder(navArgs.scriptsOrGoalsFolderId!!)
-                }
             }
 
             repositoryScope.launch {
@@ -510,12 +518,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
         var scriptsOrGoalsFolderType:Folder.FolderType? = null
     }
 
+    fun setFolderType(folderType:Folder.FolderType) {
+        scriptsOrGoalsFolderType.update { folderType }
+        loadAppSettings()
+    }
+
     fun loadEditFolder(id:Long?){
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 withContext(Dispatchers.Main) {
+                    newEditFolder.update { null }
                     editFolder.value = withContext(Dispatchers.IO) {
-                        if (id != -1L) dao.getFolderNow(id)
+                        if (id != INITIAL_FOLDER_ID) dao.getFolderNow(id)
                         else null
                     }
                 }
@@ -563,38 +577,36 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun setNewEditFolder(editFolder:Folder?){
+    suspend fun setNewEditFolder(editFolder:Folder?){
         if (newEditFolder.value!=null) return
-        repositoryScope.launch {
-            newEditFolder.value = withContext(Dispatchers.IO){
-                clearNewEditFolder(runAsync = false, resetEditFolder = false)
-                val newFolder = Folder(
-                    folderType = scriptsOrGoalsFolderType.value,
-                    folderParent = folder.value?.folderId?: INITIAL_FOLDER_ID
-                )
+        newEditFolder.value = withContext(Dispatchers.IO){
+            clearNewEditFolder(runAsync = false, resetEditFolder = false)
+            val newFolder = Folder(
+                folderType = scriptsOrGoalsFolderType.value,
+                folderParent = folder.value?.folderId?: INITIAL_FOLDER_ID
+            )
 
-                newFolder.folderId = dao.insert(newFolder)
+            newFolder.folderId = dao.insert(newFolder)
 
-                if (editFolder != null) {
-                    copyFolder(editFolder, newFolder)
+            if (editFolder != null) {
+                copyFolder(editFolder, newFolder)
+            } else {
+                if (folder.value == null) {
+                    // Update AppSettings Table
+                    newFolder.folderPosition = if (appSettings.value != null) dao.getFoldersNow(
+                        INITIAL_FOLDER_ID,
+                        scriptsOrGoalsFolderType.value
+                    ).size.toLong()
+                    else 0.toLong()
                 } else {
-                    if (folder.value == null) {
-                        // Update AppSettings Table
-                        newFolder.folderPosition = if (appSettings.value != null) dao.getFoldersNow(
-                            INITIAL_FOLDER_ID,
-                            scriptsOrGoalsFolderType.value
-                        ).size.toLong()
-                        else 0.toLong()
-                    } else {
-                        // Update Folders Table
-                        newFolder.folderPosition = dao.getFoldersNow(
-                            folder.value!!.folderId,
-                            folder.value!!.folderType
-                        ).size.toLong()
-                    }
+                    // Update Folders Table
+                    newFolder.folderPosition = dao.getFoldersNow(
+                        folder.value!!.folderId,
+                        folder.value!!.folderType
+                    ).size.toLong()
                 }
-                newFolder
             }
+            newFolder
         }
     }
 
@@ -608,59 +620,51 @@ class AccountableRepository(val application: Application): AutoCloseable {
         dao.update(to)
     }
 
-    fun setNewEditFolderImage(imageUri: Uri?=null){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO){
-                if (imageUri!=null) newEditFolder.value?.saveImage(application, imageUri)
-                dao.update(newEditFolder.value!!)
-            }
+    suspend fun setNewEditFolderImage(imageUri: Uri?=null){
+        withContext(Dispatchers.IO){
+            if (imageUri!=null) newEditFolder.value?.saveImage(application, imageUri)
+            dao.update(newEditFolder.value!!)
         }
     }
 
-    fun clearNewEditFolder(runAsync:Boolean = true, resetEditFolder:Boolean = true){
-        repositoryScope.launch {
-            val unit = suspend {
-                if (newEditFolder.value != null) {
-                    newEditFolder.value!!.imageResource.deleteFile(application)
-                    dao.delete(newEditFolder.value!!)
-                }
-                if (resetEditFolder) editFolder.value = null
-                null
+    suspend fun clearNewEditFolder(runAsync:Boolean = true, resetEditFolder:Boolean = true){
+        val unit = suspend {
+            if (newEditFolder.value != null) {
+                newEditFolder.value!!.imageResource.deleteFile(application)
+                dao.delete(newEditFolder.value!!)
             }
-            if (runAsync)  newEditFolder.value = withContext(Dispatchers.IO){
-                unit()
-            }
-            else{
-                newEditFolder.value = unit()
-            }
+            if (resetEditFolder) editFolder.value = null
+            null
+        }
+        if (runAsync)  newEditFolder.value = withContext(Dispatchers.IO){
+            unit()
+        }
+        else{
+            newEditFolder.value = unit()
         }
     }
 
-    fun saveNewEditFolderToNewFolder(){
-        repositoryScope.launch {
-            if (editFolder.value==null){
-                newEditFolder.value?.let { dao.update(it) }
-            }
-            else{
-                newEditFolder.value?.let {
-                    copyFolder(it, editFolder.value!!)
-                    it.deleteFile(application)
-                    dao.delete(it)
-                }
-            }
-            withContext(Dispatchers.Main) {
-                editFolder.value = null
-                newEditFolder.value = null
-            }
-            loadFolder()
+    suspend fun saveNewEditFolderToNewFolder(){
+        if (editFolder.value==null){
+            newEditFolder.value?.let { dao.update(it) }
         }
+        else{
+            newEditFolder.value?.let {
+                copyFolder(it, editFolder.value!!)
+                it.deleteFile(application)
+                dao.delete(it)
+            }
+        }
+        withContext(Dispatchers.Main) {
+            editFolder.value = null
+            newEditFolder.value = null
+        }
+        loadFolder()
     }
 
-    fun deleteNewEditFolderImage(){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                newEditFolder.value?.deleteFile(application)
-            }
+    suspend fun deleteNewEditFolderImage(){
+        withContext(Dispatchers.IO) {
+            newEditFolder.value?.deleteFile(application)
         }
     }
 
@@ -1241,65 +1245,59 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun getMarkupLanguages(){
-        repositoryScope.launch{
-            markupLanguagesList.clear()
-            markupLanguagesList.addAll( withContext(Dispatchers.IO){
-                val arrayList = dao.getMarkupLanguages().toMutableList()
-                if (script.value != null && script.value!!.scriptMarkupLanguage != null){
-                    var exist = false
-                    for (markupLanguage in arrayList) {
-                        if (markupLanguage.name.value == script.value!!.scriptMarkupLanguage){
-                            exist = true
-                            break
-                        }
-                    }
-                    if (!exist){
-                        script.value!!.scriptMarkupLanguage = null
-                        dao.update(script.value!!)
-                    }
-                }
-
+    suspend fun getMarkupLanguages(){
+        markupLanguagesList.clear()
+        markupLanguagesList.addAll( withContext(Dispatchers.IO){
+            val arrayList = dao.getMarkupLanguages().toMutableList()
+            if (script.value != null && script.value!!.scriptMarkupLanguage != null){
                 var exist = false
                 for (markupLanguage in arrayList) {
-                    if (markupLanguage.name.value == defaultMarkupLanguage.value.name.value){
+                    if (markupLanguage.name.value == script.value!!.scriptMarkupLanguage){
                         exist = true
                         break
                     }
                 }
-                if (!exist) arrayList.add(defaultMarkupLanguage.value)
-                arrayList
-            })
-        }
+                if (!exist){
+                    script.value!!.scriptMarkupLanguage = null
+                    dao.update(script.value!!)
+                }
+            }
+
+            var exist = false
+            for (markupLanguage in arrayList) {
+                if (markupLanguage.name.value == defaultMarkupLanguage.value.name.value){
+                    exist = true
+                    break
+                }
+            }
+            if (!exist) arrayList.add(defaultMarkupLanguage.value)
+            arrayList
+        })
     }
 
-    fun deleteMarkupLanguage(
+    suspend fun deleteMarkupLanguage(
         markupLanguage: MarkupLanguage,
         appendedUnit: (() -> Unit)? = null
     ) {
-        repositoryScope.launch{
-            withContext(Dispatchers.IO) {
-                dao.delete(markupLanguage)
-                withContext(Dispatchers.Main){
-                    appendedUnit?.invoke()
-                }
+        withContext(Dispatchers.IO) {
+            dao.delete(markupLanguage)
+            withContext(Dispatchers.Main){
+                appendedUnit?.invoke()
             }
         }
     }
 
-    fun saveMarkupLanguage(similarList: List<String>, appendedUnit: (() -> Unit)?){
-        repositoryScope.launch{
-            withContext(Dispatchers.IO) {
-                // skip the save if there are conflicting identifiers
-                var isValid = false
-                spansNotSimilarAndNameUnique(similarList) { isValidInput, _, _ ->
-                    isValid = isValidInput
-                }
-                if (isValid) {
-                    scriptMarkupLanguage.value?.let { dao.upsert(it) }
-                }
-                appendedUnit?.invoke()
+    suspend fun saveMarkupLanguage(similarList: List<String>, appendedUnit: (() -> Unit)?){
+        withContext(Dispatchers.IO) {
+            // skip the save if there are conflicting identifiers
+            var isValid = false
+            spansNotSimilarAndNameUnique(similarList) { isValidInput, _, _ ->
+                isValid = isValidInput
             }
+            if (isValid) {
+                scriptMarkupLanguage.value?.let { dao.upsert(it) }
+            }
+            appendedUnit?.invoke()
         }
     }
 
@@ -1323,7 +1321,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun deleteDefaultMarkupLanguage(appendedUnit: (() -> Unit)? = null){
+    suspend fun deleteDefaultMarkupLanguage(appendedUnit: (() -> Unit)? = null){
         deleteMarkupLanguage(defaultMarkupLanguage.value,appendedUnit)
     }
 
@@ -1364,44 +1362,42 @@ class AccountableRepository(val application: Application): AutoCloseable {
         markupLanguageSelectedIndex.value = selection
     }
 
-    fun loadTeleprompterSettingsList(){
-        repositoryScope.launch{
-            teleprompterSettingsList.clear()
-            teleprompterSettingsList.addAll(withContext(Dispatchers.IO){
-                val arrayList = ArrayList<TeleprompterSettings>(dao.getTeleprompterSettings())
-                if (script.value != null && script.value!!.scriptTeleprompterSettings == null){
-                    var exist = false
-                    for (teleprompterSetting in arrayList) {
-                        if (teleprompterSetting.id == script.value!!.scriptTeleprompterSettings){
-                            exist = true
-                            break
-                        }
-                    }
-                    if (!exist){
-                        script.value!!.scriptTeleprompterSettings = null
-                        dao.update(script.value!!)
-                    }
-                }
-
+    suspend fun loadTeleprompterSettingsList(){
+        teleprompterSettingsList.clear()
+        teleprompterSettingsList.addAll(withContext(Dispatchers.IO){
+            val arrayList = ArrayList<TeleprompterSettings>(dao.getTeleprompterSettings())
+            if (script.value != null && script.value!!.scriptTeleprompterSettings == null){
                 var exist = false
                 for (teleprompterSetting in arrayList) {
-                    if (teleprompterSetting.id == defaultTeleprompterSetting.value.id){
+                    if (teleprompterSetting.id == script.value!!.scriptTeleprompterSettings){
                         exist = true
                         break
                     }
                 }
-                if (!exist) arrayList.add(defaultTeleprompterSetting.value)
-                arrayList.toList()
-            })
-        }
+                if (!exist){
+                    script.value!!.scriptTeleprompterSettings = null
+                    dao.update(script.value!!)
+                }
+            }
+
+            var exist = false
+            for (teleprompterSetting in arrayList) {
+                if (teleprompterSetting.id == defaultTeleprompterSetting.value.id){
+                    exist = true
+                    break
+                }
+            }
+            if (!exist) arrayList.add(defaultTeleprompterSetting.value)
+            arrayList.toList()
+        })
     }
 
-    fun setRepositoryTeleprompterSetting(teleprompterSettings: TeleprompterSettings?){
+    suspend fun setRepositoryTeleprompterSetting(teleprompterSettings: TeleprompterSettings?){
         scriptTeleprompterSetting.value = teleprompterSettings
         loadTeleprompterSpecialCharacters(teleprompterSettings)
     }
 
-    fun resetDefaultTeleprompterSetting(appendedUnit: (() -> Unit)? = null){
+    suspend fun resetDefaultTeleprompterSetting(appendedUnit: (suspend () -> Unit)? = null){
         defaultTeleprompterSetting.value = TeleprompterSettings()
         teleprompterSettingsList.clear()
         teleprompterSettingsSelectedIndex.value = -1
@@ -1412,16 +1408,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
         teleprompterSettingsSelectedIndex.value = selection
     }
 
-    fun saveTeleprompterSettings(appendedUnit: ((settingsId:Long?) -> Unit)? = null){
-        repositoryScope.launch {
-            scriptTeleprompterSetting.value?.let { teleprompterSettings ->
-                val newId = dao.upsert(teleprompterSettings)
-                teleprompterSettings.id = newId
-                saveSpecialCharactersToDatabase(newId)
-                appendedUnit?.invoke(newId)
-            }?:run {
-                appendedUnit?.invoke(null)
-            }
+    suspend fun saveTeleprompterSettings(appendedUnit: (suspend (settingsId:Long?) -> Unit)? = null){
+        scriptTeleprompterSetting.value?.let { teleprompterSettings ->
+            val newId = dao.upsert(teleprompterSettings)
+            teleprompterSettings.id = newId
+            saveSpecialCharactersToDatabase(newId)
+            appendedUnit?.invoke(newId)
+        }?:run {
+            appendedUnit?.invoke(null)
         }
     }
 
@@ -1434,56 +1428,50 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun setTeleprompterSettingToScript(set:Boolean, appendedUnit: (suspend () -> Unit)? = null){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                script.value?.let { script ->
-                    if (set) {
-                        scriptTeleprompterSetting.value?.id.let {
-                            script.scriptTeleprompterSettings = it
-                            dao.update(script)
-                        }
-                    }
-                    else{
-                        scriptTeleprompterSetting.value = null
-                        script.scriptTeleprompterSettings = null
-                        dao.update(script)
-                    }
+    suspend fun setTeleprompterSettingToScript(set:Boolean, appendedUnit: (suspend () -> Unit)? = null){
+        script.value?.let { script ->
+            if (set) {
+                scriptTeleprompterSetting.value?.id.let {
+                    script.scriptTeleprompterSettings = it
+                    dao.update(script)
                 }
-                appendedUnit?.invoke()
+            }
+            else{
+                scriptTeleprompterSetting.value = null
+                script.scriptTeleprompterSettings = null
+                dao.update(script)
             }
         }
+        appendedUnit?.invoke()
     }
 
-    fun deleteTeleprompterSetting(
+    suspend fun deleteTeleprompterSetting(
         teleprompterSettings: TeleprompterSettings,
         deleteSpecialCharacters: Boolean = true,
-        operationsAfterDelete:()->Unit
+        operationsAfterDelete: suspend ()->Unit
     ){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO){
-                if (deleteSpecialCharacters) dao.deleteSpecialCharacters(teleprompterSettings.id)
-                dao.delete(teleprompterSettings)
+        withContext(Dispatchers.IO) {
+            if (deleteSpecialCharacters) dao.deleteSpecialCharacters(
+                teleprompterSettings.id
+            )
+            dao.delete(teleprompterSettings)
+        }
 
-                withContext(Dispatchers.Main) {
-                    operationsAfterDelete()
-                }
-            }
+        withContext(Dispatchers.Main) {
+            operationsAfterDelete()
         }
     }
 
-    fun loadTeleprompterSpecialCharacters(teleprompterSettings: TeleprompterSettings?){
+    suspend fun loadTeleprompterSpecialCharacters(teleprompterSettings: TeleprompterSettings?){
         teleprompterSettings?.let { teleprompterSettings ->
-            repositoryScope.launch {
-                teleprompterSettings.specialCharactersList.clear()
-                teleprompterSettings.specialCharactersList.addAll(
-                    withContext(Dispatchers.IO) {
-                        dao.getScriptSpecialCharacters(
-                            teleprompterSettings.id
-                        )
-                    }
-                )
-            }
+            teleprompterSettings.specialCharactersList.clear()
+            teleprompterSettings.specialCharactersList.addAll(
+                withContext(Dispatchers.IO) {
+                    dao.getScriptSpecialCharacters(
+                        teleprompterSettings.id
+                    )
+                }
+            )
         }
     }
 
@@ -1761,7 +1749,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                                 newGoal.numAudios.value = editGoal.numAudios.value
                                 newGoal.numDocuments.value = editGoal.numDocuments.value
                                 newGoal.numScripts.value = editGoal.numScripts.value
-                                newGoal.goal.value = editGoal.goal.value
+                                newGoal.goal.setTextAndPlaceCursorAtEnd(editGoal.goal.text.toString())
                                 newGoal.dateOfCompletion = editGoal.dateOfCompletion?.let{ AppResources.CalendarResource(it.getCalendar()) }
                                 newGoal.status.value = editGoal.status.value
                                 newGoal.colour.value = editGoal.colour.value
@@ -1793,11 +1781,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         // Make New Goal
                         withContext(Dispatchers.Main) {
                             editGoal.value = null
-                            newGoal.value = withContext(Dispatchers.IO) {
+                            newGoal.update { withContext(Dispatchers.IO) {
                                 val tempGoal = Goal()
                                 tempGoal.id = dao.insert(tempGoal)
                                 tempGoal
-                            }
+                            }}
                         }
                     }
             }
@@ -1807,12 +1795,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun setNewGoalImage(imageUri: Uri?=null){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO){
-                if (imageUri!=null) newGoal.value?.saveImage(application, imageUri)
-                newGoal.value?.let { dao.update(it) }
+    suspend fun setNewGoalImage(imageUri: Uri?=null){
+        withContext(Dispatchers.IO){
+            if (newGoal.value?.id == null) newGoal.value?.let {
+                it.id = dao.insert(it)
             }
+            if (imageUri!=null) newGoal.value?.saveImage(application, imageUri)
+            newGoal.value?.let { dao.update(it) }
         }
     }
 
@@ -1824,109 +1813,104 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun addNewGoalTimeBlock(){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO){
-                newGoal.value?.id?.let {
-                    val newTime = GoalTaskDeliverableTime()
-                    newTime.goal.value = it
-                    newTime.id = dao.insert(newTime)
-                    withContext(Dispatchers.Main) {
-                        newGoal.value?.times?.add(newTime)
-                    }
-                }
+    suspend fun addNewGoalTimeBlock(){
+        withContext(Dispatchers.IO){
+            if (newGoal.value?.id == null) newGoal.value?.let {
+                it.id = dao.insert(it)
             }
-        }
-    }
-
-    fun deleteNewGoalTimeBlock(timeBlock: GoalTaskDeliverableTime) {
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                dao.delete(timeBlock)
+            newGoal.value?.id?.let {
+                val newTime = GoalTaskDeliverableTime()
+                newTime.goal.value = it
+                newTime.id = dao.insert(newTime)
                 withContext(Dispatchers.Main) {
-                    newGoal.value?.times?.remove(timeBlock)
+                    newGoal.value?.times?.add(newTime)
                 }
             }
         }
     }
 
-    fun saveNewGoal(process:()->Unit){
-        repositoryScope.launch {
-            if (editGoal.value == null) {
-                editGoal.value = Goal()
-                editGoal.value!!.id = dao.insert(editGoal.value!!)
+    suspend fun deleteNewGoalTimeBlock(timeBlock: GoalTaskDeliverableTime) {
+        withContext(Dispatchers.IO) {
+            dao.delete(timeBlock)
+            withContext(Dispatchers.Main) {
+                newGoal.value?.times?.remove(timeBlock)
             }
-            editGoal.value?.let { editGoal ->
-                newGoal.value?.let { newGoal ->
-                    editGoal.goalCategory.value = newGoal.goalCategory.value
-                    editGoal.initialDateTime =
-                        AppResources.CalendarResource(newGoal.initialDateTime.getCalendar())
-                    editGoal.position.value = newGoal.position.value
-                    editGoal.scrollPosition.scrollTo(newGoal.scrollPosition.value)
-                    editGoal.size.value = newGoal.size.value
-                    editGoal.numImages.value = newGoal.numImages.value
-                    editGoal.numVideos.value = newGoal.numVideos.value
-                    editGoal.numAudios.value = newGoal.numAudios.value
-                    editGoal.numDocuments.value = newGoal.numDocuments.value
-                    editGoal.numScripts.value = newGoal.numScripts.value
-                    editGoal.goal.value = newGoal.goal.value
-                    editGoal.dateOfCompletion =
-                        newGoal.dateOfCompletion?.let{ AppResources.CalendarResource(it.getCalendar()) }
-                    editGoal.status.value = newGoal.status.value
-                    editGoal.colour.value = newGoal.colour.value
-                    editGoal.location.setTextAndPlaceCursorAtEnd(newGoal.location.text.toString())
+        }
+    }
 
-                    editGoal.saveImage(
-                        application,
-                        newGoal.imageResource.getUriFromStorage(application)
-                    )
-                    for (time in editGoal.times) {
-                        dao.delete(time)
-                    }
-                    editGoal.times.clear()
-                    for (time in newGoal.times) {
-                        editGoal.id?.let { id ->
-                            val newTime = GoalTaskDeliverableTime()
+    suspend fun saveNewGoal(process:suspend ()->Unit){
+        if (editGoal.value == null) {
+            editGoal.value = Goal()
+        }
+        if (editGoal.value!!.id == null){
+            editGoal.value!!.id = dao.insert(editGoal.value!!)
+        }
+        editGoal.value?.let { editGoal ->
+            newGoal.value?.let { newGoal ->
+                editGoal.goalCategory.value = newGoal.goalCategory.value
+                editGoal.initialDateTime =
+                    AppResources.CalendarResource(newGoal.initialDateTime.getCalendar())
+                editGoal.position.value = newGoal.position.value
+                editGoal.scrollPosition.scrollTo(newGoal.scrollPosition.value)
+                editGoal.size.value = newGoal.size.value
+                editGoal.numImages.value = newGoal.numImages.value
+                editGoal.numVideos.value = newGoal.numVideos.value
+                editGoal.numAudios.value = newGoal.numAudios.value
+                editGoal.numDocuments.value = newGoal.numDocuments.value
+                editGoal.numScripts.value = newGoal.numScripts.value
+                editGoal.goal.setTextAndPlaceCursorAtEnd(newGoal.goal.text.toString())
+                editGoal.dateOfCompletion =
+                    newGoal.dateOfCompletion?.let{ AppResources.CalendarResource(it.getCalendar()) }
+                editGoal.status.value = newGoal.status.value
+                editGoal.colour.value = newGoal.colour.value
+                editGoal.location.setTextAndPlaceCursorAtEnd(newGoal.location.text.toString())
 
-                            newTime.goal.value = id
-                            newTime.task.value = time.task.value
-                            newTime.deliverable.value = time.deliverable.value
-                            newTime.timeBlockType.value = time.timeBlockType.value
-                            newTime.start.value = time.start.value
-                            newTime.duration.value = time.duration.value
-                            newTime.id = dao.insert(newTime)
-                            editGoal.times.add(newTime)
-                        }
-                    }
-                    dao.update(editGoal)
+                editGoal.saveImage(
+                    application,
+                    newGoal.imageResource.getUriFromStorage(application)
+                )
+                for (time in editGoal.times) {
+                    dao.delete(time)
+                }
+                editGoal.times.clear()
+                for (time in newGoal.times) {
+                    editGoal.id?.let { id ->
+                        val newTime = GoalTaskDeliverableTime()
 
-                    withContext(Dispatchers.Main){
-                        process()
+                        newTime.goal.value = id
+                        newTime.task.value = time.task.value
+                        newTime.deliverable.value = time.deliverable.value
+                        newTime.timeBlockType.value = time.timeBlockType.value
+                        newTime.start.value = time.start.value
+                        newTime.duration.value = time.duration.value
+                        newTime.id = dao.insert(newTime)
+                        editGoal.times.add(newTime)
                     }
+                }
+                dao.update(editGoal)
+
+                withContext(Dispatchers.Main){
+                    process()
                 }
             }
         }
     }
 
-    fun clearNewGoal(){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO){
-                newGoal.value?.let {
-                    it.deleteFile(application)
-                    for (time in it.times) dao.delete(time)
-                    dao.delete(it)
-                    newGoal.value = null
-                }
-                editGoal.value = null
+    suspend fun clearNewGoal(){
+        withContext(Dispatchers.IO){
+            newGoal.value?.let {
+                it.deleteFile(application)
+                for (time in it.times) dao.delete(time)
+                dao.delete(it)
+                newGoal.value = null
             }
+            editGoal.value = null
         }
     }
 
-    fun goBackToGoalsFromEditGoal(){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                changeFragment(AccountableFragment.GoalsFragment)
-            }
+    suspend fun goBackToGoalsFromEditGoal(){
+        withContext(Dispatchers.IO) {
+            changeFragment(AccountableFragment.GoalsFragment)
         }
     }
 }

@@ -11,7 +11,6 @@ import com.thando.accountable.fragments.AppSettingsView
 import com.thando.accountable.fragments.BooksView
 import com.thando.accountable.fragments.EditFolderView
 import com.thando.accountable.fragments.EditGoalView
-import com.thando.accountable.fragments.GoalsView
 import com.thando.accountable.fragments.HelpView
 import com.thando.accountable.fragments.HomeView
 import com.thando.accountable.fragments.MarkupLanguageView
@@ -24,7 +23,6 @@ import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.fragments.viewmodels.BooksViewModel.Companion.INITIAL_FOLDER_ID
 import com.thando.accountable.fragments.viewmodels.EditFolderViewModel
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
-import com.thando.accountable.fragments.viewmodels.GoalsViewModel
 import com.thando.accountable.fragments.viewmodels.HelpViewModel
 import com.thando.accountable.fragments.viewmodels.HomeViewModel
 import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel
@@ -87,22 +85,6 @@ class AccountableNavigationController {
             else -> false
         }
 
-        fun getFragmentFromName(fragment: String) = when(fragment) {
-            AccountableFragment.HomeFragment.name -> AccountableFragment.HomeFragment
-            AccountableFragment.GoalsFragment.name -> AccountableFragment.GoalsFragment
-            AccountableFragment.BooksFragment.name -> AccountableFragment.BooksFragment
-            AccountableFragment.AppSettingsFragment.name -> AccountableFragment.AppSettingsFragment
-            AccountableFragment.HelpFragment.name -> AccountableFragment.HelpFragment
-            AccountableFragment.EditFolderFragment.name -> AccountableFragment.EditFolderFragment
-            AccountableFragment.EditGoalFragment.name -> AccountableFragment.EditGoalFragment
-            AccountableFragment.TaskFragment.name -> AccountableFragment.TaskFragment
-            AccountableFragment.MarkupLanguageFragment.name -> AccountableFragment.MarkupLanguageFragment
-            AccountableFragment.ScriptFragment.name -> AccountableFragment.ScriptFragment
-            AccountableFragment.TeleprompterFragment.name -> AccountableFragment.TeleprompterFragment
-            AccountableFragment.SearchFragment.name -> AccountableFragment.SearchFragment
-            else -> AccountableFragment.HomeFragment
-        }
-
         fun getFragmentFromId(fragment: Int) = when(fragment) {
             HOME_FRAGMENT_ID -> AccountableFragment.HomeFragment
             GOAL_FRAGMENT_ID -> AccountableFragment.GoalsFragment
@@ -143,6 +125,7 @@ class AccountableNavigationController {
                         navArgs.scriptsOrGoalsFolderId = INITIAL_FOLDER_ID
                         navArgs.scriptsOrGoalsFolderType = Folder.FolderType.GOALS
                         navArgs.isValidDir = true
+                        navArgs.isDrawerFragment = false
                     }
                 }
                 AccountableFragment.AppSettingsFragment -> {}
@@ -217,7 +200,7 @@ class AccountableNavigationController {
     }
 
     @Composable
-    fun getAccountableActivity(
+    fun GetAccountableActivity(
         navController: NavHostController,
         startFragment: String,
         mainActivityViewModel: MainActivityViewModel,
@@ -233,11 +216,13 @@ class AccountableNavigationController {
                 HomeView( viewModel, mainActivityViewModel)
             }
             composable(AccountableFragment.GoalsFragment.name) {
-                val viewModel = viewModel<GoalsViewModel>(factory = GoalsViewModel.Factory)
-                GoalsView( viewModel, mainActivityViewModel)
+                val viewModel = viewModel<BooksViewModel>(factory = BooksViewModel.Factory)
+                viewModel.setFolderType(Folder.FolderType.GOALS)
+                BooksView( viewModel, mainActivityViewModel)
             }
             composable(AccountableFragment.BooksFragment.name) {
                 val viewModel = viewModel<BooksViewModel>(factory = BooksViewModel.Factory)
+                viewModel.setFolderType(Folder.FolderType.SCRIPTS)
                 BooksView( viewModel, mainActivityViewModel)
             }
             composable(AccountableFragment.AppSettingsFragment.name) {

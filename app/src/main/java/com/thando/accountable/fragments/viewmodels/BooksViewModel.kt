@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AccountableRepository
+import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.Folder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -42,6 +43,10 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         val onEditClickListener: (() -> Unit)?,
         val onDeleteClickListener: () -> Unit
     )
+
+    fun setFolderType(inputFolderType: Folder.FolderType){
+        repository.setFolderType(inputFolderType)
+    }
 
     fun getScriptContentPreview(scriptId: Long): AccountableRepository.ContentPreview{
         return repository.ContentPreview(scriptId)
@@ -202,6 +207,12 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         updateFolderShowScripts()
         updateFolderScrollPosition()
         appendedUnit()
+    }
+
+    fun navigateToHome(){
+        repository.changeFragment(
+            AccountableNavigationController.AccountableFragment.HomeFragment
+        )
     }
 
     companion object {

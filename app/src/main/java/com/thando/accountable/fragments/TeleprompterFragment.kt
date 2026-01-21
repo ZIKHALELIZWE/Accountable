@@ -46,6 +46,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -72,7 +73,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.material.snackbar.Snackbar
-import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.MarkupLanguage
@@ -84,7 +84,6 @@ import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -95,22 +94,21 @@ fun TeleprompterView(
 ) {
     val scriptViewModel = viewModel<ScriptViewModel>(factory = ScriptViewModel.Factory)
     val activity = LocalActivity.current
+    val coroutineScope = rememberCoroutineScope()
 
     DisposableEffect(Unit) {
         onDispose {
             activity?.let { showBars(it) }
-            viewModel.prepareToClose()
+            coroutineScope.launch {
+                viewModel.prepareToClose()
+            }
         }
     }
 
     val navigateToScript by viewModel.navigateToScript.collectAsStateWithLifecycle(false)
     LaunchedEffect(navigateToScript) {
         if (navigateToScript) {
-            viewModel.viewModelScope.launch {
-                withContext(Dispatchers.IO) {
-                    viewModel.closeTeleprompterFragment()
-                }
-            }
+            viewModel.closeTeleprompterFragment()
         }
     }
 
@@ -208,7 +206,8 @@ fun TeleprompterFragmentView(
                 viewModel.setTeleprompterSettingsFunctions(
                     teleprompterSettings!!,
                     context,
-                    height
+                    height,
+                    coroutineScope
                 )
             }
         }
@@ -546,9 +545,6 @@ fun ControlsSection(
     val resources = LocalResources.current
     val height = (LocalResources.current.displayMetrics.heightPixels*2)/5
     val scope = rememberCoroutineScope()
-    val specialCharactersList = teleprompterSettings?.specialCharactersList?.let {
-        remember { it }
-    }?: remember { mutableStateListOf() }
     LazyColumn(modifier = modifier
         .padding(16.dp)
         .height((height / LocalResources.current.displayMetrics.density).dp),
@@ -599,7 +595,7 @@ fun ControlsSection(
                 setSpinnerView(LocalView.current)
                 val fillMaxWidth = Modifier.fillMaxWidth()
                 TextField(
-                    value = if (selectedOptionName == TeleprompterSettings().name.value)
+                    value = if (selectedOptionName == TeleprompterSettings().name.collectAsState().value)
                         stringResource(
                             R.string.change_name_to_save,
                             selectedOptionName
@@ -631,10 +627,10 @@ fun ControlsSection(
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.primary,
                         unfocusedContainerColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = if (selectedOptionName == TeleprompterSettings().name.value)
+                        focusedTextColor = if (selectedOptionName == TeleprompterSettings().name.collectAsState().value)
                             Color.Red
                         else MaterialTheme.colorScheme.onPrimary,
-                        unfocusedTextColor = if (selectedOptionName == TeleprompterSettings().name.value)
+                        unfocusedTextColor = if (selectedOptionName == TeleprompterSettings().name.collectAsState().value)
                             Color.Red
                         else MaterialTheme.colorScheme.onPrimary,
                         focusedIndicatorColor = MaterialTheme.colorScheme.surface,
@@ -656,21 +652,23 @@ fun ControlsSection(
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        text = if (selectionOptionName == TeleprompterSettings().name.value)
+                                        text = if (selectionOptionName == TeleprompterSettings().name.collectAsState().value)
                                             stringResource(
                                                 R.string.change_name_to_save,
                                                 selectionOptionName
                                             )
                                         else selectionOptionName,
-                                        color = if (selectionOptionName == TeleprompterSettings().name.value)
+                                        color = if (selectionOptionName == TeleprompterSettings().name.collectAsState().value)
                                                 Color.Red
                                             else MaterialTheme.colorScheme.onPrimary
                                     )
                                 },
                                 onClick = {
-                                    viewModel.setSelectedIndex(
-                                        teleprompterSettingsList.indexOf(selectionOption)
-                                    )
+                                    scope.launch {
+                                        viewModel.setSelectedIndex(
+                                            teleprompterSettingsList.indexOf(selectionOption)
+                                        )
+                                    }
                                     onSpinnerExpandedChanged(false)
                                 }
                             )
@@ -731,120 +729,125 @@ fun ControlsSection(
             Spacer(modifier = Modifier.height(16.dp))
         }
         item {
-            val scrollSpeed by (teleprompterSettings?.scrollSpeed?: MutableStateFlow(4))
-                .collectAsStateWithLifecycle()
-            Text(stringResource(R.string.scroll_speed, scrollSpeed))
+            teleprompterSettings?.scrollSpeed?.let { mutableScrollSpeed ->
+                val scrollSpeed by mutableScrollSpeed.collectAsStateWithLifecycle()
+                Text(stringResource(R.string.scroll_speed, scrollSpeed))
+            }
         }
         item {
-            val scrollSpeed by (teleprompterSettings?.scrollSpeed?: MutableStateFlow(4))
-                .collectAsStateWithLifecycle()
-            Slider(
-                value = scrollSpeed.toFloat(),
-                onValueChange = { teleprompterSettings?.scrollSpeed?.update { it } },
-                valueRange = 1f..60f
-            )
-        }
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-        item {
-            val skipSize by (
-                teleprompterSettings?.skipSize?:MutableStateFlow(0)
-                    ).collectAsStateWithLifecycle()
-            Text(stringResource(R.string.skip_size, skipSize))
-        }
-        item {
-            val skipSize by (
-                teleprompterSettings?.skipSize?:MutableStateFlow(0)
-                    ).collectAsStateWithLifecycle()
-            Slider(
-                value = skipSize.toFloat(),
-                onValueChange = { teleprompterSettings?.skipSize?.update { it } },
-                valueRange = 100f..3000f
-            )
+            teleprompterSettings?.scrollSpeed?.let { mutableScrollSpeed ->
+                val scrollSpeed by mutableScrollSpeed.collectAsStateWithLifecycle()
+                Slider(
+                    value = scrollSpeed.toFloat(),
+                    onValueChange = { scope.launch { mutableScrollSpeed.emit(it.toInt()) } },
+                    valueRange = 1f..60f
+                )
+            }
         }
         item {
             Spacer(modifier = Modifier.height(16.dp))
         }
         item {
-            val textSize by (
-                teleprompterSettings?.textSize?:MutableStateFlow(24)
-                    ).collectAsStateWithLifecycle()
-            Text(stringResource(R.string.text_size, textSize))
+            teleprompterSettings?.skipSize?.let { mutableSkipSize ->
+                val skipSize by mutableSkipSize.collectAsStateWithLifecycle()
+                Text(stringResource(R.string.skip_size, skipSize))
+            }
         }
         item {
-            val textSize by (
-                teleprompterSettings?.textSize?:MutableStateFlow(24)
-                    ).collectAsStateWithLifecycle()
-            Slider(
-                value = textSize.toFloat(),
-                onValueChange = { teleprompterSettings?.textSize?.update { it } },
-                valueRange = 12f..70f
-            )
-        }
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-        item {
-            val startCountDown by (
-                        teleprompterSettings?.startCountDown?:MutableStateFlow(0)
-                    ).collectAsStateWithLifecycle()
-            Text(stringResource(R.string.start_count_down, startCountDown))
-        }
-        item {
-            val startCountDown by (
-                teleprompterSettings?.startCountDown?:MutableStateFlow(0)
-                    ).collectAsStateWithLifecycle()
-            Slider(
-                value = startCountDown.toFloat(),
-                onValueChange = { teleprompterSettings?.startCountDown?.update { it } },
-                valueRange = 0f..10f
-            )
+            teleprompterSettings?.skipSize?.let { mutableSkipSize ->
+                val skipSize by mutableSkipSize.collectAsStateWithLifecycle()
+                Slider(
+                    value = skipSize.toFloat(),
+                    onValueChange = { scope.launch { mutableSkipSize.emit( it.toInt()) }},
+                    valueRange = 100f..3000f
+                )
+            }
         }
         item {
             Spacer(modifier = Modifier.height(16.dp))
         }
         item {
-            val scrollCountDown by (
-                teleprompterSettings?.scrollCountDown?:MutableStateFlow(0)
-                    ).collectAsStateWithLifecycle()
-            Text(stringResource(R.string.scroll_count_down, scrollCountDown))
+            teleprompterSettings?.textSize?.let { mutableTextSize ->
+                val textSize by mutableTextSize.collectAsStateWithLifecycle()
+                Text(stringResource(R.string.text_size, textSize))
+            }
         }
         item {
-            val scrollCountDown by (
-                    teleprompterSettings?.scrollCountDown?:MutableStateFlow(0)
-                ).collectAsStateWithLifecycle()
-            val range: ClosedFloatingPointRange<Float> = 0f..10f
-            Slider(
-                value = scrollCountDown.toFloat(),
-                onValueChange = { teleprompterSettings?.scrollCountDown?.update { it } },
-                valueRange = range
-            )
+            teleprompterSettings?.textSize?.let { mutableTextSize ->
+                val textSize by mutableTextSize.collectAsStateWithLifecycle()
+                Slider(
+                    value = textSize.toFloat(),
+                    onValueChange = { scope.launch { mutableTextSize.emit( it.toInt()) } },
+                    valueRange = 12f..70f
+                )
+            }
         }
         item {
             Spacer(modifier = Modifier.height(16.dp))
         }
         item {
-            val textColor by (teleprompterSettings?.textColour?:MutableStateFlow(android.graphics.Color.BLACK)).collectAsStateWithLifecycle()
-            Button(
-                onClick = { viewModel.chooseTextColour(context) },
-                shape = RectangleShape, modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Change Text Color (Current: $textColor)")
+            teleprompterSettings?.startCountDown?.let { mutableStartCountDown ->
+                val startCountDown by mutableStartCountDown.collectAsStateWithLifecycle()
+                Text(stringResource(R.string.start_count_down, startCountDown))
+            }
+        }
+        item {
+            teleprompterSettings?.startCountDown?.let { mutableStartCountDown ->
+                val startCountDown by mutableStartCountDown.collectAsStateWithLifecycle()
+                Slider(
+                    value = startCountDown.toFloat(),
+                    onValueChange = { scope.launch { mutableStartCountDown.emit(it.toInt()) } },
+                    valueRange = 0f..10f
+                )
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            teleprompterSettings?.scrollCountDown?.let { mutableScrollCountDown ->
+                val scrollCountDown by mutableScrollCountDown.collectAsStateWithLifecycle()
+                Text(stringResource(R.string.scroll_count_down, scrollCountDown))
+            }
+        }
+        item {
+            teleprompterSettings?.scrollCountDown?.let { mutableScrollCountDown ->
+                val scrollCountDown by mutableScrollCountDown.collectAsStateWithLifecycle()
+                val range: ClosedFloatingPointRange<Float> = 0f..10f
+                Slider(
+                    value = scrollCountDown.toFloat(),
+                    onValueChange = { scope.launch { mutableScrollCountDown.emit(it.toInt()) } },
+                    valueRange = range
+                )
+            }
+        }
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+        item {
+            teleprompterSettings?.textColour?.let { mutableTextColour ->
+                val textColor by mutableTextColour.collectAsStateWithLifecycle()
+                Button(
+                    onClick = { viewModel.chooseTextColour(context) },
+                    shape = RectangleShape, modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Change Text Color (Current: $textColor)")
+                }
             }
         }
         item {
             Spacer(modifier = Modifier.height(8.dp))
         }
         item {
-            val backgroundColour by (teleprompterSettings?.backgroundColour?:MutableStateFlow(
-                android.graphics.Color.WHITE)).collectAsStateWithLifecycle()
+            teleprompterSettings?.backgroundColour?.let { mutableBackgroundColour ->
+            val backgroundColour by mutableBackgroundColour.collectAsStateWithLifecycle()
             Button(
                 onClick = { viewModel.chooseBackgroundColour(context) },
                 shape = RectangleShape, modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Change Background Color (Current: $backgroundColour)")
             }
+                }
         }
         item {
             Spacer(modifier = Modifier.height(16.dp))

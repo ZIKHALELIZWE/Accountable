@@ -131,7 +131,7 @@ class MarkupLanguageViewModel(
                     withContext(Dispatchers.IO) {
                         repository.setMarkupLanguageToScript(false){
                             repository.deleteMarkupLanguage(markupLanguage){
-                                loadMarkupLanguage()
+                                viewModelScope.launch { loadMarkupLanguage() }
                             }
                         }
                     }
@@ -140,7 +140,7 @@ class MarkupLanguageViewModel(
         }
     }
 
-    fun loadMarkupLanguage() {
+    suspend fun loadMarkupLanguage() {
         repository.getMarkupLanguages()
     }
 

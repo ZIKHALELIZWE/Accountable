@@ -1,7 +1,6 @@
 package com.thando.accountable.fragments
 
 import android.net.Uri
-import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
@@ -35,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
@@ -88,16 +88,17 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AccountableRepository
 import com.thando.accountable.AppResources
 import com.thando.accountable.IntentActivity
+import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Folder
@@ -127,33 +128,51 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
 
     val coroutineScope = rememberCoroutineScope()
     var navigationIcon by remember { mutableStateOf<(@Composable (Modifier) -> Unit)?>(null) }
+    val folder by viewModel.folder.collectAsStateWithLifecycle()
     if (viewModel.intentString == null) {
         //WindowCompat.setDecorFitsSystemWindows(mainActivity.window, false)
-        navigationIcon = {
-            IconButton(
-                modifier = Modifier,
-                onClick = { coroutineScope.launch { mainActivityViewModel.toggleDrawer() } })
+        navigationIcon = if (viewModel.folderIsScripts()) {
             {
-                Icon(
-                    imageVector = Icons.Filled.Menu,
-                    contentDescription = stringResource(R.string.navigation_drawer_button),
-                    tint = Color.White
-                )
+                IconButton(
+                    modifier = Modifier,
+                    onClick = { coroutineScope.launch { mainActivityViewModel.toggleDrawer() } })
+                {
+                    Icon(
+                        imageVector = Icons.Filled.Menu,
+                        contentDescription = stringResource(R.string.navigation_drawer_button),
+                        tint = Color.White
+                    )
+                }
             }
         }
-    } else {
-        val activity = LocalActivity.current
-        coroutineScope.launch { mainActivityViewModel.disableDrawer() }
-        activity?.let { activity ->
-            val intentActivity by remember { mutableStateOf(activity as IntentActivity) }
-            //WindowCompat.setDecorFitsSystemWindows(intentActivity.window, false)
+        else {
+            {
+                IconButton(
+                    modifier = Modifier,
+                    onClick = {
+                        if (folder!=null) viewModel.onBackPressed()
+                        else viewModel.navigateToHome()
+                    })
+                {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.navigate_back_to_home_fragment),
+                        tint = Color.White
+                    )
+                }
+            }
         }
+
+        if (viewModel.folderIsScripts())
+            mainActivityViewModel.enableDrawer()
+        else mainActivityViewModel.disableDrawer()
+    } else {
+        mainActivityViewModel.disableDrawer()
     }
 
     val booksString = stringResource(R.string.books)
     val goalsString = stringResource(R.string.goals)
     AccountableTheme {
-        val folder by viewModel.folder.collectAsStateWithLifecycle()
         val folderName = folder?.folderName?.let { remember { it } }
             ?: remember {
                 TextFieldState(
@@ -162,8 +181,8 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
                 )
             }
 
-        BackHandler(folder!=null) {
-            viewModel.onBackPressed()
+        BackHandler(folder!=null || !viewModel.folderIsScripts()) {
+            if (!viewModel.onBackPressed()) viewModel.navigateToHome()
         }
 
         val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -215,7 +234,10 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = stringResource(R.string.add_folder)
+                            contentDescription = stringResource(if(showScripts){
+                                if (viewModel.folderIsScripts()) R.string.add_script
+                                else R.string.add_goal
+                            } else R.string.add_folder)
                         )
                     }
                 }
@@ -256,15 +278,17 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
                             scrolledContainerColor = Color.Transparent
                         ),
                         actions = {
-                            IconButton(
-                                modifier = Modifier,
-                                onClick = { coroutineScope.launch { viewModel.search() } })
-                            {
-                                Icon(
-                                    imageVector = Icons.Filled.Search,
-                                    contentDescription = stringResource(R.string.search),
-                                    tint = Color.White
-                                )
+                            if (viewModel.folderIsScripts()){
+                                IconButton(
+                                    modifier = Modifier,
+                                    onClick = { coroutineScope.launch { viewModel.search() } })
+                                {
+                                    Icon(
+                                        imageVector = Icons.Filled.Search,
+                                        contentDescription = stringResource(R.string.search),
+                                        tint = Color.White
+                                    )
+                                }
                             }
                             IconButton(
                                 modifier = Modifier,
@@ -285,7 +309,11 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
                                 onClick = { viewModel.switchFolderScript() })
                             {
                                 Icon(
-                                    imageVector = if (showScripts) Icons.AutoMirrored.Filled.LibraryBooks
+                                    imageVector = if (showScripts) {
+                                        if (viewModel.folderIsScripts())
+                                            Icons.AutoMirrored.Filled.LibraryBooks
+                                        else ImageVector.vectorResource(R.drawable.ic_stars_black_24dp)
+                                    }
                                     else Icons.Default.Folder,
                                     contentDescription = stringResource(R.string.switch_between_folder_and_script_button),
                                     tint = Color.White
@@ -346,7 +374,7 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
                     contentPadding = PaddingValues(0.dp),
                     modifier = modifier.fillMaxSize()
                 ) {
-                    items(items = foldersList, key = { it.folderId ?: Random.nextLong() }) { folder ->
+                    items(items = foldersList) { folder ->
                         FolderCard(
                             folder = folder,
                             modifier = Modifier

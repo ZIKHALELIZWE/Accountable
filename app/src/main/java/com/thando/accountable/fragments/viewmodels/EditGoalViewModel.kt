@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableRepository
+import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.ui.cards.Colour
 
@@ -16,7 +17,7 @@ class EditGoalViewModel(
 
     val newGoal = repository.getNewGoal()
 
-    fun setImage(uri:Uri?){
+    suspend fun setImage(uri:Uri?){
         uri?.let {
             repository.setNewGoalImage(uri)
         }
@@ -32,20 +33,20 @@ class EditGoalViewModel(
         }
     }
 
-    fun addTimeBlock(){
+    suspend fun addTimeBlock(){
         repository.addNewGoalTimeBlock()
     }
 
-    fun deleteTimeBlock(timeBlock: GoalTaskDeliverableTime){
+    suspend fun deleteTimeBlock(timeBlock: GoalTaskDeliverableTime){
         repository.deleteNewGoalTimeBlock(timeBlock)
     }
 
-    fun closeGoal(){
+    suspend fun closeGoal(){
         repository.clearNewGoal()
         repository.goBackToGoalsFromEditGoal()
     }
 
-    fun saveAndCloseGoal(){
+    suspend fun saveAndCloseGoal(){
         repository.saveNewGoal { closeGoal() }
     }
 

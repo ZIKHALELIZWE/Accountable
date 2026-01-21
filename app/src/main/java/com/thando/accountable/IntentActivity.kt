@@ -91,7 +91,7 @@ class IntentActivity : ComponentActivity() {
                             contentAlignment = Alignment.Center
                         ) {
                             currentFragment?.name?.let { startFragment ->
-                                mainActivityViewModel.accountableNavigationController.getAccountableActivity(
+                                mainActivityViewModel.accountableNavigationController.GetAccountableActivity(
                                     navController,
                                     startFragment,
                                     mainActivityViewModel,

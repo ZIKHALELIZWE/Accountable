@@ -6,24 +6,14 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.input.InputTransformation
-import androidx.compose.foundation.text.input.KeyboardActionHandler
-import androidx.compose.foundation.text.input.OutputTransformation
-import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -33,14 +23,10 @@ import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TextFieldLabelPosition
-import androidx.compose.material3.TextFieldLabelScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,15 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.fromColorLong
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -70,7 +53,6 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorLong
@@ -159,104 +141,6 @@ fun GetContentCard(
 }
 
 @Composable
-fun TextFieldAccountable(
-    state: TextFieldState,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    readOnly: Boolean = false,
-    textStyle: TextStyle = LocalTextStyle.current,
-    labelPosition: TextFieldLabelPosition = TextFieldLabelPosition.Attached(),
-    label: (@Composable TextFieldLabelScope.() -> Unit)? = null,
-    placeholder: (@Composable () -> Unit)? = null,
-    leadingIcon: (@Composable () -> Unit)? = null,
-    trailingIcon: (@Composable () -> Unit)? = null,
-    prefix: (@Composable () -> Unit)? = null,
-    suffix: (@Composable () -> Unit)? = null,
-    supportingText: (@Composable () -> Unit)? = null,
-    isError: Boolean = false,
-    inputTransformation: InputTransformation? = null,
-    outputTransformation: OutputTransformation? = null,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
-    onKeyboardAction: KeyboardActionHandler? = null,
-    lineLimits: TextFieldLineLimits = TextFieldLineLimits.Default,
-    onTextLayout: (Density.(getResult: () -> TextLayoutResult?) -> Unit)? = null,
-    scrollState: ScrollState = rememberScrollState(),
-    shape: Shape = TextFieldDefaults.shape,
-    colors: TextFieldColors = TextFieldDefaults.colors(),
-    contentPadding: PaddingValues = if (label == null || labelPosition is TextFieldLabelPosition.Above) {
-        TextFieldDefaults.contentPaddingWithoutLabel()
-    } else {
-        TextFieldDefaults.contentPaddingWithLabel()
-    },
-    interactionSource: MutableInteractionSource? = null,
-    onTextSelect: (TextFieldState, (TextFieldState)-> Unit)->Unit = { _, _ ->},
-){
-    onTextSelect(state) { newTextFieldState ->
-        state.edit {
-            replace(0,length, newTextFieldState.text.toString())
-            selection = newTextFieldState.selection
-        }
-    }
-
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    var lastLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val density = LocalDensity.current
-
-    LaunchedEffect(state.selection) {
-        val layout = lastLayout ?: return@LaunchedEffect
-        var offset = state.selection.start
-        if (offset < 0) return@LaunchedEffect
-        if (offset>layout.size.height) offset = layout.size.height
-        val caretRect = layout.getCursorRect(offset)
-        // Ask parent scroll container(s) to bring this rect into view
-        bringIntoViewRequester.bringIntoView(caretRect)
-    }
-
-    val myTextLayout: Density.(getResult: () -> TextLayoutResult?) -> Unit = { getResult ->
-        onTextLayout?.invoke(density,getResult)
-        val result = getResult()
-        if (result != null) {
-            lastLayout = result
-        }
-    }
-
-   TextField(
-       state = state,
-       modifier = modifier.bringIntoViewRequester(bringIntoViewRequester).onFocusChanged{
-           if (it.isFocused) onTextSelect(state) { newTextFieldState ->
-               state.edit {
-                   replace(0,length, newTextFieldState.text.toString())
-                   selection = newTextFieldState.selection
-               }
-           }
-       },
-       enabled = enabled,
-       readOnly = readOnly,
-       textStyle = textStyle,
-       labelPosition = labelPosition,
-       label = label,
-       placeholder = placeholder,
-       leadingIcon = leadingIcon,
-       trailingIcon = trailingIcon,
-       prefix = prefix,
-       suffix = suffix,
-       supportingText = supportingText,
-       isError = isError,
-       inputTransformation = inputTransformation,
-       outputTransformation = outputTransformation,
-       keyboardOptions = keyboardOptions,
-       onKeyboardAction = onKeyboardAction,
-       lineLimits = lineLimits,
-       onTextLayout = myTextLayout,
-       scrollState = scrollState,
-       shape = shape,
-       colors = colors,
-       contentPadding = contentPadding,
-       interactionSource = interactionSource
-   )
-}
-
-@Composable
 fun TextCard(
     content: Content,
     isEditingScript: Boolean,
@@ -302,6 +186,7 @@ fun TextCard(
     val contentFileNameAnnotatedString by content.spannedStringFileName.spannableAnnotatedString.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var hasFocus by remember { mutableStateOf(false) }
 
     LaunchedEffect(
         markupLanguage,
@@ -319,6 +204,21 @@ fun TextCard(
             scope,
             textSize.toFloat()
         )
+    }
+
+    LaunchedEffect( hasFocus,(if (contentFileName!=null) fileName else text).selection.start) {
+        if (hasFocus) textIndex(
+            Triple(
+                (if (contentFileName!=null) fileName else text).selection.start,
+                content
+            ) { newStr, newSelection ->
+                (if (contentFileName!=null) fileName else text).edit {
+                    replace(0,length, newStr)
+                    selection = TextRange(newSelection)
+                }
+            }
+        )
+        else textIndex(null)
     }
 
     if (!isEditingScript) {
@@ -350,26 +250,10 @@ fun TextCard(
         }
     }
     else {
-        TextFieldAccountable(
+        TextField(
             state = if (contentFileName!=null) fileName else text,
-            onTextSelect = { textFieldState, updateTextFieldState ->
-                textIndex(
-                    Triple(
-                        textFieldState.selection.start,
-                        content
-                    ) { newStr, newSelection ->
-                        updateTextFieldState(TextFieldState(
-                                newStr,
-                                TextRange(newSelection)
-                            )
-                        )
-                    }
-                )
-            },
             modifier = modifier.fillMaxWidth()
-                .onFocusChanged { focusState ->
-                    if (!focusState.isFocused) textIndex(null)
-            },
+                .onFocusChanged { focusState -> hasFocus = focusState.isFocused },
             placeholder = { Text(stringResource(if (contentFileName!=null) R.string.video_name
             else if (description) R.string.image_description
                     else R.string.edit_script)) },

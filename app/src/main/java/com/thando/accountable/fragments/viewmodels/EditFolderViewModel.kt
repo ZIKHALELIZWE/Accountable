@@ -26,13 +26,13 @@ class EditFolderViewModel(
     // Information Set To Views
     val updateButtonText: MutableStateFlow<AppResources.StringResource?> = MutableStateFlow(null)
 
-    fun initializeEditFolder(inputFolder:Folder?){
+    suspend fun initializeEditFolder(inputFolder:Folder?){
         updateButtonText.value = if (inputFolder == null) AppResources.StringResource(R.string.add_folder)
         else AppResources.StringResource(R.string.update_folder)
         repository.setNewEditFolder(inputFolder)
     }
 
-    fun setImage(uri:Uri?){
+    suspend fun setImage(uri:Uri?){
         repository.setNewEditFolderImage(uri)
     }
 
@@ -51,16 +51,16 @@ class EditFolderViewModel(
         return value!=null
     }
 
-    fun removeImage() {
+    suspend fun removeImage() {
         repository.deleteNewEditFolderImage()
     }
 
-    fun closeFolder(){
+    suspend fun closeFolder(){
         repository.clearNewEditFolder(false)
         goBackToFoldersAndScripts()
     }
 
-    fun saveAndCloseFolder() {
+    suspend fun saveAndCloseFolder() {
         repository.saveNewEditFolderToNewFolder()
         goBackToFoldersAndScripts()
     }

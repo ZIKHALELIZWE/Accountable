@@ -251,4 +251,8 @@
     <string name="ok">Ok</string>
     <string name="text_size_preview">Text Size Preview</string>
     <string name="change_name_to_save">%1$s (Change Name To Save)</string>
+    <string name="navigate_back_to_home_fragment">Navigate Back to Home Fragment</string>
+    <string name="edit_folder">Edit Folder</string>
+    <string name="save">Save</string>
+    <string name="navigate_back_to_goals">Navigate Back to Goals</string>
 </resources>

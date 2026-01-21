@@ -18,7 +18,9 @@ data class TeleprompterSettings(
     var id: Long? = null,
 
     @ColumnInfo (name = "name")
-    var name: MutableStateFlow<String> = MutableStateFlow(MainActivity.ResourceProvider.getString(R.string.default_settings)),
+    var name: MutableStateFlow<String> = MutableStateFlow(
+        MainActivity.ResourceProvider.getString(R.string.default_settings)
+    ),
 
     @ColumnInfo (name = "text_size")
     var textSize: MutableStateFlow<Int> = MutableStateFlow(24),

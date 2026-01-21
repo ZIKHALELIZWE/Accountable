@@ -78,11 +78,11 @@ class TeleprompterViewModel(
         countDownText.update { countDownTextAfterTick }
     }
 
-    fun loadTeleprompterSettings() {
+    suspend fun loadTeleprompterSettings() {
         repository.loadTeleprompterSettingsList()
     }
 
-    fun loadTeleprompterSetting(
+    suspend fun loadTeleprompterSetting(
         index: Int
     ){
         if (index<0 || teleprompterSettingsList.isEmpty()) return
@@ -93,7 +93,8 @@ class TeleprompterViewModel(
 
     fun setTeleprompterSettingsFunctions(teleprompterSetting: TeleprompterSettings,
                                          context: Context,
-                                         rootHeight:Int){
+                                         rootHeight:Int,
+                                         coroutineScope: CoroutineScope){
         val index = selectedIndex.value
         changeNameFunction = {
             showMarkupLanguageNameDialog(
@@ -134,7 +135,7 @@ class TeleprompterViewModel(
                                     defaultTeleprompterSetting.value,
                                     false
                                 ) {
-                                    loadTeleprompterSettings()
+                                    coroutineScope.launch { loadTeleprompterSettings() }
                                 }
                             }
                         }
@@ -165,7 +166,7 @@ class TeleprompterViewModel(
         }
     }
 
-    fun setSelectedIndex(selection: Int){
+    suspend fun setSelectedIndex(selection: Int){
         if (selection == selectedIndex.value){
             loadTeleprompterSetting(selection)
         }
@@ -348,11 +349,11 @@ class TeleprompterViewModel(
         deleteButtonFunction.invoke()
     }
 
-    fun closeTeleprompterFragment(backToScript:Boolean = true) {
+    suspend fun closeTeleprompterFragment(backToScript:Boolean = true) {
         teleprompterSettings.value?.let { teleprompterSettings ->
             if (teleprompterSettingsList.isNotEmpty()
                 && teleprompterSettings != teleprompterSettingsList.last()
-                && teleprompterSettings.name.value != TeleprompterSettings().name.value
+                && teleprompterSettings.name.value.trim() != TeleprompterSettings().name.value.trim()
             ) {
                 repository.deleteTeleprompterSetting(teleprompterSettingsList.last()){
                     repository.resetDefaultTeleprompterSetting{
@@ -363,7 +364,7 @@ class TeleprompterViewModel(
                         }
                     }
                 }
-            } else if (teleprompterSettings.name.value != TeleprompterSettings().name.value){
+            } else if (teleprompterSettings.name.value.trim() != TeleprompterSettings().name.value.trim()){
                 repository.saveTeleprompterSettings{
                     repository.setTeleprompterSettingToScript(true){
                         repository.resetDefaultTeleprompterSetting{
@@ -392,7 +393,7 @@ class TeleprompterViewModel(
         }
     }
 
-    fun prepareToClose() {
+    suspend fun prepareToClose() {
         teleprompterSettings.value?.let {
             repository.saveTeleprompterSettings{
                 repository.setTeleprompterSettingToScript(true)
@@ -400,11 +401,6 @@ class TeleprompterViewModel(
         }?:run {
             repository.setTeleprompterSettingToScript(false)
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        closeTeleprompterFragment(true)
     }
 
     companion object{

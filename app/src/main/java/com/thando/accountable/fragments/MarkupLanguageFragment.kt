@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.material.snackbar.Snackbar
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel

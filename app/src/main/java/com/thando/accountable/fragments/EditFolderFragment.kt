@@ -9,22 +9,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -36,29 +40,64 @@ import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.EditFolderViewModel
-import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditFolderView(
     viewModel: EditFolderViewModel,
     mainActivityViewModel: MainActivityViewModel
 ) {
+    val scope = rememberCoroutineScope()
+
     mainActivityViewModel.setGalleryLauncherReturn{ galleryUri ->
         try{
-            viewModel.setImage(galleryUri)
+            scope.launch {
+                viewModel.setImage(galleryUri)
+            }
         }catch(e:Exception){
             e.printStackTrace()
         }
     }
 
     BackHandler {
-        viewModel.closeFolder()
+        scope.launch { viewModel.closeFolder() }
     }
 
     AccountableTheme {
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+        val newEditFolder by viewModel.newEditFolder.collectAsStateWithLifecycle()
+        val folderName = newEditFolder?.let { remember { it.folderName } }
+        val updateButtonTextResId by viewModel.updateButtonText.collectAsStateWithLifecycle()
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text(stringResource(R.string.edit_folder)) },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = { scope.launch { viewModel.closeFolder() } }
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.navigate_back_to_home_fragment)
+                            )
+                        }
+                    },
+                    actions = {
+                        TextButton(
+                            onClick = { scope.launch { viewModel.saveAndCloseFolder() } },
+                            enabled = viewModel.setUpdateFolderButtonEnabled(
+                                if(newEditFolder != null && folderName?.text?.isNotEmpty() == true) folderName.text.toString()
+                                else null
+                            )
+                        ) {
+                            Text(stringResource(updateButtonTextResId?.resId ?: R.string.add_folder))
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
             EditFolderFragmentView(
                 viewModel,
                 mainActivityViewModel,
@@ -75,24 +114,23 @@ fun EditFolderFragmentView(
     modifier: Modifier = Modifier
 ){
     val editFolder by viewModel.editFolder.collectAsStateWithLifecycle()
-    var notInitialized by remember { mutableStateOf(true) }
-
-    if (notInitialized) {
+    LaunchedEffect(editFolder) {
         viewModel.initializeEditFolder(editFolder)
-        notInitialized = false
     }
+
     val newEditFolder by viewModel.newEditFolder.collectAsStateWithLifecycle()
     val updateButtonTextResId by viewModel.updateButtonText.collectAsStateWithLifecycle()
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     if (newEditFolder != null) {
         val uri by newEditFolder!!.getUri(context).collectAsStateWithLifecycle()
         val folderName = remember { newEditFolder!!.folderName }
-        val scope = rememberCoroutineScope()
         val listState = rememberScrollState()
         Column(
-            modifier = modifier.imePadding().verticalScroll(listState),
+            modifier = modifier
+                .imePadding()
+                .verticalScroll(listState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // folder image
@@ -106,18 +144,12 @@ fun EditFolderFragmentView(
                 Spacer(modifier = Modifier.width(2.dp))
             }
             // folder name edit text
-            TextFieldAccountable(
+            TextField(
                 state = folderName,
                 label = { Text(stringResource(R.string.enter_folder_name)) },
                 modifier = Modifier
-                    .bringIntoViewRequester(bringIntoViewRequester).onFocusEvent { focusState ->
-                        if (focusState.isFocused) {
-                            scope.launch {
-                                bringIntoViewRequester.bringIntoView()
-                            }
-                        }
-                    }
-                    .fillMaxWidth().padding(horizontal = 3.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 3.dp)
             )
             Spacer(modifier = Modifier.width(2.dp))
             // choose image button
@@ -134,7 +166,9 @@ fun EditFolderFragmentView(
             if (uri != null) {
                 Button(
                     onClick = {
-                        viewModel.removeImage()
+                        scope.launch {
+                            viewModel.removeImage()
+                        }
                     },
                     enabled = viewModel.newEditFolderViewEnabled(newEditFolder)
                 ) {
@@ -145,7 +179,9 @@ fun EditFolderFragmentView(
             // update folder button
             Button(
                 onClick = {
-                    viewModel.saveAndCloseFolder()
+                    scope.launch {
+                        viewModel.saveAndCloseFolder()
+                    }
                 },
                 enabled = viewModel.setUpdateFolderButtonEnabled(if(folderName.text.isNotEmpty()) folderName.text.toString() else null)
             ) {

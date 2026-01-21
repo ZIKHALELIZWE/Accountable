@@ -19,11 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.Button
@@ -46,6 +45,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.TimePickerState
@@ -61,7 +61,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -77,12 +76,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
-import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -98,16 +97,19 @@ fun EditGoalView(
     viewModel: EditGoalViewModel,
     mainActivityViewModel: MainActivityViewModel
 ) {
+    val scope = rememberCoroutineScope()
     mainActivityViewModel.setGalleryLauncherReturn{ galleryUri ->
         try{
-            viewModel.setImage(galleryUri)
+            scope.launch {
+                viewModel.setImage(galleryUri)
+            }
         }catch(e:Exception){
             e.printStackTrace()
         }
     }
 
     BackHandler {
-        viewModel.closeGoal()
+        scope.launch { viewModel.closeGoal() }
     }
 
     AccountableTheme {
@@ -116,9 +118,21 @@ fun EditGoalView(
             topBar = {
                 CenterAlignedTopAppBar(
                     title = { Text(stringResource(R.string.new_goal)) },
+                    navigationIcon = {
+                        IconButton(
+                            modifier = Modifier,
+                            onClick = { scope.launch { viewModel.closeGoal() } }
+                        )
+                        {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.navigate_back_to_goals)
+                            )
+                        }
+                    },
                     actions = {
                         IconButton(onClick = {
-                            viewModel.saveAndCloseGoal()
+                            scope.launch { viewModel.saveAndCloseGoal() }
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Done,
@@ -144,42 +158,35 @@ fun EditGoalFragmentView(
     mainActivityViewModel: MainActivityViewModel,
     modifier: Modifier = Modifier
 ){
-    val newGoal by remember { viewModel.newGoal }
+    val newGoal by viewModel.newGoal.collectAsStateWithLifecycle()
     val context = LocalContext.current
     newGoal?.let { newGoal ->
         val scrollState = remember { newGoal.scrollPosition }
-        val uri by remember { newGoal.getStateUri(context) }
-        var goal by remember { newGoal.goal }
+        val uri by newGoal.getUri(context).collectAsStateWithLifecycle()
+        val goal = remember { newGoal.goal }
         var colour by remember { newGoal.colour }
         val location = remember { newGoal.location }
         val times = remember { newGoal.times }
-        val bringIntoViewRequester = remember { BringIntoViewRequester() }
         val scope = rememberCoroutineScope()
+        val context = LocalContext.current
 
         Column(
-            modifier = modifier.imePadding().verticalScroll(scrollState),
+            modifier = modifier
+                .imePadding()
+                .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             OutlinedTextField(
-                value = goal,
-                onValueChange = { goal = it },
+                state = goal,
                 label = { Text(stringResource(R.string.goal)) },
-                modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
-                    .onFocusEvent { focusState ->
-                        if (focusState.isFocused) {
-                            scope.launch {
-                                bringIntoViewRequester.bringIntoView()
-                            }
-                        }
-                    }
+                modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 3.dp)
             )
             Spacer(modifier = Modifier.width(2.dp))
             uri?.let {
                 Image(
-                    bitmap = AppResources.getBitmapFromUri(LocalContext.current, it)
-                        ?.asImageBitmap()
+                    bitmap = AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
                         ?: ImageBitmap(1, 1),
                     contentDescription = stringResource(R.string.goal_image),
                     contentScale = ContentScale.FillWidth
@@ -191,11 +198,12 @@ fun EditGoalFragmentView(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = { mainActivityViewModel.launchGalleryLauncher(AppResources.ContentType.IMAGE) },
+                    onClick = { mainActivityViewModel.launchGalleryLauncher(
+                        AppResources.ContentType.IMAGE
+                    ) },
                     modifier = Modifier
                         .weight(1f)
                         .padding(8.dp),
-                    //enabled =
                 ) { Text(stringResource(R.string.choose_image)) }
                 uri?.let {
                     Button(
@@ -208,17 +216,10 @@ fun EditGoalFragmentView(
                 }
             }
             Spacer(modifier = Modifier.width(2.dp))
-            TextFieldAccountable(
+            TextField(
                 state = location,
                 label = { Text(stringResource(R.string.location)) },
-                modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
-                    .onFocusEvent { focusState ->
-                        if (focusState.isFocused) {
-                            scope.launch {
-                                bringIntoViewRequester.bringIntoView()
-                            }
-                        }
-                    }
+                modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 3.dp)
             )
@@ -252,7 +253,7 @@ fun EditGoalFragmentView(
             Spacer(modifier = Modifier.width(2.dp))
             var buttonHeightPx by remember { mutableIntStateOf(0) }
             Button(
-                onClick = {viewModel.addTimeBlock()},
+                onClick = { scope.launch { viewModel.addTimeBlock() } },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(8.dp)
@@ -266,7 +267,7 @@ fun EditGoalFragmentView(
                     .padding(vertical = 8.dp)
                     .height((LocalWindowInfo.current.containerSize.height - buttonHeightPx * 2).dp)
             ) {
-                items(items = times, key = { it.id?.toInt()?:Random.nextInt() }) { item ->
+                items(items = times, key = { it.id?:Random.nextLong() }) { item ->
                     TimeInputView(item, viewModel)
                     if (times.indexOf(item) != times.lastIndex) {
                         Spacer(modifier = Modifier.width(2.dp))
@@ -295,6 +296,7 @@ fun TimeInputView(
     var pickedDuration by remember { time.duration }
     val resources = LocalResources.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -316,7 +318,8 @@ fun TimeInputView(
                         .padding(4.dp)
                         .weight(1f)
                         .background(color = Color.Red),
-                    onClick = { viewModel.deleteTimeBlock(time) }) {
+                    onClick = { scope.launch { viewModel.deleteTimeBlock(time) } }
+                ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = stringResource(R.string.delete_time_block)
@@ -350,7 +353,8 @@ fun TimeInputView(
                         c.set(Calendar.HOUR_OF_DAY, pickedDate.hour)
                         c.set(Calendar.MINUTE, pickedDate.minute)
                         val date = AppResources.CalendarResource(c)
-                        Text("Start Time: ${date.getTimeStateFlow(LocalContext.current).collectAsStateWithLifecycle()}")
+                        val pickedTimeString by date.getTimeStateFlow(context).collectAsStateWithLifecycle()
+                        Text("Start Time: $pickedTimeString")
                     }
                     DurationPickerButton(pickedDate, pickedDuration){ newDuration ->
                         pickedDuration = newDuration
@@ -415,7 +419,8 @@ fun TimeInputView(
                         c.set( Calendar.HOUR_OF_DAY, stateTime.hour)
                         c.set( Calendar.MINUTE, stateTime.minute)
                         val date = AppResources.CalendarResource(c)
-                        Text("Start Time and Weekday: ${date.getTimeStateFlow(LocalContext.current).collectAsStateWithLifecycle()} $selectedDay")
+                        val pickedTimeString by date.getTimeStateFlow(context).collectAsStateWithLifecycle()
+                        Text("Start Time and Weekday: $pickedTimeString $selectedDay")
                     }
                     DurationPickerButton(pickedDate,pickedDuration){ newDuration ->
                         pickedDuration = newDuration
@@ -465,7 +470,8 @@ fun TimeInputView(
                             }
                             pickedDate = l
                             val date = AppResources.CalendarResource(c)
-                            Text("Start Time and Date: ${date.getTimeStateFlow(LocalContext.current).collectAsStateWithLifecycle()} ${date.getStandardDate(context)}")
+                            val pickedTimeString by date.getTimeStateFlow(context).collectAsStateWithLifecycle()
+                            Text("Start Time and Date: $pickedTimeString ${date.getStandardDate(context)}")
                         }?: run {
                             Text(stringResource(R.string.pick_time_frequency))
                         }
@@ -786,7 +792,9 @@ fun TimeDurationPicker(
                                         +
                                         (if (selectedMinutes == 1) "$selectedMinutes Minute"
                                         else if (selectedMinutes != 0) "$selectedMinutes Minutes" else ""),
-                                modifier = Modifier.weight(1f).padding(start = 8.dp)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 8.dp)
                             )
                         }
                     }
@@ -799,10 +807,11 @@ fun TimeDurationPicker(
                             onTextLayout = {
                                 if (it.size.width > textWidth) textWidth = it.size.width
                             },
-                            modifier = Modifier.width(
-                                if (textWidth == 0) Dp.Unspecified else with(
-                                    LocalDensity.current
-                                ) { textWidth.toDp() })
+                            modifier = Modifier
+                                .width(
+                                    if (textWidth == 0) Dp.Unspecified else with(
+                                        LocalDensity.current
+                                    ) { textWidth.toDp() })
                                 .padding(start = 8.dp)
                         )
                         Slider(

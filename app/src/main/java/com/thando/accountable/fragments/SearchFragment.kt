@@ -1,11 +1,5 @@
 package com.thando.accountable.fragments
 
-import android.os.Bundle
-import android.view.KeyEvent
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.core.LinearEasing
@@ -27,8 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowLeft
@@ -45,6 +37,7 @@ import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,23 +54,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.thando.accountable.IntentActivity
-import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
-import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -190,9 +176,6 @@ class SearchView(
             viewModel.searchScrollPosition.firstVisibleItemScrollOffset
         )) }
 
-        val bringIntoViewRequester = remember { BringIntoViewRequester() }
-        val scope = rememberCoroutineScope()
-
         LaunchedEffect(searchString.selection, matchCaseCheck, wordCheck) {
             viewModel.search {
                 if (initialized){
@@ -213,16 +196,9 @@ class SearchView(
 
         Column(modifier = modifier.fillMaxWidth()) {
             if (menuOpen) {
-                TextFieldAccountable(
+                TextField(
                     state = searchString,
-                    modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoViewRequester)
-                        .onFocusEvent { focusState ->
-                            if (focusState.isFocused) {
-                                scope.launch {
-                                    bringIntoViewRequester.bringIntoView()
-                                }
-                            }
-                        },
+                    modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text(
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center,

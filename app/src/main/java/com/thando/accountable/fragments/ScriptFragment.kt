@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -83,7 +84,6 @@ import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.ScriptViewModel
 import com.thando.accountable.ui.cards.GetContentCard
-import com.thando.accountable.ui.cards.TextFieldAccountable
 import com.thando.accountable.ui.screens.MenuItemData
 import com.thando.accountable.ui.screens.basicDropdownMenu
 import com.thando.accountable.ui.theme.AccountableTheme
@@ -799,7 +799,7 @@ fun ScriptFragmentCatalog(
                         }
                     }
                     if (isEditingScript) {
-                        TextFieldAccountable(
+                        TextField(
                             state = scriptTitle,
                             modifier = Modifier
                                 .fillMaxWidth()
