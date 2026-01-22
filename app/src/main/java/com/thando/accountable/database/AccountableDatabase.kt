@@ -28,7 +28,7 @@ import kotlinx.coroutines.coroutineScope
     TeleprompterSettings::class,
     SpecialCharacters::class,
     GoalTaskDeliverableTime::class
-], version = 2, exportSchema = false)
+], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AccountableDatabase: RoomDatabase() {
     abstract val repositoryDao : RepositoryDao
@@ -65,6 +65,10 @@ abstract class AccountableDatabase: RoomDatabase() {
                     db.execSQL("ALTER TABLE app_settings_table DROP COLUMN num_scripts")
                     db.execSQL("ALTER TABLE app_settings_table DROP COLUMN num_goal_folders")
                     db.execSQL("ALTER TABLE app_settings_table DROP COLUMN num_goals")*/
+                        },
+                        Migration(2,3) { db ->
+                            db.execSQL("ALTER TABLE app_settings_table ADD goal_folders_order INTEGER DEFAULT 1 NOT NULL")
+                            db.execSQL("ALTER TABLE app_settings_table ADD goal_scripts_order INTEGER DEFAULT 1 NOT NULL")
                         }
                     )
                      //    .allowMainThreadQueries() // allow for testing only todo

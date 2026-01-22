@@ -76,7 +76,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
-import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
@@ -207,7 +206,7 @@ fun EditGoalFragmentView(
                 ) { Text(stringResource(R.string.choose_image)) }
                 uri?.let {
                     Button(
-                        onClick = { viewModel.removeImage() },
+                        onClick = { scope.launch { viewModel.removeImage() } },
                         modifier = Modifier
                             .weight(1f)
                             .padding(8.dp),

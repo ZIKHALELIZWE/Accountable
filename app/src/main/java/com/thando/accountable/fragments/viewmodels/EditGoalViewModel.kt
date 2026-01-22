@@ -23,7 +23,7 @@ class EditGoalViewModel(
         }
     }
 
-    fun removeImage(){
+    suspend fun removeImage(){
         repository.deleteNewGoalImage()
     }
 

@@ -12,15 +12,14 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 class MainActivityViewModel(
-    val repository: AccountableRepository
+    val repository: AccountableRepository,
+    val isIntentActivity: Boolean = false
 ) : ViewModel() {
     val direction = repository.getDirection()
     val appSettings = repository.getAppSettings()
@@ -47,7 +46,10 @@ class MainActivityViewModel(
     val restoreBackupEvent = _restoreBackupEvent.asSharedFlow()
     private val _makeBackupEvent = MutableSharedFlow<Intent>()
     val makeBackupEvent = _makeBackupEvent.asSharedFlow()
-    val accountableNavigationController = AccountableNavigationController()
+    val accountableNavigationController = AccountableNavigationController(
+        this,
+        isIntentActivity
+    )
 
 
     fun clearGalleryLaunchers(){
@@ -172,7 +174,7 @@ class MainActivityViewModel(
     }
 
     companion object {
-        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+        fun Factory(isIntentActivity: Boolean): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(
                 modelClass: Class<T>,
@@ -184,7 +186,8 @@ class MainActivityViewModel(
                 val accountableRepository = AccountableRepository.getInstance(application)
 
                 return MainActivityViewModel(
-                    accountableRepository
+                    accountableRepository,
+                    isIntentActivity
                 ) as T
             }
         }

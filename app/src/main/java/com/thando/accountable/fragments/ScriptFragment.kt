@@ -135,8 +135,11 @@ fun ScriptView(
         viewModel.contentRetrieved()
     }
 
+    val scope = rememberCoroutineScope()
     BackHandler {
-        viewModel.onBackPressed()
+       scope.launch {
+           viewModel.onBackPressed()
+       }
     }
 
     viewModel.setIsScriptFragment(true)
@@ -311,7 +314,7 @@ fun ScriptFragmentView(
                             navigationIcon = {
                                 IconButton(
                                     modifier = Modifier,
-                                    onClick = { if (viewModel.getIsScriptFragment()) viewModel.onBackPressed()
+                                    onClick = { if (viewModel.getIsScriptFragment()) scope.launch { viewModel.onBackPressed() }
                                                 else (context as MainActivity).onBackPressedDispatcher.onBackPressed()
                                     })
                                 {

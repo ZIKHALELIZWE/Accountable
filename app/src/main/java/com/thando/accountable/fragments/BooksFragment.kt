@@ -227,7 +227,7 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
             floatingActionButton = if (viewModel.intentString == null) {
                 @Composable {
                     FloatingActionButton(
-                        onClick = { viewModel.addFolderScript() },
+                        onClick = { coroutineScope.launch { viewModel.addFolderScript() } },
                         modifier = Modifier.padding(16.dp),
                         shape = CircleShape,
                         containerColor = MaterialTheme.colorScheme.primaryContainer

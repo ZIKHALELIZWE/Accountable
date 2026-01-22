@@ -16,8 +16,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-
-class BooksViewModel(private val repository: AccountableRepository): ViewModel() {
+class BooksViewModel(
+    private val repository: AccountableRepository
+): ViewModel() {
     // Data
     val intentString = repository.intentString
     val folder = repository.getFolder()
@@ -43,10 +44,6 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         val onEditClickListener: (() -> Unit)?,
         val onDeleteClickListener: () -> Unit
     )
-
-    fun setFolderType(inputFolderType: Folder.FolderType){
-        repository.setFolderType(inputFolderType)
-    }
 
     fun getScriptContentPreview(scriptId: Long): AccountableRepository.ContentPreview{
         return repository.ContentPreview(scriptId)
@@ -92,7 +89,7 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         repository.deleteScript(scriptId)
     }
 
-    private fun onGoalEdit(goalId: Long?) {
+    private suspend fun onGoalEdit(goalId: Long?) {
         repository.loadEditGoal(goalId)
     }
 
@@ -150,7 +147,7 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         initialized.value = false
     }
 
-    fun addFolderScript(){
+    suspend fun addFolderScript(){
         val id = INITIAL_FOLDER_ID
         showScripts.value?.let {
             if (it.value) {
@@ -185,7 +182,7 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         else return false
     }
 
-    fun loadFolder(folderId: Long) {
+    suspend fun loadFolder(folderId: Long) {
         repository.loadFolder(folderId)
     }
 
@@ -199,7 +196,7 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
         )
     }
 
-    fun updateFolderShowScripts(appendedUnit : (()->Unit)? = null){
+    fun updateFolderShowScripts(appendedUnit : (suspend ()->Unit)? = null){
         repository.updateFolderShowScripts(appendedUnit)
     }
 
@@ -220,8 +217,10 @@ class BooksViewModel(private val repository: AccountableRepository): ViewModel()
 
         val Factory : ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>,
-                                                extras: CreationExtras): T {
+            override fun <T : ViewModel> create(
+                modelClass: Class<T>,
+                extras: CreationExtras
+            ): T {
                 // Get the Application object from extras
                 val application = checkNotNull(extras[APPLICATION_KEY])
 

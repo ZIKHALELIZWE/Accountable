@@ -39,6 +39,12 @@ data class AppSettings(
     @ColumnInfo (name = "scripts_order")
     var scriptsOrder: MutableStateFlow<Boolean> = MutableStateFlow(true),
 
+    @ColumnInfo (name = "goal_folders_order")
+    var goalFoldersOrder: MutableStateFlow<Boolean> = MutableStateFlow(true),
+
+    @ColumnInfo (name = "goal_scripts_order")
+    var goalScriptsOrder: MutableStateFlow<Boolean> = MutableStateFlow(true),
+
     @ColumnInfo (name = "text_size")
     var textSize: MutableStateFlow<Int> = MutableStateFlow(50)
 ) {

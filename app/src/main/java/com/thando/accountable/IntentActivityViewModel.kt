@@ -8,9 +8,6 @@ import androidx.lifecycle.viewmodel.CreationExtras
 class IntentActivityViewModel(
     val repository: AccountableRepository
 ) : ViewModel() {
-    val direction = repository.getDirection()
-    val currentFragment = repository.getCurrentFragment()
-
     class Factory(private val intentString: String? = null): ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(

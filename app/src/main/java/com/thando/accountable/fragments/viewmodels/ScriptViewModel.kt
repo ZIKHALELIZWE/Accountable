@@ -186,12 +186,12 @@ class ScriptViewModel(
         if (!isEditingScript.value) repository.saveScript()
     }
 
-    fun onBackPressed(){
+    suspend fun onBackPressed(){
         if (isEditingScript.value) editOrSaveScript()
         else closeScript()
     }
 
-    fun closeScript(){
+    suspend fun closeScript(){
         script.value?.scrollPosition?.requestScrollToItem(0,0)
         repository.saveScript()
         if (repository.isFromSearchFragment()){

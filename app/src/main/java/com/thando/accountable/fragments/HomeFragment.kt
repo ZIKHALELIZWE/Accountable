@@ -97,7 +97,11 @@ fun HomeView( viewModel : HomeViewModel, mainActivityViewModel: MainActivityView
                                 contentDescription = stringResource(R.string.navigation_drawer_menu)
                             )
                         }
-                        IconButton(onClick = { viewModel.loadGoals() }) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                viewModel.loadGoals()
+                            }
+                        }) {
                             Icon(
                                 imageVector = ImageVector.vectorResource(R.drawable.ic_stars_black_24dp),
                                 contentDescription = stringResource(R.string.navigate_to_goals_button)

@@ -2,7 +2,6 @@ package com.thando.accountable
 
 import android.content.Context
 import android.content.res.Resources
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -50,18 +49,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.compose.rememberNavController
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.fragments.TeleprompterController
 import com.thando.accountable.ui.theme.AccountableTheme
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
 
 class MainActivity : ComponentActivity() {
 
-    val viewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory }
+    val viewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory(false) }
     private val galleryLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { galleryUri ->
@@ -127,6 +123,7 @@ class MainActivity : ComponentActivity() {
                     getResultRestoreBackup.launch(intent)
                 }
             }
+
             MainActivityView(viewModel){
                 finish()
             }
@@ -189,73 +186,20 @@ fun MainActivityView(
     BackHandler {
         finish()
     }
+
+    val currentFragment by mainActivityViewModel.currentFragment.collectAsStateWithLifecycle(
+        AccountableFragment.HomeFragment
+    )
+
+    val drawerState by remember { mainActivityViewModel.drawerState }
+    val drawerEnabled by remember { mainActivityViewModel.drawerEnabled }
+
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val appSettings by mainActivityViewModel.appSettings.collectAsStateWithLifecycle()
+
     AccountableTheme {
-        val drawerState by remember { mainActivityViewModel.drawerState }
-        val drawerEnabled by remember { mainActivityViewModel.drawerEnabled }
-
-
-        var initialized by remember { mutableStateOf(false) }
-        var currentFragment by remember { mutableStateOf<AccountableFragment?>(null) }
-        val navController = rememberNavController()
-
-        val scope = rememberCoroutineScope()
-        val context = LocalContext.current
-
-        val appSettings by mainActivityViewModel.appSettings.collectAsStateWithLifecycle()
-
-        var result by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
-        LaunchedEffect(appSettings) {
-            result = if (appSettings!=null) appSettings!!.getUri(context)
-            else MutableStateFlow(null)
-        }
-        val imageUri by result.collectAsStateWithLifecycle(null)
-
-        var image by remember { mutableStateOf<ImageBitmap?>(null) }
-        LaunchedEffect(imageUri) {
-            image = imageUri?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri) }
-                ?.asImageBitmap()
-                ?: AppResources.getBitmapFromUri(
-                    context,
-                    AppResources.getUriFromDrawable(
-                        context,
-                        R.drawable.ic_stars_black_24dp
-                    )
-                )?.asImageBitmap()
-        }
-
-        // LaunchedEffect to collect SharedFlow
-        LaunchedEffect(Unit) {
-            mainActivityViewModel.currentFragment.collect { fragment ->
-                if (fragment!=null){
-                    if (!initialized){
-                        (0 until navController.currentBackStack.value.size).forEach { _ ->
-                            navController.popBackStack()
-                        }
-                        mainActivityViewModel.clearGalleryLaunchers()
-                        currentFragment = fragment
-                    }
-                    if (AccountableNavigationController.isDrawerFragment(fragment))
-                        mainActivityViewModel.enableDrawer()
-                    else mainActivityViewModel.disableDrawer()
-                }
-            }
-        }
-
-        LaunchedEffect(Unit) {
-            mainActivityViewModel.direction.collect { direction ->
-                if (direction != null){
-                    scope.launch { mainActivityViewModel.toggleDrawer(false) }
-                    mainActivityViewModel.clearGalleryLaunchers()
-                    (0 until navController.currentBackStack.value.size).forEach { _ ->
-                        navController.popBackStack()
-                    }
-                    navController.navigate(
-                        direction.name
-                    ){launchSingleTop = true}
-                }
-            }
-        }
-
         ModalNavigationDrawer(
             drawerState = drawerState,
             drawerContent = {
@@ -269,13 +213,30 @@ fun MainActivityView(
                         modifier = Modifier
                             .verticalScroll(rememberScrollState())
                     ) {
-                        image?.let { image ->
-                            Image(
-                                bitmap = image,
-                                contentDescription = "Navigation Drawer Image",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
+                        appSettings?.let { appSettings ->
+                            val imageUri by appSettings.getUri(context).collectAsStateWithLifecycle(null)
+                            var image by remember { mutableStateOf<ImageBitmap?>(null) }
+
+                            LaunchedEffect(imageUri) {
+                                image = imageUri?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri) }
+                                    ?.asImageBitmap()
+                                    ?: AppResources.getBitmapFromUri(
+                                        context,
+                                        AppResources.getUriFromDrawable(
+                                            context,
+                                            R.drawable.ic_stars_black_24dp
+                                        )
+                                    )?.asImageBitmap()
+                            }
+
+                            image?.let { image ->
+                                Image(
+                                    bitmap = image,
+                                    contentDescription = "Navigation Drawer Image",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                         Spacer(Modifier.height(12.dp))
                         Text(stringResource(R.string.app_name), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
@@ -291,7 +252,7 @@ fun MainActivityView(
                                 )
                             },
                             label = { Text(stringResource(R.string.home)) },
-                            selected = navController.currentDestination?.route == AccountableFragment.HomeFragment.name,
+                            selected = currentFragment == AccountableFragment.HomeFragment,
                             onClick = { mainActivityViewModel.changeFragment(
                                 AccountableFragment.HomeFragment
                             ) }
@@ -305,7 +266,7 @@ fun MainActivityView(
                                 )
                             },
                             label = { Text(stringResource(R.string.books)) },
-                            selected = navController.currentDestination?.route == AccountableFragment.BooksFragment.name,
+                            selected = currentFragment == AccountableFragment.BooksFragment,
                             onClick = { mainActivityViewModel.changeFragment(
                                 AccountableFragment.BooksFragment
                             ) }
@@ -317,7 +278,7 @@ fun MainActivityView(
                         NavigationDrawerItem(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             label = { Text("Settings") },
-                            selected = navController.currentDestination?.route == AccountableFragment.AppSettingsFragment.name,
+                            selected = currentFragment == AccountableFragment.AppSettingsFragment,
                             icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
                             badge = { Text("20") }, // Placeholder
                             onClick = { mainActivityViewModel.changeFragment(
@@ -327,7 +288,7 @@ fun MainActivityView(
                         NavigationDrawerItem(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             label = { Text("Help and feedback") },
-                            selected = navController.currentDestination?.route == AccountableFragment.HelpFragment.name,
+                            selected = currentFragment == AccountableFragment.HelpFragment,
                             icon = { Icon(Icons.AutoMirrored.Outlined.Help, contentDescription = null) },
                             onClick = { mainActivityViewModel.changeFragment(
                                 AccountableFragment.HelpFragment
@@ -339,13 +300,7 @@ fun MainActivityView(
             },
             gesturesEnabled = drawerEnabled
         ) {
-            currentFragment?.name?.let { startFragment ->
-                mainActivityViewModel.accountableNavigationController.GetAccountableActivity(
-                    navController,
-                    startFragment,
-                    mainActivityViewModel
-                )
-            }
+            mainActivityViewModel.accountableNavigationController.GetAccountableActivity()
         }
     }
 }

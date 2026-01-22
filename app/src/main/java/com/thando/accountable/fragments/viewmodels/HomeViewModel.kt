@@ -8,7 +8,7 @@ import com.thando.accountable.AccountableRepository
 
 class HomeViewModel(val repository: AccountableRepository) : ViewModel() {
 
-    fun loadGoals(){
+    suspend fun loadGoals(){
         repository.loadGoals()
     }
 

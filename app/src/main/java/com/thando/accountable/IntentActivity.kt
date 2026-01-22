@@ -38,49 +38,16 @@ class IntentActivity : ComponentActivity() {
             } else null
         )
     }
-    val mainActivityViewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory }
+    val mainActivityViewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory(true) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ResourceProvider.init(this.applicationContext)
 
         setContent {
-            val navController = rememberNavController()
-            var initialized by remember { mutableStateOf(false) }
-            var currentFragment by remember { mutableStateOf<AccountableFragment?>(null) }
             val context = LocalContext.current
             if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
                 if(!intent.getStringExtra(Intent.EXTRA_TEXT).isNullOrEmpty()) {
-                    LaunchedEffect(Unit) {
-                        viewModel.currentFragment.collect { fragment ->
-                            if (fragment!=null){
-                                if (!initialized){
-                                    (0 until navController.currentBackStack.value.size).forEach { _ ->
-                                        navController.popBackStack()
-                                    }
-                                    currentFragment =
-                                        if (
-                                            fragment == AccountableFragment.BooksFragment ||
-                                            fragment == AccountableFragment.SearchFragment
-                                        ) fragment else AccountableFragment.BooksFragment
-                                }
-                            }
-                        }
-                    }
-
-                    LaunchedEffect(Unit) {
-                        viewModel.direction.collect { direction ->
-                            if (direction != null){
-                                (0 until navController.currentBackStack.value.size).forEach { _ ->
-                                    navController.popBackStack()
-                                }
-                                navController.navigate(
-                                    direction.name
-                                ){launchSingleTop = true}
-                            }
-                        }
-                    }
-
                     AccountableTheme {
                         val height = LocalResources.current.displayMetrics.heightPixels*0.8f
                         val width = LocalResources.current.displayMetrics.widthPixels*0.8f
@@ -90,18 +57,13 @@ class IntentActivity : ComponentActivity() {
                                 .combinedClickable(onClick = { finish() }),
                             contentAlignment = Alignment.Center
                         ) {
-                            currentFragment?.name?.let { startFragment ->
-                                mainActivityViewModel.accountableNavigationController.GetAccountableActivity(
-                                    navController,
-                                    startFragment,
-                                    mainActivityViewModel,
-                                    modifier = Modifier.height(
-                                        with(density){height.toDp()}
-                                    ).width(
-                                        with(density){width.toDp()}
-                                    )
+                            mainActivityViewModel.accountableNavigationController.GetAccountableActivity(
+                                modifier = Modifier.height(
+                                    with(density){height.toDp()}
+                                ).width(
+                                    with(density){width.toDp()}
                                 )
-                            }
+                            )
                         }
                     }
                 }

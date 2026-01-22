@@ -16,7 +16,6 @@ import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
-import com.thando.accountable.MainActivity
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Calendar
 
