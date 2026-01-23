@@ -1,6 +1,7 @@
 package com.thando.accountable.fragments
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -14,17 +15,17 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,6 +53,7 @@ import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,16 +63,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -82,9 +85,11 @@ import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import java.util.Calendar
 import kotlin.enums.EnumEntries
@@ -97,6 +102,16 @@ fun EditGoalView(
     mainActivityViewModel: MainActivityViewModel
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var showErrorMessage by remember { viewModel.showErrorMessage }
+    val errorMessage by remember { viewModel.errorMessage }
+
+    LaunchedEffect (showErrorMessage) {
+        if (showErrorMessage) { delay(2000) // message disappears after 2 seconds
+            showErrorMessage = false
+        }
+    }
+
     mainActivityViewModel.setGalleryLauncherReturn{ galleryUri ->
         try{
             scope.launch {
@@ -131,7 +146,7 @@ fun EditGoalView(
                     },
                     actions = {
                         IconButton(onClick = {
-                            scope.launch { viewModel.saveAndCloseGoal() }
+                            scope.launch { viewModel.saveAndCloseGoal(context) }
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Done,
@@ -142,11 +157,30 @@ fun EditGoalView(
                 )
             }
         ) { innerPadding ->
-            EditGoalFragmentView(
-                viewModel,
-                mainActivityViewModel,
-                modifier = Modifier.padding(innerPadding)
-            )
+            Column(modifier = Modifier.padding(innerPadding)) {
+                AnimatedVisibility(visible = showErrorMessage) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                            .background(Color.Red)
+                            .padding(4.dp)
+                            .align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(
+                            text = errorMessage,
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .align(Alignment.Center),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                EditGoalFragmentView(
+                    viewModel,
+                    mainActivityViewModel
+                )
+            }
         }
     }
 }
@@ -169,108 +203,154 @@ fun EditGoalFragmentView(
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
 
-        Column(
+        val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
+        val goalFocusRequester = remember { viewModel.goalFocusRequester }
+        val locationFocusRequester = remember { viewModel.locationFocusRequester }
+        val colourFocusRequester = remember { viewModel.colourFocusRequester }
+
+        LazyColumn(
+            state = scrollState,
             modifier = modifier
-                .imePadding()
-                .verticalScroll(scrollState),
+                .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            OutlinedTextField(
-                state = goal,
-                label = { Text(stringResource(R.string.goal)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 3.dp)
-            )
-            Spacer(modifier = Modifier.width(2.dp))
-            uri?.let {
-                Image(
-                    bitmap = AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
-                        ?: ImageBitmap(1, 1),
-                    contentDescription = stringResource(R.string.goal_image),
-                    contentScale = ContentScale.FillWidth
+            item {
+                OutlinedTextField(
+                    state = goal,
+                    label = { Text(stringResource(R.string.goal)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 3.dp)
+                        .focusRequester(goalFocusRequester),
+                    trailingIcon = {
+                        if (triedToSave && goal.text.isEmpty()){
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = stringResource(R.string.empty_field),
+                                tint = Color.Red
+                            )
+                        }
+                    }
                 )
+            }
+            item {
                 Spacer(modifier = Modifier.width(2.dp))
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Button(
-                    onClick = { mainActivityViewModel.launchGalleryLauncher(
-                        AppResources.ContentType.IMAGE
-                    ) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(8.dp),
-                ) { Text(stringResource(R.string.choose_image)) }
-                uri?.let {
+            uri?.let {
+                item {
+                    Image(
+                        bitmap = AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
+                            ?: ImageBitmap(1, 1),
+                        contentDescription = stringResource(R.string.goal_image),
+                        contentScale = ContentScale.FillWidth
+                    )
+                }
+                item {
+                    Spacer(modifier = Modifier.width(2.dp))
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Button(
-                        onClick = { scope.launch { viewModel.removeImage() } },
+                        onClick = { mainActivityViewModel.launchGalleryLauncher(
+                            AppResources.ContentType.IMAGE
+                        ) },
                         modifier = Modifier
                             .weight(1f)
                             .padding(8.dp),
-                        // enabled =
-                    ) { Text(stringResource(R.string.remove_image)) }
+                    ) { Text(stringResource(R.string.choose_image)) }
+                    uri?.let {
+                        Button(
+                            onClick = { scope.launch { viewModel.removeImage() } },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(8.dp),
+                            // enabled =
+                        ) { Text(stringResource(R.string.remove_image)) }
+                    }
                 }
             }
-            Spacer(modifier = Modifier.width(2.dp))
-            TextField(
-                state = location,
-                label = { Text(stringResource(R.string.location)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 3.dp)
-            )
-            Spacer(modifier = Modifier.width(2.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Max),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (colour != -1) {
-                    Box(
+            item {
+                Spacer(modifier = Modifier.width(2.dp))
+            }
+            item {
+                TextField(
+                    state = location,
+                    label = { Text(stringResource(R.string.location)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 3.dp)
+                        .focusRequester(locationFocusRequester),
+                    trailingIcon = {
+                        if (triedToSave && location.text.isEmpty()){
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = stringResource(R.string.empty_field),
+                                tint = Color.Red
+                            )
+                        }
+                    }
+                )
+            }
+            item {
+                Spacer(modifier = Modifier.width(2.dp))
+            }
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Max),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (colour != -1) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .padding(12.dp)
+                                .background(Color(colour), shape = RoundedCornerShape(8.dp))
+                                .weight(1f)
+                        )
+                    }
+                    Button(
+                        onClick = { viewModel.pickColour(context) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .fillMaxHeight()
-                            .padding(12.dp)
-                            .background(Color(colour), shape = RoundedCornerShape(8.dp))
-                            .weight(1f)
-                    )
+                            .padding(8.dp)
+                            .weight(2f)
+                            .focusRequester(colourFocusRequester)
+                    ) {
+                        Row {
+                            Text(stringResource(R.string.pick_colour))
+                            if (triedToSave && colour==-1){
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = stringResource(R.string.empty_field),
+                                    tint = Color.Red
+                                )
+                            }
+                        }
+                    }
                 }
+            }
+            item {
+                Spacer(modifier = Modifier.width(2.dp))
+            }
+            stickyHeader {
                 Button(
-                    onClick = { viewModel.pickColour(context) },
+                    onClick = { scope.launch { viewModel.addTimeBlock() } },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(8.dp)
-                        .weight(2f)
-                ) {
-                    Text(stringResource(R.string.pick_colour))
-                }
+                ) { Text(stringResource(R.string.add_time_block)) }
             }
-            Spacer(modifier = Modifier.width(2.dp))
-            var buttonHeightPx by remember { mutableIntStateOf(0) }
-            Button(
-                onClick = { scope.launch { viewModel.addTimeBlock() } },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-                    .onGloballyPositioned { coordinates ->
-                        // Get height in pixels
-                        buttonHeightPx = coordinates.size.height
-                    }
-            ) { Text(stringResource(R.string.add_time_block)) }
-            LazyColumn(
-                modifier = Modifier
-                    .padding(vertical = 8.dp)
-                    .height((LocalWindowInfo.current.containerSize.height - buttonHeightPx * 2).dp)
-            ) {
-                items(items = times, key = { it.id?:Random.nextLong() }) { item ->
-                    TimeInputView(item, viewModel)
-                    if (times.indexOf(item) != times.lastIndex) {
-                        Spacer(modifier = Modifier.width(2.dp))
-                    }
+            items(items = times, key = { it.id?:Random.nextLong() }) { item ->
+                TimeInputView(item, viewModel)
+                if (times.indexOf(item) != times.lastIndex) {
+                    Spacer(modifier = Modifier.width(2.dp))
                 }
             }
         }
@@ -296,6 +376,10 @@ fun TimeInputView(
     val resources = LocalResources.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
+    val durationPickerFocusRequester = remember { time.durationPickerFocusRequester }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -353,9 +437,14 @@ fun TimeInputView(
                         c.set(Calendar.MINUTE, pickedDate.minute)
                         val date = AppResources.CalendarResource(c)
                         val pickedTimeString by date.getTimeStateFlow(context).collectAsStateWithLifecycle()
-                        Text("Start Time: $pickedTimeString")
+                        Text(stringResource(R.string.start_time, pickedTimeString))
                     }
-                    DurationPickerButton(pickedDate, pickedDuration){ newDuration ->
+                    DurationPickerButton(
+                        pickedDate,
+                        pickedDuration,
+                        triedToSave,
+                        durationPickerFocusRequester
+                    ){ newDuration ->
                         pickedDuration = newDuration
                     }
                 }
@@ -419,9 +508,19 @@ fun TimeInputView(
                         c.set( Calendar.MINUTE, stateTime.minute)
                         val date = AppResources.CalendarResource(c)
                         val pickedTimeString by date.getTimeStateFlow(context).collectAsStateWithLifecycle()
-                        Text("Start Time and Weekday: $pickedTimeString $selectedDay")
+                        Text(
+                            stringResource(
+                                R.string.start_time_and_weekday,
+                                pickedTimeString,
+                                selectedDay
+                            ))
                     }
-                    DurationPickerButton(pickedDate,pickedDuration){ newDuration ->
+                    DurationPickerButton(
+                        pickedDate,
+                        pickedDuration,
+                        triedToSave,
+                        durationPickerFocusRequester
+                    ){ newDuration ->
                         pickedDuration = newDuration
                     }
                 }
@@ -433,7 +532,9 @@ fun TimeInputView(
                         pickedDate.minute,
                         true
                     )
-                    val stateDate = rememberDatePickerState()
+                    val stateDate = rememberDatePickerState(
+                        initialSelectedDateMillis = pickedDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    )
                     var buttonDatePick by remember { mutableStateOf(false) }
                     var buttonTimePick by remember { mutableStateOf(false) }
                     if (buttonDatePick) {
@@ -460,7 +561,7 @@ fun TimeInputView(
                             c.set( Calendar.MINUTE, stateTime.minute)
                             val l = LocalDateTime.of(
                                 c.get(Calendar.YEAR),
-                                c.get(Calendar.MONTH),
+                                c.get(Calendar.MONTH)+1,
                                 c.get(Calendar.DAY_OF_MONTH),
                                 c.get(Calendar.HOUR_OF_DAY),
                                 c.get(Calendar.MINUTE))
@@ -470,13 +571,23 @@ fun TimeInputView(
                             pickedDate = l
                             val date = AppResources.CalendarResource(c)
                             val pickedTimeString by date.getTimeStateFlow(context).collectAsStateWithLifecycle()
-                            Text("Start Time and Date: $pickedTimeString ${date.getStandardDate(context)}")
+                            Text(
+                                stringResource(
+                                    R.string.start_time_and_date,
+                                    pickedTimeString,
+                                    date.getStandardDate(context)
+                                ))
                         }?: run {
                             Text(stringResource(R.string.pick_time_frequency))
                         }
                     }
                     stateDate.selectedDateMillis?.let {
-                        DurationPickerButton(pickedDate,pickedDuration){ newDuration ->
+                        DurationPickerButton(
+                            pickedDate,
+                            pickedDuration,
+                            triedToSave,
+                            durationPickerFocusRequester
+                        ){ newDuration ->
                             pickedDuration = newDuration
                         }
                     }
@@ -686,7 +797,13 @@ fun PickWeekday(
 }
 
 @Composable
-fun DurationPickerButton(datePicked:LocalDateTime, duration:LocalDateTime, changeDuration:(LocalDateTime)->Unit){
+fun DurationPickerButton(
+    datePicked:LocalDateTime,
+    duration:LocalDateTime,
+    triedToSave:Boolean,
+    durationPickerFocusRequester: FocusRequester,
+    changeDuration:(LocalDateTime)->Unit
+){
     val buttonDurationPick = remember { mutableStateOf(false) }
     if (buttonDurationPick.value) {
         TimeDurationPicker(datePicked, duration) { hours, minutes ->
@@ -697,7 +814,8 @@ fun DurationPickerButton(datePicked:LocalDateTime, duration:LocalDateTime, chang
 
     OutlinedButton(modifier = Modifier
         .fillMaxWidth()
-        .padding(4.dp),
+        .padding(4.dp)
+        .focusRequester(durationPickerFocusRequester),
         onClick = { buttonDurationPick.value = true }
     ) {
         if (duration.hour != 0 || duration.minute != 0){
@@ -719,7 +837,16 @@ fun DurationPickerButton(datePicked:LocalDateTime, duration:LocalDateTime, chang
             }
         }
         else {
-            Text("Please Select A Duration")
+            Row {
+                Text(stringResource(R.string.please_select_a_duration))
+                if (triedToSave){
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = stringResource(R.string.empty_field),
+                        tint = Color.Red
+                    )
+                }
+            }
         }
     }
 }

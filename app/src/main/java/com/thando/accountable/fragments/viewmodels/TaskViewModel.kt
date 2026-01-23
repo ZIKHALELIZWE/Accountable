@@ -8,6 +8,10 @@ import com.thando.accountable.AccountableRepository
 
 class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
 
+    suspend fun closeTasks(){
+        repository.goBackToGoalsFromTasks()
+    }
+
     companion object{
         val Factory : ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")

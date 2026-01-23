@@ -84,8 +84,8 @@ import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.ScriptViewModel
 import com.thando.accountable.ui.cards.GetContentCard
-import com.thando.accountable.ui.screens.MenuItemData
-import com.thando.accountable.ui.screens.basicDropdownMenu
+import com.thando.accountable.ui.MenuItemData
+import com.thando.accountable.ui.basicDropdownMenu
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

@@ -3,8 +3,10 @@ package com.thando.accountable.database.tables
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.focus.FocusRequester
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.database.tables.Goal.TimeBlockType
 import java.time.LocalDateTime
@@ -31,4 +33,7 @@ data class GoalTaskDeliverableTime (
 
     @ColumnInfo(name = "times_duration")
     val duration: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now().withHour(0).withMinute(0))
-)
+){
+    @Ignore
+    val durationPickerFocusRequester = FocusRequester()
+}

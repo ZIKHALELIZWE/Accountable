@@ -252,6 +252,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             }
                         )
                     }
+
+                    goalsList.forEach { goal ->
+                        goal.loadGoalTimes(dao)
+                    }
                 }
             }
             withContext(Dispatchers.Main){ appendedUnit?.invoke() }
@@ -538,40 +542,34 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun deleteFolder(id:Long?){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                id?.let {
-                    dao.deleteFolder(it, application)
-                    foldersList.removeIf { folder ->
-                        folder.folderId == id
-                    }
+    suspend fun deleteFolder(id:Long?){
+        withContext(Dispatchers.IO) {
+            id?.let {
+                dao.deleteFolder(it, application)
+                foldersList.removeIf { folder ->
+                    folder.folderId == id
                 }
             }
         }
     }
 
-    fun deleteGoal(id:Long?){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO){
-                id?.let {
-                    dao.deleteGoal(it, application)
-                    goalsList.removeIf { goal ->
-                        goal.id == id
-                    }
+    suspend fun deleteGoal(id:Long?){
+        withContext(Dispatchers.IO){
+            id?.let {
+                dao.deleteGoal(it, application)
+                goalsList.removeIf { goal ->
+                    goal.id == id
                 }
             }
         }
     }
 
-    fun deleteScript(id:Long?){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                id?.let {
-                    dao.deleteScript(it, application)
-                    scriptsList.removeIf { script ->
-                        script.scriptId == id
-                    }
+    suspend fun deleteScript(id:Long?){
+        withContext(Dispatchers.IO) {
+            id?.let {
+                dao.deleteScript(it, application)
+                scriptsList.removeIf { script ->
+                    script.scriptId == id
                 }
             }
         }
@@ -1522,6 +1520,100 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return dao.getContentListNow(scriptId)
     }
 
+    inner class GoalContentPreview(
+        val id:Long
+    ) {
+        private var numAudios: MutableStateFlow<Int> = MutableStateFlow(0)
+        private var numImages: MutableStateFlow<Int> = MutableStateFlow(0)
+        private var numVideos: MutableStateFlow<Int> = MutableStateFlow(0)
+        private var numScripts: MutableStateFlow<Int> = MutableStateFlow(0)
+        private var numDocuments: MutableStateFlow<Int> = MutableStateFlow(0)
+        private var description: MutableStateFlow<String> = MutableStateFlow("")
+        private var displayImage: MutableStateFlow<Uri?> = MutableStateFlow(null)
+
+        fun init(finished:(()->Unit)?=null): Job {
+            return repositoryScope.launch {
+                /*withContext(Dispatchers.IO) {
+                    val contentList: List<Content> = getContentListNow(id)
+                    val builder = StringBuilder("")
+                    contentList.forEach { content ->
+                        when (content.type) {
+                            ContentType.TEXT -> {
+                                if (content.content.text.isNotEmpty()) builder.append(content.content.text.toString())
+                            }
+
+                            ContentType.IMAGE -> {
+                                withContext(Dispatchers.Main) { numImages.value += 1 }
+                                if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
+                                if (displayImage.value == null) {
+                                    val file = File(
+                                        application.filesDir.toString() + "/" + AppResources.ImageResource.DESTINATION_FOLDER,
+                                        content.content.text.toString()
+                                    )
+                                    withContext(Dispatchers.Main) {
+                                        displayImage.value = if (file.exists()) {
+                                            withContext(Dispatchers.IO) { Uri.fromFile(file) }
+                                        } else {
+                                            null
+                                        }
+                                    }
+                                }
+                            }
+
+                            ContentType.AUDIO -> {
+                                withContext(Dispatchers.Main) { numAudios.value += 1 }
+                                if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
+                            }
+
+                            ContentType.VIDEO -> {
+                                withContext(Dispatchers.Main) { numVideos.value += 1 }
+                                if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
+                            }
+
+                            ContentType.DOCUMENT -> {
+                                withContext(Dispatchers.Main) { numDocuments.value += 1 }
+                                if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
+                            }
+
+                            ContentType.SCRIPT -> {
+                                val scriptContentPreview =
+                                    content.id?.let { it1 -> ContentPreview(it1) }
+                                if (scriptContentPreview != null) {
+                                    scriptContentPreview.init()
+                                    withContext(Dispatchers.Main) {
+                                        numAudios.value = scriptContentPreview.numAudios.value
+                                        numImages.value = scriptContentPreview.numImages.value
+                                        numVideos.value = scriptContentPreview.numVideos.value
+                                        numDocuments.value = scriptContentPreview.numDocuments.value
+                                        numScripts.value = scriptContentPreview.numScripts.value
+                                        if (scriptContentPreview.description.value.isNotEmpty()) builder.append(
+                                            scriptContentPreview.description.value
+                                        )
+                                        if (displayImage.value == null && scriptContentPreview.displayImage.value != null) displayImage.value =
+                                            scriptContentPreview.displayImage.value
+                                    }
+                                }
+                                withContext(Dispatchers.Main) { numScripts.value += 1 }
+                            }
+                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        description.value = builder.toString()
+                        finished?.invoke()
+                    }
+                }*/
+            }
+        }
+
+        fun getNumAudios(): StateFlow<Int> { return numAudios }
+        fun getNumImages(): StateFlow<Int> { return numImages }
+        fun getNumVideos(): StateFlow<Int> { return numVideos }
+        fun getNumScripts(): StateFlow<Int> { return numScripts }
+        fun getNumDocuments(): StateFlow<Int> { return numDocuments }
+        fun getDescription(): StateFlow<String> { return description }
+        fun getDisplayImage(): StateFlow<Uri?> { return displayImage }
+    }
+
     inner class ContentPreview(
         val id:Long
     ) {
@@ -1718,7 +1810,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun loadEditGoal(id: Long? = null){
         withContext(Dispatchers.IO) {
-                id?.let { id ->
+                if (id != null && id != INITIAL_FOLDER_ID){
                     // Load Existing Goal
                     val tempEditGoal = dao.getGoalWithTimes(id)
                     val tempNewGoal = Goal()
@@ -1726,10 +1818,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         tempEditGoal?.let { editGoal ->
                             newGoal.id = dao.insert(newGoal)
 
+                            newGoal.parent.value = editGoal.parent.value
                             newGoal.goalCategory.value = editGoal.goalCategory.value
-                            newGoal.initialDateTime = AppResources.CalendarResource(editGoal.initialDateTime.getCalendar())
+                            newGoal.initialDateTime = AppResources.CalendarResource(
+                                editGoal.initialDateTime.getCalendar()
+                            )
                             newGoal.position.value = editGoal.position.value
-                            newGoal.scrollPosition.scrollTo(editGoal.scrollPosition.value)
+                            newGoal.scrollPosition.requestScrollToItem(
+                                editGoal.scrollPosition.firstVisibleItemIndex,
+                                editGoal.scrollPosition.firstVisibleItemScrollOffset
+                            )
                             newGoal.size.value = editGoal.size.value
                             newGoal.numImages.value = editGoal.numImages.value
                             newGoal.numVideos.value = editGoal.numVideos.value
@@ -1737,12 +1835,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             newGoal.numDocuments.value = editGoal.numDocuments.value
                             newGoal.numScripts.value = editGoal.numScripts.value
                             newGoal.goal.setTextAndPlaceCursorAtEnd(editGoal.goal.text.toString())
-                            newGoal.dateOfCompletion = editGoal.dateOfCompletion?.let{ AppResources.CalendarResource(it.getCalendar()) }
+                            newGoal.dateOfCompletion = editGoal.dateOfCompletion?.let{
+                                AppResources.CalendarResource(it.getCalendar())
+                            }
                             newGoal.status.value = editGoal.status.value
                             newGoal.colour.value = editGoal.colour.value
                             newGoal.location.setTextAndPlaceCursorAtEnd(editGoal.location.text.toString())
 
-                            newGoal.saveImage(application,editGoal.imageResource.getUriFromStorage(application))
+                            newGoal.saveImage(
+                                application,
+                                editGoal.imageResource.getUriFromStorage(application)
+                            )
                             for (time in editGoal.times) {
                                 newGoal.id?.let {
                                     val newTime = GoalTaskDeliverableTime()
@@ -1764,12 +1867,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         editGoal.value = tempEditGoal
                         newGoal.value = tempNewGoal
                     }
-                } ?: run {
+                }
+                else {
                     // Make New Goal
                     withContext(Dispatchers.Main) {
                         editGoal.value = null
                         newGoal.update { withContext(Dispatchers.IO) {
                             val tempGoal = Goal()
+                            tempGoal.parent.value = folder.value?.folderId?:INITIAL_FOLDER_ID
+                            tempGoal.position.value = dao.getGoalsNow(
+                                tempGoal.parent.value
+                            ).size.toLong()
                             tempGoal.id = dao.insert(tempGoal)
                             tempGoal
                         }}
@@ -1831,11 +1939,15 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
         editGoal.value?.let { editGoal ->
             newGoal.value?.let { newGoal ->
+                editGoal.parent.value = newGoal.parent.value
                 editGoal.goalCategory.value = newGoal.goalCategory.value
                 editGoal.initialDateTime =
                     AppResources.CalendarResource(newGoal.initialDateTime.getCalendar())
                 editGoal.position.value = newGoal.position.value
-                editGoal.scrollPosition.scrollTo(newGoal.scrollPosition.value)
+                editGoal.scrollPosition.requestScrollToItem(
+                    newGoal.scrollPosition.firstVisibleItemIndex,
+                    newGoal.scrollPosition.firstVisibleItemScrollOffset
+                )
                 editGoal.size.value = newGoal.size.value
                 editGoal.numImages.value = newGoal.numImages.value
                 editGoal.numVideos.value = newGoal.numVideos.value
@@ -1894,6 +2006,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun goBackToGoalsFromEditGoal(){
         withContext(Dispatchers.IO) {
+            loadFolder()
+            changeFragment(AccountableFragment.GoalsFragment)
+        }
+    }
+
+    suspend fun goBackToGoalsFromTasks() {
+        withContext(Dispatchers.IO) {
+            loadFolder()
             changeFragment(AccountableFragment.GoalsFragment)
         }
     }

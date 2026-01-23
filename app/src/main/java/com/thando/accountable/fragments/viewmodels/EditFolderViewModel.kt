@@ -1,6 +1,7 @@
 package com.thando.accountable.fragments.viewmodels
 
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -24,11 +25,11 @@ class EditFolderViewModel(
     val folderType = repository.getScriptsOrGoalsFolderType()
 
     // Information Set To Views
-    val updateButtonText: MutableStateFlow<AppResources.StringResource?> = MutableStateFlow(null)
+    val updateButtonText: MutableStateFlow<Int?> = MutableStateFlow(null)
 
     suspend fun initializeEditFolder(inputFolder:Folder?){
-        updateButtonText.value = if (inputFolder == null) AppResources.StringResource(R.string.add_folder)
-        else AppResources.StringResource(R.string.update_folder)
+        updateButtonText.value = if (inputFolder == null) R.string.add_folder
+        else R.string.update_folder
         repository.setNewEditFolder(inputFolder)
     }
 

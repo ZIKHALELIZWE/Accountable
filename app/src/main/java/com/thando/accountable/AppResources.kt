@@ -120,12 +120,6 @@ sealed class AppResources {
         IMAGE, DOCUMENT, AUDIO, VIDEO
     }
 
-    class StringResource(@StringRes val resId: Int, private vararg val args: Any): AppResources(){
-        fun asString(context: Context): String {
-            return context.getString(resId, *args)
-        }
-    }
-
     class CalendarResource(private val calendar: Calendar) {
 
         private var time = MutableStateFlow(getTime())

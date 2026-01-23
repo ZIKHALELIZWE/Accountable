@@ -38,16 +38,4 @@ class NumberPickerPreferenceDialog : PreferenceDialogFragmentCompat() {
             }
         }
     }
-
-    companion object {
-        fun newInstance(key: String, targetFragment: Fragment): NumberPickerPreferenceDialog {
-            val fragment = NumberPickerPreferenceDialog()
-            fragment.setTargetFragment( targetFragment,0)
-            val bundle = Bundle(1)
-            bundle.putString(ARG_KEY, key)
-            fragment.arguments = bundle
-
-            return fragment
-        }
-    }
 }

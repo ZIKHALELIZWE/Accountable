@@ -102,6 +102,7 @@ import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Folder
+import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
@@ -363,6 +364,7 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
         var scriptHeight by remember { mutableStateOf(0.dp) }
         val density = LocalResources.current.displayMetrics.density
         val activity = LocalActivity.current
+        val scope = rememberCoroutineScope()
 
         when (listShown) {
             Folder.FolderListType.FOLDERS -> {
@@ -424,7 +426,9 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
                                             },
                                             onEditClickListener = null,
                                             onDeleteClickListener = {
-                                                viewModel.onDeleteScript(script.scriptId)
+                                                scope.launch {
+                                                    viewModel.onDeleteScript(script.scriptId)
+                                                }
                                             }
                                         )
                                     }
@@ -439,7 +443,55 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
             }
 
             Folder.FolderListType.GOALS -> {
+                val goalsList = remember { viewModel.goalsList }
 
+                LazyColumn(
+                    state = scrollStateParent,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = modifier.fillMaxSize()
+                ) {
+                    items(items = goalsList, key = {it.id?:Random.nextLong()}) { goal ->
+                        GoalCard(
+                            goal = goal,
+                            modifier = Modifier
+                                .padding(2.dp)
+                                .fillMaxWidth()
+                                .padding(2.dp)
+                                .onGloballyPositioned {
+                                    if (scriptHeight == 0.dp) scriptHeight =
+                                        (it.size.height / density).dp
+                                },
+                            getGoalContentPreview = { viewModel.getGoalContentPreview(it) },
+                            onLongClick = {
+                                if (viewModel.setOnLongClick()) {
+                                    viewModel.bottomSheetListeners.update {
+                                        BooksViewModel.BottomSheetListeners(
+                                            displayView = {
+                                                GoalCard(
+                                                    goal,
+                                                    modifier = Modifier,
+                                                    clickable = false,
+                                                    onLongClick = {},
+                                                    onClick = {},
+                                                    getGoalContentPreview = { viewModel.getGoalContentPreview(it) }
+                                                )
+                                            },
+                                            onEditClickListener = null,
+                                            onDeleteClickListener = {
+                                                scope.launch {
+                                                    viewModel.onDeleteGoal(goal.id)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {
+                                goal.id?.let { viewModel.onGoalClick(it) }
+                            }
+                        )
+                    }
+                }
             }
         }
 
@@ -546,6 +598,7 @@ fun FolderCard(
     viewModel: BooksViewModel
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val folderName = remember { folder.folderName }
     var folderUriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
 
@@ -582,7 +635,9 @@ fun FolderCard(
                                     viewModel.onFolderEdit(folder.folderId)
                                 },
                                 onDeleteClickListener = {
-                                    viewModel.onDeleteFolder(folder.folderId)
+                                    scope.launch {
+                                        viewModel.onDeleteFolder(folder.folderId)
+                                    }
                                 }
                             )
                         }
@@ -825,6 +880,167 @@ fun ScriptCard(
                             textAlign = TextAlign.End,
                             fontSize = 12.sp
                         ) // Entry Date
+                    }
+                }
+                //Text() // Entry Size
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GoalCard(
+    goal: Goal,
+    getGoalContentPreview: (Long) -> AccountableRepository.GoalContentPreview,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    clickable:Boolean = true
+) {
+    var contentPreviewAsync: Job? = null
+    DisposableEffect(Unit) {
+        onDispose {
+            contentPreviewAsync?.cancel()
+        }
+    }
+
+    var contentPreview by remember { mutableStateOf<AccountableRepository.GoalContentPreview?>(null) }
+    val context = LocalContext.current
+    var uriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
+    var initialDateTimeStateFlow by remember { mutableStateOf<StateFlow<String?>>(MutableStateFlow(null)) }
+    var dateOfCompletionStateFlow by remember { mutableStateOf<StateFlow<String?>>(MutableStateFlow(null)) }
+    LaunchedEffect(goal) {
+        uriStateFlow = goal.getUri(context)
+        initialDateTimeStateFlow = goal.initialDateTime.getFullDateStateFlow(context)
+        goal.dateOfCompletion?.let { dateOfCompletionStateFlow = it.getFullDateStateFlow(context) }
+        contentPreview = goal.id?.let { getGoalContentPreview(it) }
+        contentPreview?.init {
+            contentPreviewAsync = null
+        }
+    }
+    val scriptUri by uriStateFlow.collectAsStateWithLifecycle()
+    val initialDateTime by initialDateTimeStateFlow.collectAsStateWithLifecycle()
+    val dateOfCompletion by dateOfCompletionStateFlow.collectAsStateWithLifecycle()
+
+    val title = remember { goal.goal }
+    val description by contentPreview?.getDescription()?.collectAsStateWithLifecycle("")
+        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+    val displayImage by contentPreview?.getDisplayImage()?.collectAsStateWithLifecycle()
+        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(scriptUri,displayImage) {
+        imageBitmap = (scriptUri?:displayImage)?.let { AppResources.getBitmapFromUri(context, it)?.asImageBitmap() }
+    }
+
+    val numImages by contentPreview?.getNumImages()?.collectAsStateWithLifecycle(0)
+        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+    val numVideos by contentPreview?.getNumVideos()?.collectAsStateWithLifecycle(0)
+        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+    val numAudios by contentPreview?.getNumAudios()?.collectAsStateWithLifecycle(0)
+        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+    val numDocuments by contentPreview?.getNumDocuments()?.collectAsStateWithLifecycle(0)
+        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+    val numScript by contentPreview?.getNumScripts()?.collectAsStateWithLifecycle(0)
+        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .wrapContentHeight()
+            .combinedClickable(
+                onLongClick = {
+                    if (clickable) {
+                        onLongClick()
+                    }
+                },
+                onClick = {
+                    if (clickable) {
+                        onClick()
+                    }
+                }
+            ),
+        shape = RectangleShape,
+        colors = CardColors(Color.White,
+            Color.Black,
+            Color.LightGray,
+            Color.DarkGray)
+    ) {
+        Row (modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)) {
+            Card(modifier = Modifier
+                .height(113.dp)
+                .width(113.dp),
+                colors = CardColors(Color.White,
+                    Color.White,
+                    Color.LightGray,
+                    Color.DarkGray),
+            ) {
+                imageBitmap?.let { imageBitmap ->
+                    Image(
+                        bitmap = imageBitmap,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .height(113.dp)
+                            .width(113.dp),
+                        contentDescription = stringResource(R.string.script_display_image)
+                    )
+                }
+            }
+            Column(modifier = Modifier
+                .padding(end = 5.dp)
+                .fillMaxHeight()
+                .weight(1f),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = title.text.toString(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(5.dp),
+                    textAlign = TextAlign.Start,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    fontSize = 16.sp) // Title
+                Text(text = description?:"",
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 5.dp),
+                    textAlign = TextAlign.Start,
+                    color = Color.Black,
+                    fontSize = 12.sp) // Description
+                Row(
+                    modifier = Modifier
+                        .padding(5.dp)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    initialDateTime?.let { initialDateTime ->
+                        Text(
+                            text = initialDateTime,
+                            modifier = Modifier.padding(end = 5.dp),
+                            textAlign = TextAlign.Start,
+                            fontSize = 12.sp
+                        )
+                    }
+                    val modifier = Modifier
+                    numImages?.let { numImages -> MediaIcon(numImages, Icons.Default.Image,modifier) }
+                    numVideos?.let { numVideos -> MediaIcon(numVideos, Icons.Default.Videocam,modifier) }
+                    numAudios?.let { numAudios -> MediaIcon(numAudios, Icons.Default.Mic,modifier) }
+                    numDocuments?.let { numDocuments -> MediaIcon(numDocuments, Icons.Default.Book,modifier) }
+                    numScript?.let { numScript -> MediaIcon(numScript, Icons.AutoMirrored.Filled.LibraryBooks,modifier) }
+                    dateOfCompletion?.let { dateOfCompletion ->
+                        Text(
+                            text = dateOfCompletion,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.End,
+                            fontSize = 12.sp
+                        )
                     }
                 }
                 //Text() // Entry Size

@@ -92,7 +92,7 @@ fun EditFolderView(
                                 else null
                             )
                         ) {
-                            Text(stringResource(updateButtonTextResId?.resId ?: R.string.add_folder))
+                            Text(stringResource(updateButtonTextResId ?: R.string.add_folder))
                         }
                     }
                 )
@@ -185,7 +185,7 @@ fun EditFolderFragmentView(
                 },
                 enabled = viewModel.setUpdateFolderButtonEnabled(if(folderName.text.isNotEmpty()) folderName.text.toString() else null)
             ) {
-                Text(stringResource(updateButtonTextResId?.resId ?: R.string.add_folder))
+                Text(stringResource(updateButtonTextResId ?: R.string.add_folder))
             }
         }
     }

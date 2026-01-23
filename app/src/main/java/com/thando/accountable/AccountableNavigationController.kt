@@ -166,19 +166,19 @@ class AccountableNavigationController(
                     if (newFragment == AccountableFragment.BooksFragment ||
                         newFragment == AccountableFragment.GoalsFragment ){
                         navArgs.isValidDir = true
-                        navArgs.isDrawerFragment = true
+                        navArgs.isDrawerFragment = newFragment == AccountableFragment.BooksFragment
                     }
                 }
                 AccountableFragment.EditGoalFragment -> {
                     if (newFragment == AccountableFragment.GoalsFragment){
                         navArgs.isValidDir = true
-                        navArgs.isDrawerFragment = true
+                        navArgs.isDrawerFragment = false
                     }
                 }
                 AccountableFragment.TaskFragment -> {
                     if (newFragment == AccountableFragment.GoalsFragment){
                         navArgs.isValidDir = true
-                        navArgs.isDrawerFragment = true
+                        navArgs.isDrawerFragment = false
                     }
                 }
                 AccountableFragment.MarkupLanguageFragment -> {

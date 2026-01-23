@@ -3,6 +3,7 @@ package com.thando.accountable.database.tables
 import android.content.Context
 import android.net.Uri
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableFloatStateOf
@@ -16,7 +17,10 @@ import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
+import com.thando.accountable.database.dataaccessobjects.RepositoryDao
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 @Entity(tableName = "goal_table")
@@ -37,7 +41,7 @@ data class Goal(
     val position: MutableState<Long> = mutableLongStateOf(0L),
 
     @ColumnInfo (name = "goal_scroll_position")
-    val scrollPosition: ScrollState = ScrollState(0),
+    val scrollPosition: LazyListState = LazyListState(0,0),
 
     @ColumnInfo (name = "goal_size")
     val size: MutableState<Float> = mutableFloatStateOf(0F),
@@ -94,6 +98,15 @@ data class Goal(
 
     @Ignore
     val imageResource = AppResources.ImageResource(goalPicture?:"")
+
+    suspend fun loadGoalTimes(dao: RepositoryDao){
+        times.clear()
+        times.addAll(
+            withContext(Dispatchers.IO){
+                dao.getGoalTimes(id)
+            }
+        )
+    }
 
     fun getGoalPicture(): String? { return goalPicture }
 

@@ -49,6 +49,10 @@ class BooksViewModel(
         return repository.ContentPreview(scriptId)
     }
 
+    fun getGoalContentPreview(goalId: Long): AccountableRepository.GoalContentPreview{
+        return repository.GoalContentPreview(goalId)
+    }
+
     suspend fun getFolderContentPreview(folder: Folder) {
         repository.getFolderFolderNum(folder)
         repository.getFolderScriptGoalNum(folder)
@@ -77,15 +81,15 @@ class BooksViewModel(
         repository.loadEditFolder(folderId)
     }
 
-    fun onDeleteFolder(folderId: Long?){
+    suspend fun onDeleteFolder(folderId: Long?){
         repository.deleteFolder(folderId)
     }
 
-    private fun onDeleteGoal(goalId: Long?){
+    suspend fun onDeleteGoal(goalId: Long?){
         repository.deleteGoal(goalId)
     }
 
-    fun onDeleteScript(scriptId:Long?){
+    suspend fun onDeleteScript(scriptId:Long?){
         repository.deleteScript(scriptId)
     }
 
@@ -103,7 +107,7 @@ class BooksViewModel(
         }
     }
 
-    private fun onGoalClick(goalId: Long) {
+    fun onGoalClick(goalId: Long) {
         viewModelScope.launch {
             updateFolderScrollPosition{
                 updateFolderShowScripts {
