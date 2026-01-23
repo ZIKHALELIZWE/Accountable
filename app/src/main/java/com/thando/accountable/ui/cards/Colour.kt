@@ -1,83 +1,222 @@
 package com.thando.accountable.ui.cards
 
-import android.content.Context
-import android.graphics.Color
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffColorFilter
-import android.graphics.drawable.Drawable
-import android.view.ViewGroup
-import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.thando.accountable.R
-import com.thando.accountable.recyclerviewadapters.ColourItemAdapter
-import com.thando.accountable.ui.decoration.GridSpacingItemDecoration
+import kotlin.math.atan2
+import kotlin.math.hypot
 
-data class Colour(
-    val colour: Int
-)
-{
-    var backgroundDrawable: Drawable? = null
+class ColourPickerDialog {
+    val pickedColour = mutableStateOf(Color.Black)
+    val showColourPickerDialog = mutableStateOf(false)
+    val processSelectedColour = mutableStateOf<((Int)->Unit)?>(null)
 
-    fun setDrawable(context: Context){
-        backgroundDrawable = ContextCompat.getDrawable(context, R.drawable.square_rounded_corners)?.mutate()
-        backgroundDrawable?.colorFilter = PorterDuffColorFilter(colour, PorterDuff.Mode.SRC_IN)
+    fun pickColour(originalColour: Color? = null, processPickedColour:(Int) -> Unit){
+        originalColour?.let { pickedColour.value = it }
+        processSelectedColour.value = { selectedColour: Int ->
+            pickedColour.value = Color(selectedColour)
+            processPickedColour(selectedColour)
+        }
+        showColourPickerDialog.value = true
     }
 
-    fun removeDrawable(){
-        backgroundDrawable = null
-    }
+    @Composable
+    fun ColourPicker(){
+        val pickedColour by remember { pickedColour }
+        var showColourPickerDialog by remember { showColourPickerDialog }
+        val processSelectedColour by remember { processSelectedColour }
 
-    companion object{
-        fun showColorPickerDialog(
-            context: Context, processSelectedColour:(selectedColour:Int)->Unit
-        ) {
-            lateinit var colorPickerDialog: AlertDialog
-            val density = context.resources.displayMetrics.density
-            val colors = listOf(
-                Color.BLACK, Color.WHITE, Color.CYAN, Color.rgb(179, 157, 219), Color.MAGENTA, Color.rgb(245, 245, 220), Color.YELLOW,
-                Color.rgb(169, 169, 169), Color.GREEN, Color.rgb(244, 164, 96), Color.BLUE, Color.RED,
-                Color.rgb(255, 228, 181), Color.rgb(72, 61, 139), Color.rgb(205, 92, 92), Color.rgb(255, 165, 0), Color.rgb(102, 205, 170)
+        if (showColourPickerDialog) {
+            ColourPickerDialog(
+                inputColour = pickedColour,
+                processSelectedColour = { selectedColour ->
+                    showColourPickerDialog = false
+                    processSelectedColour?.invoke(selectedColour)
+                },
+                onDismiss = { showColourPickerDialog = false },
             )
+        }
+    }
 
-            val colourList = ArrayList<Colour>()
-            colors.forEach{colourList.add(Colour(it))}
+    @Composable
+    fun ColourPickerDialog(
+        inputColour: Color,
+        processSelectedColour: (selectedColour: Int) -> Unit,
+        onDismiss: () -> Unit
+    ) {
+        var selectedColour by remember { mutableStateOf(inputColour) }
 
-            val numColumns = 5 // Desired number of columns
-            val padding = dpToPx(15, density) // Convert 15 dp to pixels
-            val spacing = dpToPx(15, density) // Set the spacing between items in dp
+        var hue by remember { mutableStateOf(0f) }
+        var saturation by remember { mutableStateOf(1f) }
+        var brightness by remember { mutableStateOf(1f) }
 
-            val recyclerView = RecyclerView(context).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                layoutManager = GridLayoutManager(context, numColumns)
-                setPadding(padding, dpToPx(20, density), padding, padding) // Convert padding to pixels
-                val colourItemAdapter = ColourItemAdapter(context) { selectedColor ->
-                    // Do something with the selected color
-                    processSelectedColour(selectedColor)
-                    colorPickerDialog.dismiss()
+        val density = LocalDensity.current
+        var size by remember { mutableStateOf(0.dp) }
+        val radius = with(density) { size.toPx() / 2 }
+        val center = Offset(radius, radius)
+
+        Dialog(
+            onDismissRequest = onDismiss
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                modifier = Modifier.fillMaxWidth().wrapContentHeight()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        stringResource(R.string.choose_a_colour),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(
+                        Modifier.fillMaxWidth().wrapContentHeight()
+                            .onGloballyPositioned {
+                                size = with(density) { it.size.width.toDp() }
+                            }
+                    ) {
+                        Canvas(
+                            modifier = Modifier.size(size)
+                                .pointerInput(Unit) {
+                                    detectTapGestures { offset ->
+                                        val (newHue, newSaturation) = calculateColour(
+                                            offset,
+                                            center,
+                                            radius
+                                        ) ?: return@detectTapGestures
+                                        val colour = Color.hsv(newHue, newSaturation, brightness)
+                                        if (selectedColour == colour) return@detectTapGestures
+                                        hue = newHue
+                                        saturation = newSaturation
+                                        selectedColour = Color.hsv(hue, saturation, brightness)
+                                    }
+                                }
+                                .pointerInput(Unit) {
+                                    detectDragGestures { change, _ ->
+                                        val (newHue, newSaturation) = calculateColour(
+                                            change.position,
+                                            center,
+                                            radius
+                                        ) ?: return@detectDragGestures
+                                        val colour = Color.hsv(newHue, newSaturation, brightness)
+                                        if (selectedColour == colour) return@detectDragGestures
+                                        hue = newHue
+                                        saturation = newSaturation
+                                        selectedColour = Color.hsv(hue, saturation, brightness)
+                                    }
+                                }
+                        ) {
+                            for (i in 0..360) {
+                                drawArc(
+                                    color = Color.hsv(i.toFloat(), 1f, 1f),
+                                    startAngle = i.toFloat(),
+                                    sweepAngle = 1f,
+                                    useCenter = false,
+                                    topLeft = Offset(size.value, size.value),
+                                    size = Size(size.value, size.value),
+                                    style = Stroke(width = radius)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Slider(
+                        value = brightness,
+                        onValueChange = {
+                            brightness = it
+                            selectedColour = Color
+                                .hsv(hue, saturation, brightness)
+                        },
+                        valueRange = 0f..1f
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(
+                        modifier = Modifier
+                            .height(80.dp)
+                            .fillMaxWidth()
+                            .padding(3.dp)
+                            .background(
+                                selectedColour,
+                                shape = RectangleShape
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row {
+                        TextButton(onClick = {
+                            processSelectedColour(
+                                selectedColour.toArgb()
+                            )
+                        }) {
+                            Text("OK")
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancel")
+                        }
+                    }
                 }
-                adapter = colourItemAdapter
-                addItemDecoration(GridSpacingItemDecoration(numColumns, spacing, true))
-                colourItemAdapter.submitList(colourList.toMutableList())
             }
-
-            colorPickerDialog = AlertDialog.Builder(context, R.style.CustomAlertDialogTheme)
-                .setTitle(context.getString(R.string.choose_a_colour))
-                .setView(recyclerView)
-                .setNegativeButton(context.getString(R.string.cancel)) { dialog, _ ->
-                    dialog.dismiss()
-                }
-                .create()
-            colorPickerDialog.show()
         }
+    }
 
-        private fun dpToPx(dp: Int, density:Float): Int {
-            return (dp * density).toInt()
+    private fun calculateColour(
+        offset: Offset,
+        center: Offset,
+        radius: Float
+    ): Pair<Float, Float>? {
+        val dx = offset.x - center.x
+        val dy = offset.y - center.y
+        val distance = hypot(dx, dy)
+        if (distance <= radius) {
+            val angle = atan2(dy, dx)
+            val hue = Math.toDegrees(angle.toDouble()).toFloat().let {
+                if (it < 0) it + 360f else it
+            }
+            val saturation = distance / radius
+            return hue to saturation
         }
+        return null
     }
 }
 

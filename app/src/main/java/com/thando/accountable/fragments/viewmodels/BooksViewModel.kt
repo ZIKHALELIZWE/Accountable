@@ -93,7 +93,7 @@ class BooksViewModel(
         repository.deleteScript(scriptId)
     }
 
-    private suspend fun onGoalEdit(goalId: Long?) {
+    suspend fun onGoalEdit(goalId: Long?) {
         repository.loadEditGoal(goalId)
     }
 

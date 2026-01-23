@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -22,6 +23,7 @@ import com.thando.accountable.SpannedString
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.MarkupLanguage.Companion.EXAMPLE_SPAN
 import com.thando.accountable.database.tables.MarkupLanguage.Companion.EXAMPLE_TEXT
+import com.thando.accountable.ui.cards.ColourPickerDialog
 import com.thando.accountable.ui.cards.MarkupLanguageCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -57,6 +59,7 @@ class MarkupLanguageViewModel(
     val selectedIndex = repository.getMarkupLanguageSelectedIndex()
     val menuOpen = MutableStateFlow(true)
     var lazyListState = LazyListState()
+    val colourPickerDialog = ColourPickerDialog()
 
     fun toggleMenuOpen(){
         menuOpen.update { menuOpen.value.not() }
@@ -325,6 +328,13 @@ class MarkupLanguageViewModel(
             stringBuilder.append(EXAMPLE_SPAN).append(closing)
         }
         stringBuilder.append(EXAMPLE_TEXT.substring(spanRange.last, EXAMPLE_TEXT.length))
+    }
+
+    fun pickColour(
+        originalColour: Color? = null,
+        colourPicked: (Int) -> Unit
+    ){
+        colourPickerDialog.pickColour(originalColour, colourPicked)
     }
 
     companion object{

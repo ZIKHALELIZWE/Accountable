@@ -158,6 +158,7 @@ fun EditGoalView(
             }
         ) { innerPadding ->
             Column(modifier = Modifier.padding(innerPadding)) {
+                viewModel.colourPickerDialog.ColourPicker()
                 AnimatedVisibility(visible = showErrorMessage) {
                     Box(
                         modifier = Modifier
@@ -316,7 +317,9 @@ fun EditGoalFragmentView(
                         )
                     }
                     Button(
-                        onClick = { viewModel.pickColour(context) },
+                        onClick = { viewModel.pickColour(
+                            Color(newGoal.colour.value)
+                        ) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(8.dp)

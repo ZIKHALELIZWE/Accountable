@@ -70,7 +70,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.android.material.snackbar.Snackbar
 import com.thando.accountable.MainActivityViewModel
@@ -82,10 +81,8 @@ import com.thando.accountable.fragments.viewmodels.ScriptViewModel
 import com.thando.accountable.fragments.viewmodels.TeleprompterViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 fun TeleprompterView(
@@ -117,6 +114,7 @@ fun TeleprompterView(
     }
 
     AccountableTheme {
+        viewModel.colourPickerDialog.ColourPicker()
         TeleprompterFragmentView(
             modifier = Modifier,
             viewModel = viewModel,
@@ -828,7 +826,9 @@ fun ControlsSection(
             teleprompterSettings?.textColour?.let { mutableTextColour ->
                 val textColor by mutableTextColour.collectAsStateWithLifecycle()
                 Button(
-                    onClick = { viewModel.chooseTextColour(context) },
+                    onClick = { viewModel.chooseTextColour(
+                        Color(textColor)
+                    ) },
                     shape = RectangleShape, modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Change Text Color (Current: $textColor)")
@@ -842,7 +842,9 @@ fun ControlsSection(
             teleprompterSettings?.backgroundColour?.let { mutableBackgroundColour ->
             val backgroundColour by mutableBackgroundColour.collectAsStateWithLifecycle()
             Button(
-                onClick = { viewModel.chooseBackgroundColour(context) },
+                onClick = { viewModel.chooseBackgroundColour(
+                    Color(backgroundColour)
+                ) },
                 shape = RectangleShape, modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Change Background Color (Current: $backgroundColour)")

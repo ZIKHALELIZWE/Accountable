@@ -68,9 +68,8 @@ import com.google.android.material.snackbar.Snackbar
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel
-import com.thando.accountable.ui.cards.Colour
-import com.thando.accountable.ui.cards.MarkupLanguageCard
 import com.thando.accountable.ui.MenuItemData
+import com.thando.accountable.ui.cards.MarkupLanguageCard
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.launch
 
@@ -88,6 +87,7 @@ fun MarkupLanguageView(
     }
 
     val menuOpen by viewModel.menuOpen.collectAsStateWithLifecycle()
+
     AccountableTheme {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -122,6 +122,7 @@ fun MarkupLanguageView(
                 )
             }
         ) { innerPadding ->
+            viewModel.colourPickerDialog.ColourPicker()
             MarkupLanguageFragmentView(
                 modifier = Modifier.padding(innerPadding),
                 viewModel = viewModel,
@@ -421,7 +422,10 @@ fun MarkupLanguageFragmentView(
                 MarkupLanguageSpanCard(
                     spanCard,
                     markupLanguage,
-                    { viewModel.updateStates() }
+                    { viewModel.updateStates() },
+                    { initialColour, colourPicked ->
+                        viewModel.pickColour(initialColour, colourPicked)
+                    }
                 )
             }
         }
@@ -433,6 +437,7 @@ fun MarkupLanguageSpanCard(
     spanCard: MarkupLanguageCard,
     markupLanguage: MarkupLanguage?,
     updateStates: ()->Unit,
+    pickColour: (Color?, (Int) -> Unit)->Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -460,8 +465,12 @@ fun MarkupLanguageSpanCard(
         else if (spanCard.getSpanType() == MarkupLanguage.TagType.FUNCTION_COLOUR) {
             buttonText = stringResource(R.string.pick_colour)
             buttonOnClick = {
-                Colour.showColorPickerDialog(context) { selectedColour: Int ->
-                    spanCard.tag.spanCharValue.second.setTextAndPlaceCursorAtEnd(selectedColour.toString())
+                pickColour(
+                    spanCard.tag.spanCharValue.second.text.toString().toIntOrNull()?.let { Color(it) }
+                ) { selectedColour: Int ->
+                    spanCard.tag.spanCharValue.second.setTextAndPlaceCursorAtEnd(
+                        selectedColour.toString()
+                    )
                 }
             }
         } else if (spanCard.getSpanType() == MarkupLanguage.TagType.FUNCTION_URL) {

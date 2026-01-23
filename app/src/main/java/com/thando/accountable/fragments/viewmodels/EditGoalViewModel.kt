@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -11,7 +12,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableRepository
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
-import com.thando.accountable.ui.cards.Colour
+import com.thando.accountable.ui.cards.ColourPickerDialog
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class EditGoalViewModel(
@@ -26,6 +27,8 @@ class EditGoalViewModel(
     val goalFocusRequester = FocusRequester()
     val locationFocusRequester = FocusRequester()
     val colourFocusRequester = FocusRequester()
+    val colourPickerDialog = ColourPickerDialog()
+
 
     suspend fun setImage(uri:Uri?){
         uri?.let {
@@ -37,8 +40,8 @@ class EditGoalViewModel(
         repository.deleteNewGoalImage()
     }
 
-    fun pickColour(context: Context){
-        Colour.showColorPickerDialog(context){ selectedColour: Int ->
+    fun pickColour(originalColour: Color? = null){
+        colourPickerDialog.pickColour(originalColour){ selectedColour: Int ->
             newGoal.value?.colour?.value = selectedColour
         }
     }

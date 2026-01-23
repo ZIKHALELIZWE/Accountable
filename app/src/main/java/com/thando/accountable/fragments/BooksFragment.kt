@@ -476,7 +476,11 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
                                                     getGoalContentPreview = { viewModel.getGoalContentPreview(it) }
                                                 )
                                             },
-                                            onEditClickListener = null,
+                                            onEditClickListener = {
+                                                scope.launch {
+                                                    viewModel.onGoalEdit(goal.id)
+                                                }
+                                            },
                                             onDeleteClickListener = {
                                                 scope.launch {
                                                     viewModel.onDeleteGoal(goal.id)

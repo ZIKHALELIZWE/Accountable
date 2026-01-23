@@ -7,6 +7,7 @@ import android.os.Looper
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -20,7 +21,7 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.MarkupLanguageViewModel.Companion.showMarkupLanguageNameDialog
-import com.thando.accountable.ui.cards.Colour
+import com.thando.accountable.ui.cards.ColourPickerDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -73,6 +74,8 @@ class TeleprompterViewModel(
 
     var listState: LazyListState? = null
     val handler = Handler(Looper.getMainLooper())
+
+    val colourPickerDialog = ColourPickerDialog()
 
     fun setCountDownText(countDownTextAfterTick: String){
         countDownText.update { countDownTextAfterTick }
@@ -329,14 +332,14 @@ class TeleprompterViewModel(
         teleprompterSettings.value?.controlsPositionBottom?.value = teleprompterSettings.value?.controlsPositionBottom?.value?.not() == true
     }
 
-    fun chooseTextColour(context: Context){
-        Colour.showColorPickerDialog(context){ selectedColour: Int ->
+    fun chooseTextColour(originalColour: Color? = null){
+        colourPickerDialog.pickColour(originalColour) { selectedColour: Int ->
             teleprompterSettings.value?.textColour?.value = selectedColour
         }
     }
 
-    fun chooseBackgroundColour(context: Context){
-        Colour.showColorPickerDialog(context){ selectedColour: Int ->
+    fun chooseBackgroundColour(originalColour: Color? = null){
+        colourPickerDialog.pickColour(originalColour) { selectedColour: Int ->
             teleprompterSettings.value?.backgroundColour?.value = selectedColour
         }
     }
