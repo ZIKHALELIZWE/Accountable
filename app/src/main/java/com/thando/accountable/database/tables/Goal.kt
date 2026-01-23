@@ -77,12 +77,22 @@ data class Goal(
     val colour: MutableState<Int> = mutableIntStateOf(-1),
 
     @ColumnInfo (name = "goal_location")
-    val location: TextFieldState = TextFieldState("")
+    val location: TextFieldState = TextFieldState(""),
+
+    @ColumnInfo (name = "goal_selected_tab")
+    val selectedTab: MutableState<GoalTab> = mutableStateOf(GoalTab.TASKS),
+
+    @ColumnInfo (name = "goal_tab_list_state")
+    val tabListState: LazyListState = LazyListState()
 
 ) {
     companion object {
         @Ignore
         private const val GOAL_IMAGE_PREFIX = "Goal_"
+    }
+
+    enum class GoalTab{
+        TASKS, DELIVERABLES
     }
 
     enum class GoalStatus{

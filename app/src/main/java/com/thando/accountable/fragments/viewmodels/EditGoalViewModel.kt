@@ -29,7 +29,6 @@ class EditGoalViewModel(
     val colourFocusRequester = FocusRequester()
     val colourPickerDialog = ColourPickerDialog()
 
-
     suspend fun setImage(uri:Uri?){
         uri?.let {
             repository.setNewGoalImage(uri)

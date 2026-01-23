@@ -156,6 +156,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getEditFolder(): StateFlow<Folder?>{ return editFolder }
     fun getNewEditFolder(): StateFlow<Folder?>{ return newEditFolder }
     fun getNewGoal():StateFlow<Goal?> { return newGoal }
+    fun getGoal(): MutableStateFlow<Goal?> { return goal }
     fun getDirection(): SharedFlow<AccountableFragment?>{ return direction }
     fun getScriptsOrGoalsFolderType(): StateFlow<Folder.FolderType?> { return scriptsOrGoalsFolderType }
     fun getCurrentFragment(): SharedFlow<AccountableFragment?>{ return currentFragment }
@@ -742,53 +743,51 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun loadAndOpenScript(scriptId: Long){
-        repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                if (scriptId == INITIAL_FOLDER_ID) {
-                    val parentId = folder.value?.folderId ?: INITIAL_FOLDER_ID
-                    val scripts = dao.getScriptsNow(parentId)
-                    withContext(Dispatchers.Main) {
-                        script.value = Script(
-                            scriptParentType = Script.ScriptParentType.FOLDER,
-                            scriptParent = parentId,
-                            scriptDateTime = AppResources.CalendarResource(Calendar.getInstance()),
-                            scriptPosition = scripts.size.toLong(),
-                        )
-                        scriptMarkupLanguage.value = null
-                        isEditingScript.value = true
-                        script.value!!.scriptId = withContext(Dispatchers.IO) { dao.insert(script.value!!) }
+    suspend fun loadAndOpenScript(scriptId: Long){
+        withContext(Dispatchers.IO) {
+            if (scriptId == INITIAL_FOLDER_ID) {
+                val parentId = folder.value?.folderId ?: INITIAL_FOLDER_ID
+                val scripts = dao.getScriptsNow(parentId)
+                withContext(Dispatchers.Main) {
+                    script.value = Script(
+                        scriptParentType = Script.ScriptParentType.FOLDER,
+                        scriptParent = parentId,
+                        scriptDateTime = AppResources.CalendarResource(Calendar.getInstance()),
+                        scriptPosition = scripts.size.toLong(),
+                    )
+                    scriptMarkupLanguage.value = null
+                    isEditingScript.value = true
+                    script.value!!.scriptId = withContext(Dispatchers.IO) { dao.insert(script.value!!) }
+                    scriptContentList.clear()
+                    appendTextFieldIfNeeded()
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    isEditingScript.value = false
+                    script.value = withContext(Dispatchers.IO) {
+                        val tempScript = dao.getScriptNow(scriptId)
+                        withContext(Dispatchers.Main){
+                            scriptMarkupLanguage.value = withContext(Dispatchers.IO) {
+                                tempScript!!.scriptMarkupLanguage.let { dao.getMarkupLanguage(it) }
+                            }
+                        }
+                        tempScript
+                    }
+                    withContext(Dispatchers.IO) {
                         scriptContentList.clear()
+                        scriptContentList.addAll(dao.getContentList(scriptId))
                         appendTextFieldIfNeeded()
                     }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        isEditingScript.value = false
-                        script.value = withContext(Dispatchers.IO) {
-                            val tempScript = dao.getScriptNow(scriptId)
-                            withContext(Dispatchers.Main){
-                                scriptMarkupLanguage.value = withContext(Dispatchers.IO) {
-                                    tempScript!!.scriptMarkupLanguage.let { dao.getMarkupLanguage(it) }
-                                }
-                            }
-                            tempScript
-                        }
-                        withContext(Dispatchers.IO) {
-                            scriptContentList.clear()
-                            scriptContentList.addAll(dao.getContentList(scriptId))
-                            appendTextFieldIfNeeded()
-                        }
-                    }
                 }
-                if (script.value == null) {
-                    Toast.makeText(
-                        application,
-                        application.getString(R.string.script_does_not_exist),
-                        Toast.LENGTH_LONG
-                    ).show()
-                } else {
-                    changeFragment(AccountableFragment.ScriptFragment)
-                }
+            }
+            if (script.value == null) {
+                Toast.makeText(
+                    application,
+                    application.getString(R.string.script_does_not_exist),
+                    Toast.LENGTH_LONG
+                ).show()
+            } else {
+                changeFragment(AccountableFragment.ScriptFragment)
             }
         }
     }
@@ -1275,7 +1274,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun deleteMarkupLanguage(
         markupLanguage: MarkupLanguage,
-        appendedUnit: (() -> Unit)? = null
+        appendedUnit: (suspend () -> Unit)? = null
     ) {
         withContext(Dispatchers.IO) {
             dao.delete(markupLanguage)
@@ -1319,7 +1318,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun deleteDefaultMarkupLanguage(appendedUnit: (() -> Unit)? = null){
+    suspend fun deleteDefaultMarkupLanguage(appendedUnit: (suspend () -> Unit)? = null){
         deleteMarkupLanguage(defaultMarkupLanguage.value,appendedUnit)
     }
 
@@ -1348,7 +1347,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         process(similarList.isEmpty() && nameUniqueErrorMessage.isEmpty(),similarList,nameUniqueErrorMessage)
     }
 
-    fun resetDefaultMarkupLanguage(appendedUnit: (() -> Unit)? = null){
+    suspend fun resetDefaultMarkupLanguage(appendedUnit: (suspend () -> Unit)? = null){
         defaultMarkupLanguage.update { MarkupLanguage() }
         markupLanguagesList.clear()
         markupLanguageSelectedIndex.value = -1
@@ -1776,7 +1775,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun setIsFromSearchFolderToTrue(appendedUnit: (() -> Unit)?=null){
+    suspend fun setIsFromSearchFolderToTrue(appendedUnit: (suspend () -> Unit)?=null){
         isFromSearchFolder = true
         appendedUnit?.invoke()
     }

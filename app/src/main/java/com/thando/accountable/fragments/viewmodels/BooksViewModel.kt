@@ -117,7 +117,7 @@ class BooksViewModel(
         }
     }
 
-    fun loadAndOpenScript(scriptId: Long, activity: Activity?) {
+    suspend fun loadAndOpenScript(scriptId: Long, activity: Activity?) {
         if (repository.intentString==null) {
             repository.loadAndOpenScript(scriptId)
         }

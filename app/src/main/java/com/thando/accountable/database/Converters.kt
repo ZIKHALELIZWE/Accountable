@@ -256,6 +256,16 @@ class Converters {
     }
 
     @TypeConverter
+    fun toGoalTab(mutableState: MutableState<Goal.GoalTab>): String {
+        return mutableState.value.name
+    }
+
+    @TypeConverter
+    fun fromGoalTab(goalStatus: String): MutableState<Goal.GoalTab> {
+        return mutableStateOf(Goal.GoalTab.valueOf(goalStatus))
+    }
+
+    @TypeConverter
     fun toStateLocalDateTime(time: MutableState<LocalDateTime>): String {
         val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         return time.value.format(formatter)

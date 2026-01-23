@@ -362,7 +362,10 @@ class TeleprompterViewModel(
                     repository.resetDefaultTeleprompterSetting{
                         repository.saveTeleprompterSettings{
                             repository.setTeleprompterSettingToScript(true){
-                                if (backToScript) repository.changeFragment(AccountableFragment.ScriptFragment)
+                                if (backToScript) {
+                                    script.value?.scriptId?.let { repository.loadAndOpenScript(it) }
+                                        ?: repository.changeFragment(AccountableFragment.ScriptFragment)
+                                }
                             }
                         }
                     }
@@ -371,7 +374,10 @@ class TeleprompterViewModel(
                 repository.saveTeleprompterSettings{
                     repository.setTeleprompterSettingToScript(true){
                         repository.resetDefaultTeleprompterSetting{
-                            if (backToScript) repository.changeFragment(AccountableFragment.ScriptFragment)
+                            if (backToScript) {
+                                script.value?.scriptId?.let { repository.loadAndOpenScript(it) }
+                                    ?: repository.changeFragment(AccountableFragment.ScriptFragment)
+                            }
                         }
                     }
                 }
@@ -381,7 +387,10 @@ class TeleprompterViewModel(
                     repository.deleteTeleprompterSetting(teleprompterSettingsList.last()) {
                         repository.resetDefaultTeleprompterSetting {
                             repository.setTeleprompterSettingToScript(false) {
-                                if (backToScript) repository.changeFragment(AccountableFragment.ScriptFragment)
+                                if (backToScript) {
+                                    script.value?.scriptId?.let { repository.loadAndOpenScript(it) }
+                                        ?: repository.changeFragment(AccountableFragment.ScriptFragment)
+                                }
                             }
                         }
                     }
@@ -390,7 +399,10 @@ class TeleprompterViewModel(
         }?:run {
             repository.setTeleprompterSettingToScript(false){
                 repository.resetDefaultTeleprompterSetting{
-                    if (backToScript) repository.changeFragment(AccountableFragment.ScriptFragment)
+                    if (backToScript) {
+                        script.value?.scriptId?.let { repository.loadAndOpenScript(it) }
+                            ?: repository.changeFragment(AccountableFragment.ScriptFragment)
+                    }
                 }
             }
         }

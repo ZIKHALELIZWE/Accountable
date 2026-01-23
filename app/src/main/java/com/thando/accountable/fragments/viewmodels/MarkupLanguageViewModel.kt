@@ -213,7 +213,8 @@ class MarkupLanguageViewModel(
                             repository.saveMarkupLanguage(innerSimilarList) {
                                 repository.setMarkupLanguageToScript(true) {
                                     repository.resetDefaultMarkupLanguage {
-                                        repository.changeFragment(AccountableFragment.ScriptFragment)
+                                        script.value?.scriptId?.let { repository.loadAndOpenScript(it) }
+                                            ?: repository.changeFragment(AccountableFragment.ScriptFragment)
                                     }
                                 }
                             }
@@ -235,7 +236,8 @@ class MarkupLanguageViewModel(
             repository.setMarkupLanguageToScript(false) {
                 repository.deleteDefaultMarkupLanguage {
                     repository.resetDefaultMarkupLanguage {
-                        repository.changeFragment(AccountableFragment.ScriptFragment)
+                        script.value?.scriptId?.let { repository.loadAndOpenScript(it) }
+                            ?: repository.changeFragment(AccountableFragment.ScriptFragment)
                     }
                 }
             }

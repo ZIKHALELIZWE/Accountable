@@ -49,7 +49,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -301,6 +300,7 @@ class SearchView(
         val rightButtonVisibility by item.rightButtonVisibility.collectAsStateWithLifecycle()
         val snippetIndex by item.snippetIndex.collectAsStateWithLifecycle()
         val activity = LocalActivity.current
+        val scope = rememberCoroutineScope()
 
         Column(modifier = Modifier.fillMaxSize()) {
             ScriptCard(script = item.script,
@@ -312,7 +312,9 @@ class SearchView(
                 onClick = {
                     item.script.scriptId?.let {
                         activity?.let { activity ->
-                            viewModel.loadAndOpenScript(it, activity)
+                            scope.launch {
+                                viewModel.loadAndOpenScript(it, activity)
+                            }
                         }
                     }
                 }

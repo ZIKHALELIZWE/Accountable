@@ -928,6 +928,8 @@ fun GoalCard(
     val dateOfCompletion by dateOfCompletionStateFlow.collectAsStateWithLifecycle()
 
     val title = remember { goal.goal }
+    val location = remember { goal.location }
+    val goalColour by remember { goal.colour }
     val description by contentPreview?.getDescription()?.collectAsStateWithLifecycle("")
         ?:MutableStateFlow(null).collectAsStateWithLifecycle()
     val displayImage by contentPreview?.getDisplayImage()?.collectAsStateWithLifecycle()
@@ -975,7 +977,7 @@ fun GoalCard(
             Card(modifier = Modifier
                 .height(113.dp)
                 .width(113.dp),
-                colors = CardColors(Color.White,
+                colors = CardColors(Color(goalColour),
                     Color.White,
                     Color.LightGray,
                     Color.DarkGray),
@@ -986,7 +988,7 @@ fun GoalCard(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .height(113.dp)
-                            .width(113.dp),
+                            .width(113.dp).padding(2.dp),
                         contentDescription = stringResource(R.string.script_display_image)
                     )
                 }
@@ -998,26 +1000,28 @@ fun GoalCard(
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(text = title.text.toString(),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f)
                         .padding(5.dp),
                     textAlign = TextAlign.Start,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
                     fontSize = 16.sp) // Title
-                Text(text = description?:"",
-                    maxLines = 2,
+                Text(text = stringResource(
+                    R.string.location_with_string,
+                    location.text.toString()),
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
                         .padding(horizontal = 5.dp),
                     textAlign = TextAlign.Start,
                     color = Color.Black,
-                    fontSize = 12.sp) // Description
+                    fontSize = 12.sp) // Location
                 Row(
                     modifier = Modifier
                         .padding(5.dp)
@@ -1026,7 +1030,7 @@ fun GoalCard(
                 ) {
                     initialDateTime?.let { initialDateTime ->
                         Text(
-                            text = initialDateTime,
+                            text = stringResource(R.string.start_date, initialDateTime),
                             modifier = Modifier.padding(end = 5.dp),
                             textAlign = TextAlign.Start,
                             fontSize = 12.sp
