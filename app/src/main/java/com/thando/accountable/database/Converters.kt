@@ -246,13 +246,13 @@ class Converters {
     }
 
     @TypeConverter
-    fun toGoalStatus(mutableState: MutableState<Goal.GoalStatus>): String {
+    fun toGoalStatus(mutableState: MutableState<Goal.Status>): String {
         return mutableState.value.name
     }
 
     @TypeConverter
-    fun fromGoalStatus(goalStatus: String): MutableState<Goal.GoalStatus> {
-        return mutableStateOf(Goal.GoalStatus.valueOf(goalStatus))
+    fun fromGoalStatus(goalStatus: String): MutableState<Goal.Status> {
+        return mutableStateOf(Goal.Status.valueOf(goalStatus))
     }
 
     @TypeConverter

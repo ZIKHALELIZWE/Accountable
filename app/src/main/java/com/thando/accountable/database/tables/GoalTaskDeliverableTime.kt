@@ -36,4 +36,7 @@ data class GoalTaskDeliverableTime (
 ){
     @Ignore
     val durationPickerFocusRequester = FocusRequester()
+
+    @Ignore
+    var cloneId: Long? = null
 }

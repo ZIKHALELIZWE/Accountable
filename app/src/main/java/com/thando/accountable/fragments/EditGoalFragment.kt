@@ -86,6 +86,7 @@ import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDateTime
@@ -278,7 +279,7 @@ fun EditGoalFragmentView(
                 Spacer(modifier = Modifier.width(2.dp))
             }
             item {
-                TextField(
+                OutlinedTextField(
                     state = location,
                     label = { Text(stringResource(R.string.location)) },
                     modifier = Modifier
@@ -351,7 +352,11 @@ fun EditGoalFragmentView(
                 ) { Text(stringResource(R.string.add_time_block)) }
             }
             items(items = times, key = { it.id?:Random.nextLong() }) { item ->
-                TimeInputView(item, viewModel)
+                TimeInputView(
+                    item,
+                    viewModel.triedToSave,
+                    viewModel::deleteTimeBlock
+                )
                 if (times.indexOf(item) != times.lastIndex) {
                     Spacer(modifier = Modifier.width(2.dp))
                 }
@@ -371,7 +376,8 @@ fun EditGoalFragmentView(
 @Composable
 fun TimeInputView(
     time: GoalTaskDeliverableTime,
-    viewModel: EditGoalViewModel
+    triedToSaveStateFlow: MutableStateFlow<Boolean>,
+    deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit
 ){
     var timeBlockType by remember { time.timeBlockType }
     var pickedDate by remember { time.start }
@@ -380,7 +386,7 @@ fun TimeInputView(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
+    val triedToSave by triedToSaveStateFlow.collectAsStateWithLifecycle()
     val durationPickerFocusRequester = remember { time.durationPickerFocusRequester }
 
     Card(
@@ -404,7 +410,7 @@ fun TimeInputView(
                         .padding(4.dp)
                         .weight(1f)
                         .background(color = Color.Red),
-                    onClick = { scope.launch { viewModel.deleteTimeBlock(time) } }
+                    onClick = { scope.launch { deleteTimeBlock(time) } }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,

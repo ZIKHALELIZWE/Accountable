@@ -12,12 +12,15 @@ import androidx.room.Update
 import com.thando.accountable.AppResources
 import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
+import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
+import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
+import com.thando.accountable.database.tables.Task
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -59,6 +62,15 @@ interface RepositoryDao {
     @Insert
     suspend fun insert(goalTaskDeliverableTime: GoalTaskDeliverableTime): Long
 
+    @Insert
+    suspend fun insert(task: Task): Long
+
+    @Insert
+    suspend fun insert(deliverable: Deliverable): Long
+
+    @Insert
+    suspend fun insert(marker: Marker): Long
+
     @Update
     suspend fun update(folder: Folder)
 
@@ -86,6 +98,15 @@ interface RepositoryDao {
     @Update
     suspend fun update(goalTaskDeliverableTime: GoalTaskDeliverableTime)
 
+    @Update
+    suspend fun update(task: Task)
+
+    @Update
+    suspend fun update(deliverable: Deliverable)
+
+    @Update
+    suspend fun update(marker: Marker)
+
     @Delete
     suspend fun delete(folder: Folder)
 
@@ -109,6 +130,15 @@ interface RepositoryDao {
 
     @Delete
     suspend fun delete(goalTaskDeliverableTime: GoalTaskDeliverableTime)
+
+    @Delete
+    suspend fun delete(task: Task)
+
+    @Delete
+    suspend fun delete(deliverable: Deliverable)
+
+    @Delete
+    suspend fun delete(marker: Marker)
 
     @Transaction
     suspend fun deleteGoal(goalId: Long?, context: Context){
@@ -290,6 +320,86 @@ interface RepositoryDao {
     }
 
     @Transaction
+    suspend fun upsert(task: Task): Long {
+        if (task.id!=null){
+            val existingEntity = getTask(task.id)
+            if (existingEntity!=null){
+                update(task)
+                return task.id!!
+            }
+            else{
+                task.id = null
+                return insert(task)
+            }
+        }
+        return insert(task)
+    }
+
+    @Transaction
+    suspend fun upsert(deliverable: Deliverable): Long {
+        if (deliverable.id!=null){
+            val existingEntity = getDeliverable(deliverable.id)
+            if (existingEntity!=null){
+                update(deliverable)
+                return deliverable.id!!
+            }
+            else{
+                deliverable.id = null
+                return insert(deliverable)
+            }
+        }
+        return insert(deliverable)
+    }
+
+    @Transaction
+    suspend fun upsert(marker: Marker): Long {
+        if (marker.id!=null){
+            val existingEntity = getMarker(marker.id)
+            if (existingEntity!=null){
+                update(marker)
+                return marker.id!!
+            }
+            else{
+                marker.id = null
+                return insert(marker)
+            }
+        }
+        return insert(marker)
+    }
+
+    @Transaction
+    suspend fun upsert(goalTaskDeliverableTime: GoalTaskDeliverableTime): Long {
+        if (goalTaskDeliverableTime.id!=null){
+            val existingEntity = getGoalTaskDeliverableTime(goalTaskDeliverableTime.id)
+            if (existingEntity!=null){
+                update(goalTaskDeliverableTime)
+                return goalTaskDeliverableTime.id!!
+            }
+            else{
+                goalTaskDeliverableTime.id = null
+                return insert(goalTaskDeliverableTime)
+            }
+        }
+        return insert(goalTaskDeliverableTime)
+    }
+
+    @Transaction
+    suspend fun upsert(goal: Goal): Long {
+        if (goal.id!=null){
+            val existingEntity = getGoalNow(goal.id)
+            if (existingEntity!=null){
+                update(goal)
+                return goal.id!!
+            }
+            else{
+                goal.id = null
+                return insert(goal)
+            }
+        }
+        return insert(goal)
+    }
+
+    @Transaction
     suspend fun getGoalWithTimes(goalId:Long?) = getGoalNow(goalId).apply {
         this?.times?.clear()
         this?.times?.addAll(getGoalTimes(goalId))
@@ -393,6 +503,27 @@ interface RepositoryDao {
 
     @Query("SELECT * FROM script_table WHERE script_parent = :parent ORDER BY script_position DESC")
     suspend fun getScriptsNowDESC(parent:Long?): List<Script>
+
+    @Query("SELECT * FROM task_table WHERE task_parent = :parentId AND task_parent_type = :parentType")
+    suspend fun getTasks(parentId:Long?, parentType: Task.TaskParentType): List<Task>
+
+    @Query("SELECT * FROM deliverable_table WHERE deliverable_parent = :goalId")
+    suspend fun getDeliverables(goalId:Long?): List<Deliverable>
+
+    @Query("SELECT * FROM marker_table WHERE marker_parent = :goalId")
+    suspend fun getMarkers(goalId:Long?): List<Marker>
+
+    @Query("SELECT * FROM task_table WHERE id = :taskId")
+    suspend fun getTask(taskId: Long?): Task?
+
+    @Query("SELECT * FROM deliverable_table WHERE id = :deliverableId")
+    suspend fun getDeliverable(deliverableId: Long?): Deliverable?
+
+    @Query("SELECT * FROM marker_table WHERE id = :markerId")
+    suspend fun getMarker(markerId: Long?): Marker?
+
+    @Query("SELECT * FROM times_table WHERE id = :goalTaskDeliverableTimeId")
+    suspend fun getGoalTaskDeliverableTime(goalTaskDeliverableTimeId: Long?): GoalTaskDeliverableTime?
 
     @Transaction
     suspend fun appSettings(): AppSettings {

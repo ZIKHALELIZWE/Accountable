@@ -274,5 +274,11 @@
     <string name="deliverable">Deliverable</string>
     <string name="task">Task</string>
     <string name="add">Add %1$s</string>
-    <string name="add_task_or_deliverable">Add Task or Deliverable</string>
+    <string name="add_task_deliverable_or_marker">Add Task, Deliverable or Marker</string>
+    <string name="please_enter_a_task">Please Enter A Task</string>
+    <string name="please_enter_a_deliverable">Please Enter A Deliverable</string>
+    <string name="add_marker">Add Marker</string>
+    <string name="please_enter_a_marker">Please Enter A Marker</string>
+    <string name="markers">Markers</string>
+    <string name="marker">Marker</string>
 </resources>

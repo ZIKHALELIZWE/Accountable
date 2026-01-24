@@ -14,6 +14,8 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -25,12 +27,15 @@ import com.thando.accountable.database.dataaccessobjects.RepositoryDao
 import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Content.ContentType
+import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
+import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
+import com.thando.accountable.database.tables.Task
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.ContentPosition
 import com.thando.accountable.fragments.viewmodels.BooksViewModel.Companion.INITIAL_FOLDER_ID
@@ -1811,60 +1816,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
         withContext(Dispatchers.IO) {
                 if (id != null && id != INITIAL_FOLDER_ID){
                     // Load Existing Goal
-                    val tempEditGoal = dao.getGoalWithTimes(id)
-                    val tempNewGoal = Goal()
-                    tempNewGoal.let { newGoal ->
-                        tempEditGoal?.let { editGoal ->
-                            newGoal.id = dao.insert(newGoal)
-
-                            newGoal.parent.value = editGoal.parent.value
-                            newGoal.goalCategory.value = editGoal.goalCategory.value
-                            newGoal.initialDateTime = AppResources.CalendarResource(
-                                editGoal.initialDateTime.getCalendar()
-                            )
-                            newGoal.position.value = editGoal.position.value
-                            newGoal.scrollPosition.requestScrollToItem(
-                                editGoal.scrollPosition.firstVisibleItemIndex,
-                                editGoal.scrollPosition.firstVisibleItemScrollOffset
-                            )
-                            newGoal.size.value = editGoal.size.value
-                            newGoal.numImages.value = editGoal.numImages.value
-                            newGoal.numVideos.value = editGoal.numVideos.value
-                            newGoal.numAudios.value = editGoal.numAudios.value
-                            newGoal.numDocuments.value = editGoal.numDocuments.value
-                            newGoal.numScripts.value = editGoal.numScripts.value
-                            newGoal.goal.setTextAndPlaceCursorAtEnd(editGoal.goal.text.toString())
-                            newGoal.dateOfCompletion = editGoal.dateOfCompletion?.let{
-                                AppResources.CalendarResource(it.getCalendar())
-                            }
-                            newGoal.status.value = editGoal.status.value
-                            newGoal.colour.value = editGoal.colour.value
-                            newGoal.location.setTextAndPlaceCursorAtEnd(editGoal.location.text.toString())
-
-                            newGoal.saveImage(
-                                application,
-                                editGoal.imageResource.getUriFromStorage(application)
-                            )
-                            for (time in editGoal.times) {
-                                newGoal.id?.let {
-                                    val newTime = GoalTaskDeliverableTime()
-
-                                    newTime.goal.value = it
-                                    newTime.task.value = time.task.value
-                                    newTime.deliverable.value = time.deliverable.value
-                                    newTime.timeBlockType.value = time.timeBlockType.value
-                                    newTime.start.value = time.start.value
-                                    newTime.duration.value = time.duration.value
-                                    newTime.id = dao.insert(newTime)
-                                    newGoal.times.add(newTime)
-                                }
-                            }
+                    val tempEditGoal = MutableStateFlow(dao.getGoalWithTimes(id))
+                    val tempNewGoal = MutableStateFlow<Goal?>(Goal())
+                    cloneGoalTo(tempEditGoal,tempNewGoal)
+                    tempNewGoal.value?.let { newGoal ->
+                        tempEditGoal.value?.let { _ ->
                             dao.update(newGoal)
                         }
                     }
                     withContext(Dispatchers.Main){
-                        editGoal.value = tempEditGoal
-                        newGoal.value = tempNewGoal
+                        editGoal.value = tempEditGoal.value
+                        newGoal.value = tempNewGoal.value
                     }
                 }
                 else {
@@ -1936,40 +1898,54 @@ class AccountableRepository(val application: Application): AutoCloseable {
         if (editGoal.value!!.id == null){
             editGoal.value!!.id = dao.insert(editGoal.value!!)
         }
+        cloneGoalTo(newGoal,editGoal)
         editGoal.value?.let { editGoal ->
             newGoal.value?.let { newGoal ->
-                editGoal.parent.value = newGoal.parent.value
-                editGoal.goalCategory.value = newGoal.goalCategory.value
-                editGoal.initialDateTime =
-                    AppResources.CalendarResource(newGoal.initialDateTime.getCalendar())
-                editGoal.position.value = newGoal.position.value
-                editGoal.scrollPosition.requestScrollToItem(
-                    newGoal.scrollPosition.firstVisibleItemIndex,
-                    newGoal.scrollPosition.firstVisibleItemScrollOffset
-                )
-                editGoal.size.value = newGoal.size.value
-                editGoal.numImages.value = newGoal.numImages.value
-                editGoal.numVideos.value = newGoal.numVideos.value
-                editGoal.numAudios.value = newGoal.numAudios.value
-                editGoal.numDocuments.value = newGoal.numDocuments.value
-                editGoal.numScripts.value = newGoal.numScripts.value
-                editGoal.goal.setTextAndPlaceCursorAtEnd(newGoal.goal.text.toString())
-                editGoal.dateOfCompletion =
-                    newGoal.dateOfCompletion?.let{ AppResources.CalendarResource(it.getCalendar()) }
-                editGoal.status.value = newGoal.status.value
-                editGoal.colour.value = newGoal.colour.value
-                editGoal.location.setTextAndPlaceCursorAtEnd(newGoal.location.text.toString())
+                dao.update(editGoal)
+                withContext(Dispatchers.Main){
+                    process()
+                }
+            }
+        }
+    }
 
-                editGoal.saveImage(
-                    application,
-                    newGoal.imageResource.getUriFromStorage(application)
+    suspend fun cloneGoalTo(
+        from:MutableStateFlow<Goal?>,
+        to:MutableStateFlow<Goal?>
+    ) {
+        from.value?.let { from ->
+            to.value?.let { to ->
+                to.parent.value = from.parent.value
+                to.goalCategory.value = from.goalCategory.value
+                to.initialDateTime.setCalendar(from.initialDateTime.getCalendar())
+                to.position.value = from.position.value
+                to.scrollPosition.requestScrollToItem(
+                    from.scrollPosition.firstVisibleItemIndex,
+                    from.scrollPosition.firstVisibleItemScrollOffset
                 )
-                for (time in editGoal.times) {
+                to.size.value = from.size.value
+                to.numImages.value = from.numImages.value
+                to.numVideos.value = from.numVideos.value
+                to.numAudios.value = from.numAudios.value
+                to.numDocuments.value = from.numDocuments.value
+                to.numScripts.value = from.numScripts.value
+                to.goal.setTextAndPlaceCursorAtEnd(from.goal.text.toString())
+                to.dateOfCompletion =
+                    from.dateOfCompletion?.let{ AppResources.CalendarResource(it.getCalendar()) }
+                to.status.value = from.status.value
+                to.colour.value = from.colour.value
+                to.location.setTextAndPlaceCursorAtEnd(from.location.text.toString())
+
+                to.saveImage(
+                    application,
+                    from.imageResource.getUriFromStorage(application)
+                )
+                for (time in to.times) {
                     dao.delete(time)
                 }
-                editGoal.times.clear()
-                for (time in newGoal.times) {
-                    editGoal.id?.let { id ->
+                to.times.clear()
+                for (time in from.times) {
+                    to.id?.let { id ->
                         val newTime = GoalTaskDeliverableTime()
 
                         newTime.goal.value = id
@@ -1979,13 +1955,37 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         newTime.start.value = time.start.value
                         newTime.duration.value = time.duration.value
                         newTime.id = dao.insert(newTime)
-                        editGoal.times.add(newTime)
+                        to.times.add(newTime)
                     }
                 }
-                dao.update(editGoal)
 
-                withContext(Dispatchers.Main){
-                    process()
+                if (to.id == null) to.id = saveGoal(to)
+                to.times.removeIf { toTime ->
+                    // Delete the ones that are not in from (originally in to)
+                    !from.times.any { fromTime -> toTime.id == fromTime.cloneId }
+                }
+                for (time in from.times) {
+                    to.id?.let { id ->
+                        var shouldUpdate = true
+                        var newTime = to.times.find { toTime -> toTime.id == time.cloneId }
+                        if (newTime == null){
+                            newTime = GoalTaskDeliverableTime()
+                            shouldUpdate = false
+                        }
+
+                        newTime.goal.value = time.goal.value
+                        newTime.task.value = id
+                        newTime.deliverable.value = time.deliverable.value
+                        newTime.timeBlockType.value = time.timeBlockType.value
+                        newTime.start.value = time.start.value
+                        newTime.duration.value = time.duration.value
+                        if (shouldUpdate) saveGoalTaskDeliverableTime(newTime)
+                        else {
+                            newTime.id = dao.insert(newTime)
+                            newTime.cloneId = time.id
+                            to.times.add(newTime)
+                        }
+                    }
                 }
             }
         }
@@ -2015,5 +2015,223 @@ class AccountableRepository(val application: Application): AutoCloseable {
             loadFolder()
             changeFragment(AccountableFragment.GoalsFragment)
         }
+    }
+
+    suspend fun getTasks(parentId:Long, parentType: Task.TaskParentType): List<Task> {
+        return dao.getTasks(
+            parentId,
+            parentType
+        )
+    }
+
+    suspend fun getDeliverables(parentId:Long): List<Deliverable> {
+        return dao.getDeliverables(parentId)
+    }
+
+    suspend fun getMarkers(parentId:Long): List<Marker> {
+        return dao.getMarkers(parentId)
+    }
+
+    suspend fun cloneTaskTo(
+        from:MutableStateFlow<Task?>,
+        to:MutableStateFlow<Task?>
+    ) {
+        to.value?.let { to ->
+            from.value?.let { from ->
+                to.parent.value = from.parent.value
+                to.parentType.value = from.parentType.value
+                to.position.value = from.position.value
+                to.initialDateTime.setCalendar(from.initialDateTime.getCalendar())
+                to.endDateTime.setCalendar(from.endDateTime.getCalendar())
+                to.endType.value = from.endType.value
+                to.scrollPosition.requestScrollToItem(
+                    from.scrollPosition.firstVisibleItemIndex,
+                    from.scrollPosition.firstVisibleItemScrollOffset
+                )
+                to.task.setTextAndPlaceCursorAtEnd(from.task.text.toString())
+                to.status.value = from.status.value
+                to.colour.value = from.colour.value
+                to.location.setTextAndPlaceCursorAtEnd(from.location.text.toString())
+                to.size.value = from.size.value
+                to.numImages.value = from.numImages.value
+                to.numVideos.value = from.numVideos.value
+                to.numAudios.value = from.numAudios.value
+                to.numDocuments.value = from.numDocuments.value
+                to.numScripts.value = from.numScripts.value
+
+                if (to.id == null) to.id = saveTask(to)
+                to.times.removeIf { toTime ->
+                    // Delete the ones that are not in from (originally in to)
+                    !from.times.any { fromTime -> toTime.id == fromTime.cloneId }
+                }
+                for (time in from.times) {
+                    to.id?.let { id ->
+                        var shouldUpdate = true
+                        var newTime = to.times.find { toTime -> toTime.id == time.cloneId }
+                        if (newTime == null){
+                            newTime = GoalTaskDeliverableTime()
+                            shouldUpdate = false
+                        }
+
+                        newTime.goal.value = time.goal.value
+                        newTime.task.value = id
+                        newTime.deliverable.value = time.deliverable.value
+                        newTime.timeBlockType.value = time.timeBlockType.value
+                        newTime.start.value = time.start.value
+                        newTime.duration.value = time.duration.value
+                        if (shouldUpdate) saveGoalTaskDeliverableTime(newTime)
+                        else {
+                            newTime.id = dao.insert(newTime)
+                            newTime.cloneId = time.id
+                            to.times.add(newTime)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun getTaskClone(task: Task): Task? {
+        val mutableOriginal:MutableStateFlow<Task?> = MutableStateFlow(task)
+        val mutableReturn:MutableStateFlow<Task?> = MutableStateFlow(Task(
+            parent = mutableStateOf(task.parent.value),
+            parentType = mutableStateOf(task.parentType.value),
+            position = mutableStateOf(task.position.value)
+        ))
+        cloneTaskTo(mutableOriginal,mutableReturn)
+        return mutableReturn.value
+    }
+
+    suspend fun cloneDeliverableTo(
+        from:MutableStateFlow<Deliverable?>,
+        to:MutableStateFlow<Deliverable?>
+    ) {
+        from.value?.let { from ->
+            to.value?.let { to ->
+                to.parent.value = from.parent.value
+                to.position.value = from.position.value
+                to.initialDateTime.setCalendar(from.initialDateTime.getCalendar())
+                to.endDateTime.setCalendar(from.endDateTime.getCalendar())
+                to.endType.value = from.endType.value
+                to.scrollPosition.requestScrollToItem(
+                    from.scrollPosition.firstVisibleItemIndex,
+                    from.scrollPosition.firstVisibleItemScrollOffset
+                )
+                to.deliverable.setTextAndPlaceCursorAtEnd(from.deliverable.text.toString())
+                to.status.value = from.status.value
+                to.location.setTextAndPlaceCursorAtEnd(from.location.text.toString())
+                to.size.value = from.size.value
+                to.numImages.value = from.numImages.value
+                to.numVideos.value = from.numVideos.value
+                to.numAudios.value = from.numAudios.value
+                to.numDocuments.value = from.numDocuments.value
+                to.numScripts.value = from.numScripts.value
+
+                if (to.id == null) to.id = saveDeliverable(to)
+                to.times.removeIf { toTime ->
+                    // Delete the ones that are not in from (originally in to)
+                    !from.times.any { fromTime -> toTime.id == fromTime.cloneId }
+                }
+                for (time in from.times) {
+                    to.id?.let { id ->
+                        var shouldUpdate = true
+                        var newTime = to.times.find { toTime -> toTime.id == time.cloneId }
+                        if (newTime == null){
+                            newTime = GoalTaskDeliverableTime()
+                            shouldUpdate = false
+                        }
+
+                        newTime.goal.value = time.goal.value
+                        newTime.task.value = id
+                        newTime.deliverable.value = time.deliverable.value
+                        newTime.timeBlockType.value = time.timeBlockType.value
+                        newTime.start.value = time.start.value
+                        newTime.duration.value = time.duration.value
+                        if (shouldUpdate) saveGoalTaskDeliverableTime(newTime)
+                        else {
+                            newTime.id = dao.insert(newTime)
+                            newTime.cloneId = time.id
+                            to.times.add(newTime)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun getDeliverableClone(deliverable: Deliverable): Deliverable? {
+        val mutableOriginal:MutableStateFlow<Deliverable?> = MutableStateFlow(deliverable)
+        val mutableReturn:MutableStateFlow<Deliverable?> = MutableStateFlow(Deliverable(
+            parent = mutableStateOf(deliverable.parent.value),
+            position = mutableStateOf(deliverable.position.value)
+        ))
+        cloneDeliverableTo(mutableOriginal,mutableReturn)
+        return mutableReturn.value
+    }
+
+    suspend fun cloneMarkerTo(
+        from:MutableStateFlow<Marker?>,
+        to:MutableStateFlow<Marker?>
+    ) {
+        from.value?.let { from ->
+            to.value?.let { to ->
+                to.parent.value = from.parent.value
+                to.position.value = from.position.value
+                to.dateTime.setCalendar(from.dateTime.getCalendar())
+                to.scrollPosition.requestScrollToItem(
+                    from.scrollPosition.firstVisibleItemIndex,
+                    from.scrollPosition.firstVisibleItemScrollOffset
+                )
+                to.marker.setTextAndPlaceCursorAtEnd(from.marker.text.toString())
+
+                if (to.id == null) to.id = saveMarker(to)
+            }
+        }
+    }
+
+    suspend fun getMarkerClone(marker: Marker): Marker? {
+        val mutableOriginal:MutableStateFlow<Marker?> = MutableStateFlow(marker)
+        val mutableReturn:MutableStateFlow<Marker?> = MutableStateFlow(Marker(
+            parent = mutableStateOf(marker.parent.value),
+            position = mutableStateOf(marker.position.value)
+        ))
+        cloneMarkerTo(mutableOriginal,mutableReturn)
+        return mutableReturn.value
+    }
+
+    suspend fun saveGoal(goal: Goal): Long {
+        return dao.upsert(goal)
+    }
+
+    suspend fun saveTask(task: Task): Long {
+        return dao.upsert(task)
+    }
+
+    suspend fun saveDeliverable(deliverable: Deliverable): Long {
+        return dao.upsert(deliverable)
+    }
+
+    suspend fun saveMarker(marker: Marker): Long {
+        return dao.upsert(marker)
+    }
+
+    suspend fun saveGoalTaskDeliverableTime(goalTaskDeliverableTime: GoalTaskDeliverableTime): Long {
+        return dao.upsert(goalTaskDeliverableTime)
+    }
+
+    suspend fun deleteTask(task: Task) {
+        dao.delete(task)
+    }
+
+    suspend fun deleteDeliverable(deliverable: Deliverable) {
+        dao.delete(deliverable)
+    }
+
+    suspend fun deleteMarker(marker: Marker) {
+        dao.delete(marker)
+    }
+
+    suspend fun deleteGoalTaskDeliverableTime(goalTaskDeliverableTime: GoalTaskDeliverableTime) {
+        dao.delete(goalTaskDeliverableTime)
     }
 }

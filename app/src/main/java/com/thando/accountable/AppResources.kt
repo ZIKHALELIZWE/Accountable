@@ -120,8 +120,9 @@ sealed class AppResources {
         IMAGE, DOCUMENT, AUDIO, VIDEO
     }
 
-    class CalendarResource(private val calendar: Calendar) {
+    class CalendarResource(inputCalendar: Calendar) {
 
+        private val calendar = MutableStateFlow(inputCalendar)
         private var time = MutableStateFlow(getTime())
         private var dayNum = MutableStateFlow(getDayNum())
         private lateinit var dayWord : MutableStateFlow<String>
@@ -130,8 +131,12 @@ sealed class AppResources {
         private lateinit var daysFromToday: MutableStateFlow<String>
         private var dateHasNotBeenInitialized = true
 
+        fun setCalendar(inputCalendar: Calendar){
+            calendar.value = inputCalendar
+        }
+
         fun convertToLong():Long{
-            return calendar.time.time
+            return calendar.value.time.time
         }
 
         fun getCalendar():Calendar{
@@ -141,14 +146,18 @@ sealed class AppResources {
         }
 
         private fun getDayMonthYear(): Triple<Int,Int,Int>{
-            return Triple(calendar.get(Calendar.DAY_OF_MONTH),calendar.get(Calendar.MONTH),calendar.get(Calendar.YEAR))
+            return Triple(
+                calendar.value.get(Calendar.DAY_OF_MONTH),
+                calendar.value.get(Calendar.MONTH),
+                calendar.value.get(Calendar.YEAR)
+            )
         }
 
         fun pickDate(context: Context){
             val listener = DatePickerDialog.OnDateSetListener { _, year, month, dayOfMonth ->
-                calendar.set(Calendar.YEAR, year)
-                calendar.set(Calendar.MONTH, month)
-                calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                calendar.value.set(Calendar.YEAR, year)
+                calendar.value.set(Calendar.MONTH, month)
+                calendar.value.set(Calendar.DAY_OF_MONTH, dayOfMonth)
                 initializeDatetime(context)
             }
             val (dayOfMonth, month, year) = getDayMonthYear()
@@ -157,11 +166,11 @@ sealed class AppResources {
         }
 
         private fun getTime(): String{
-            return getDoubleDigitString(calendar.get(Calendar.HOUR_OF_DAY).toString()) + ":" + getDoubleDigitString(calendar.get(Calendar.MINUTE).toString())
+            return getDoubleDigitString(calendar.value.get(Calendar.HOUR_OF_DAY).toString()) + ":" + getDoubleDigitString(calendar.value.get(Calendar.MINUTE).toString())
         }
 
         private fun getDayNum(): String{
-            return getDoubleDigitString(calendar.get(Calendar.DAY_OF_MONTH).toString())
+            return getDoubleDigitString(calendar.value.get(Calendar.DAY_OF_MONTH).toString())
         }
 
         private fun getDoubleDigitString(value:String): String{
@@ -181,7 +190,7 @@ sealed class AppResources {
         }
 
         private fun getDayWord(context: Context): String{
-            return when (calendar.get(Calendar.DAY_OF_WEEK)) {
+            return when (calendar.value.get(Calendar.DAY_OF_WEEK)) {
                 Calendar.MONDAY -> context.getString(R.string.Mon)
                 Calendar.TUESDAY -> context.getString(R.string.Tue)
                 Calendar.WEDNESDAY -> context.getString(R.string.Wed)
@@ -243,7 +252,10 @@ sealed class AppResources {
         }
 
         private fun getMonthYear(context: Context): String{
-            return getMonth( calendar.get(Calendar.MONTH).toString(), context) + " " + calendar.get(Calendar.YEAR)
+            return getMonth(
+                calendar.value.get(Calendar.MONTH).toString(),
+                context
+            ) + " " + calendar.value.get(Calendar.YEAR)
         }
 
         private fun getMonth(month: String?, context: Context): String {
@@ -280,9 +292,9 @@ sealed class AppResources {
                     now.get(Calendar.DAY_OF_MONTH)
                 ),
                 LocalDate.of(
-                    calendar.get(Calendar.YEAR),
-                    calendar.get(Calendar.MONTH)+1,
-                    calendar.get(Calendar.DAY_OF_MONTH)
+                    calendar.value.get(Calendar.YEAR),
+                    calendar.value.get(Calendar.MONTH)+1,
+                    calendar.value.get(Calendar.DAY_OF_MONTH)
                 )
             ).days.toString()
         }

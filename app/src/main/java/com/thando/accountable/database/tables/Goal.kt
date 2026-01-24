@@ -2,7 +2,6 @@ package com.thando.accountable.database.tables
 
 import android.content.Context
 import android.net.Uri
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.MutableState
@@ -71,7 +70,7 @@ data class Goal(
     private var goalPicture : String? = null,
 
     @ColumnInfo (name = "goal_status")
-    val status : MutableState<GoalStatus> = mutableStateOf(GoalStatus.PENDING),
+    val status : MutableState<Status> = mutableStateOf(Status.PENDING),
 
     @ColumnInfo (name = "goal_colour") // -1 For no colour selected
     val colour: MutableState<Int> = mutableIntStateOf(-1),
@@ -92,10 +91,10 @@ data class Goal(
     }
 
     enum class GoalTab{
-        TASKS, DELIVERABLES
+        TASKS, DELIVERABLES, MARKERS
     }
 
-    enum class GoalStatus{
+    enum class Status{
         OVERDUE, PENDING, PAUSED, BREAK, COMPLETED, FUTURE
     }
 

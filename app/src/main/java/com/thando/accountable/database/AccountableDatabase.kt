@@ -9,12 +9,15 @@ import androidx.room.migration.Migration
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
 import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
+import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
+import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
+import com.thando.accountable.database.tables.Task
 import com.thando.accountable.database.tables.TeleprompterSettings
 import kotlinx.coroutines.coroutineScope
 
@@ -27,8 +30,11 @@ import kotlinx.coroutines.coroutineScope
     MarkupLanguage::class,
     TeleprompterSettings::class,
     SpecialCharacters::class,
-    GoalTaskDeliverableTime::class
-], version = 5, exportSchema = false)
+    GoalTaskDeliverableTime::class,
+    Task::class,
+    Deliverable::class,
+    Marker::class
+], version = 6, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AccountableDatabase: RoomDatabase() {
     abstract val repositoryDao : RepositoryDao
@@ -75,6 +81,9 @@ abstract class AccountableDatabase: RoomDatabase() {
                         },
                         Migration(4,5){ db ->
                             db.execSQL("ALTER TABLE goal_table ADD goal_tab_list_state INTEGER DEFAULT 0 NOT NULL")
+                        },
+                        Migration(5,6){ db ->
+
                         }
                     )
                      //    .allowMainThreadQueries() // allow for testing only todo
