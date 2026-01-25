@@ -10,6 +10,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Deliverable
@@ -341,14 +342,15 @@ interface RepositoryDao {
             val existingEntity = getDeliverable(deliverable.id)
             if (existingEntity!=null){
                 update(deliverable)
-                return deliverable.id!!
             }
             else{
-                deliverable.id = null
-                return insert(deliverable)
+                deliverable.id = insert(deliverable)
             }
         }
-        return insert(deliverable)
+        else deliverable.id = insert(deliverable)
+        //val storedTimes = getDeliverableTimes(deliverable.id)
+
+        return deliverable.id!!
     }
 
     @Transaction
@@ -402,7 +404,41 @@ interface RepositoryDao {
     @Transaction
     suspend fun getGoalWithTimes(goalId:Long?) = getGoalNow(goalId).apply {
         this?.times?.clear()
-        this?.times?.addAll(getGoalTimes(goalId))
+        this?.times?.addAll(getTimes(
+            goalId,
+            GoalTaskDeliverableTime.TimesType.GOAL
+            )
+        )
+    }
+
+    @Transaction
+    suspend fun getTasksWithTimes(
+        parentId:Long?,
+        parentType: Task.TaskParentType
+    ) = getTasks(parentId, parentType).apply {
+        this.forEach { task ->
+            task.times.clear()
+            task.times.addAll(getTimes(
+                task.id,
+                GoalTaskDeliverableTime.TimesType.TASK
+                )
+            )
+        }
+    }
+
+    @Transaction
+    suspend fun getDeliverablesWithTimes(
+        goalId: Long?
+    ) = getDeliverables(goalId).apply {
+        this.forEach { deliverable ->
+            deliverable.times.clear()
+            deliverable.times.addAll(
+                getTimes(
+                    deliverable.id,
+                    GoalTaskDeliverableTime.TimesType.DELIVERABLE
+                    )
+            )
+        }
     }
 
     @Query("SELECT * FROM folder_table WHERE folderId = :folderId")
@@ -417,8 +453,8 @@ interface RepositoryDao {
     @Query("SELECT * FROM goal_table WHERE id = :goalId")
     suspend fun getGoalNow(goalId: Long?): Goal?
 
-    @Query("SELECT * FROM times_table WHERE times_goal =:goalId")
-    fun getGoalTimes(goalId: Long?): MutableList<GoalTaskDeliverableTime>
+    @Query("SELECT * FROM times_table WHERE times_parent =:parentId AND times_type =:type")
+    fun getTimes(parentId: Long?, type: GoalTaskDeliverableTime.TimesType): MutableList<GoalTaskDeliverableTime>
 
     @Query("SELECT * FROM folder_table WHERE folder_parent = :parent AND folder_type = :folderType ORDER BY folder_position ASC")
     fun getFolders(parent:Long?, folderType: Folder.FolderType): LiveData<List<Folder>>
@@ -512,6 +548,9 @@ interface RepositoryDao {
 
     @Query("SELECT * FROM marker_table WHERE marker_parent = :goalId")
     suspend fun getMarkers(goalId:Long?): List<Marker>
+
+    @Query("SELECT * FROM marker_table")
+    suspend fun getAllMarkers(): List<Marker>
 
     @Query("SELECT * FROM task_table WHERE id = :taskId")
     suspend fun getTask(taskId: Long?): Task?

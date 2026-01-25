@@ -5,6 +5,7 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -13,8 +14,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
-import com.thando.accountable.AppResources
-import java.util.Calendar
+import java.time.LocalDateTime
 
 @Entity(tableName = "task_table")
 data class Task(
@@ -31,14 +31,10 @@ data class Task(
     val position: MutableState<Long>,
 
     @ColumnInfo (name = "task_initial_date")
-    var initialDateTime: AppResources.CalendarResource = AppResources.CalendarResource(
-        Calendar.getInstance()
-    ),
+    var initialDateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
 
     @ColumnInfo (name = "task_end_date")
-    var endDateTime: AppResources.CalendarResource = AppResources.CalendarResource(
-        Calendar.getInstance()
-    ),
+    var endDateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
 
     @ColumnInfo (name = "task_end_type")
     val endType: MutableState<TaskEndType> = mutableStateOf(TaskEndType.UNDEFINED),
@@ -49,6 +45,15 @@ data class Task(
     @ColumnInfo (name = "task_task")
     val task : TextFieldState = TextFieldState(""),
 
+    @ColumnInfo (name = "task_type")
+    val type: MutableState<TaskType>,
+
+    @ColumnInfo (name = "task_quantity")
+    val quantity: MutableState<Long> = mutableLongStateOf(0L),
+
+    @ColumnInfo (name = "task_time")
+    val time: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
+
     @ColumnInfo (name = "task_status")
     val status : MutableState<Goal.Status> = mutableStateOf(Goal.Status.PENDING),
 
@@ -58,7 +63,7 @@ data class Task(
     @ColumnInfo (name = "task_location")
     val location: TextFieldState = TextFieldState(""),
 
-    @ColumnInfo (name = "task_s ize")
+    @ColumnInfo (name = "task_size")
     val size: MutableState<Float> = mutableFloatStateOf(0F),
 
     @ColumnInfo (name = "task_num_images")
@@ -76,13 +81,17 @@ data class Task(
     @ColumnInfo (name = "task_num_scripts")
     val numScripts: MutableState<Int> = mutableIntStateOf(0),
 
-) {
+    ) {
     enum class TaskParentType {
         GOAL, FOLDER
     }
 
     enum class TaskEndType {
         DATE, DELIVERABLE, GOAL, UNDEFINED, MARKER
+    }
+
+    enum class TaskType {
+        NORMAL, QUANTITY, TIME,
     }
 
     @Ignore
@@ -93,4 +102,7 @@ data class Task(
 
     @Ignore
     val locationFocusRequester = FocusRequester()
+
+    @Ignore
+    val colourFocusRequester = FocusRequester()
 }

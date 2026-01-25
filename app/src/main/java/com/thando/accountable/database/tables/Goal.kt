@@ -20,7 +20,7 @@ import com.thando.accountable.database.dataaccessobjects.RepositoryDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
-import java.util.Calendar
+import java.time.LocalDateTime
 
 @Entity(tableName = "goal_table")
 data class Goal(
@@ -34,7 +34,7 @@ data class Goal(
     var goalCategory: MutableState<String> = mutableStateOf(""),
 
     @ColumnInfo (name = "goal_date_time")
-    var initialDateTime: AppResources.CalendarResource = AppResources.CalendarResource(Calendar.getInstance()),
+    var initialDateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
 
     @ColumnInfo (name = "goal_position")
     val position: MutableState<Long> = mutableLongStateOf(0L),
@@ -64,7 +64,7 @@ data class Goal(
     val goal : TextFieldState = TextFieldState(""),
 
     @ColumnInfo (name = "goal_date_of_completion")
-    var dateOfCompletion : AppResources.CalendarResource? = null,
+    var dateOfCompletion : MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
 
     @ColumnInfo (name = "goal_picture")
     private var goalPicture : String? = null,
@@ -112,7 +112,7 @@ data class Goal(
         times.clear()
         times.addAll(
             withContext(Dispatchers.IO){
-                dao.getGoalTimes(id)
+                dao.getTimes(id, GoalTaskDeliverableTime.TimesType.GOAL)
             }
         )
     }

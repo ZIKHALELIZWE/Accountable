@@ -21,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import java.time.LocalDateTime
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicReference
 
@@ -115,11 +116,11 @@ class ScriptViewModel(
 
     fun addTimeStamp(context: Context, index:Int, content: Content, updateTextFieldValue:(String,Int)->Unit){
         if (script.value!=null) {
-            val cal = AppResources.CalendarResource(Calendar.getInstance())
-            val date = cal.getFullDateStateFlow(context).value
-            val time = cal.getTimeStateFlow(context).value
+            val dateTimeNow = LocalDateTime.now()
+            val date = AppResources.getFullDate(context,dateTimeNow)
+            val time = AppResources.getTime(dateTimeNow)
             val (title,stampString) = if (
-                script.value!!.scriptDateTime.getFullDateStateFlow(context).value
+                AppResources.getFullDate(context,script.value!!.scriptDateTime.value)
                 ==
                 date
             ) {
@@ -219,9 +220,9 @@ class ScriptViewModel(
                 if (script.value?.scriptTitle != null && !script.value?.scriptTitle?.text.isNullOrEmpty()) {
                     hasContent = true
                     "${
-                        script.value!!.scriptDateTime.getTimeStateFlow(context).value
+                        AppResources.getTime(script.value!!.scriptDateTime.value)
                     }\n${
-                        script.value!!.scriptDateTime.getFullDateStateFlow(context).value
+                        AppResources.getFullDate(context,script.value!!.scriptDateTime.value)
                     }\n\n*${
                         script.value!!.scriptTitle.text
                     }*"

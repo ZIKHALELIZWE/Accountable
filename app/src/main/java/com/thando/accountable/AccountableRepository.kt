@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -757,7 +758,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     script.value = Script(
                         scriptParentType = Script.ScriptParentType.FOLDER,
                         scriptParent = parentId,
-                        scriptDateTime = AppResources.CalendarResource(Calendar.getInstance()),
                         scriptPosition = scripts.size.toLong(),
                     )
                     scriptMarkupLanguage.value = null
@@ -1872,9 +1872,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 it.id = dao.insert(it)
             }
             newGoal.value?.id?.let {
-                val newTime = GoalTaskDeliverableTime()
-                newTime.goal.value = it
-                newTime.id = dao.insert(newTime)
+                val newTime = GoalTaskDeliverableTime(
+                    parent = mutableLongStateOf(it),
+                    type = mutableStateOf(
+                        GoalTaskDeliverableTime.TimesType.GOAL
+                    )
+                )
+                newTime.id = dao.upsert(newTime)
                 withContext(Dispatchers.Main) {
                     newGoal.value?.times?.add(newTime)
                 }
@@ -1917,7 +1921,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
             to.value?.let { to ->
                 to.parent.value = from.parent.value
                 to.goalCategory.value = from.goalCategory.value
-                to.initialDateTime.setCalendar(from.initialDateTime.getCalendar())
+                to.initialDateTime.value = from.initialDateTime.value
                 to.position.value = from.position.value
                 to.scrollPosition.requestScrollToItem(
                     from.scrollPosition.firstVisibleItemIndex,
@@ -1930,8 +1934,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.numDocuments.value = from.numDocuments.value
                 to.numScripts.value = from.numScripts.value
                 to.goal.setTextAndPlaceCursorAtEnd(from.goal.text.toString())
-                to.dateOfCompletion =
-                    from.dateOfCompletion?.let{ AppResources.CalendarResource(it.getCalendar()) }
+                to.dateOfCompletion.value = from.dateOfCompletion.value
                 to.status.value = from.status.value
                 to.colour.value = from.colour.value
                 to.location.setTextAndPlaceCursorAtEnd(from.location.text.toString())
@@ -1940,24 +1943,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     application,
                     from.imageResource.getUriFromStorage(application)
                 )
-                for (time in to.times) {
-                    dao.delete(time)
-                }
-                to.times.clear()
-                for (time in from.times) {
-                    to.id?.let { id ->
-                        val newTime = GoalTaskDeliverableTime()
-
-                        newTime.goal.value = id
-                        newTime.task.value = time.task.value
-                        newTime.deliverable.value = time.deliverable.value
-                        newTime.timeBlockType.value = time.timeBlockType.value
-                        newTime.start.value = time.start.value
-                        newTime.duration.value = time.duration.value
-                        newTime.id = dao.insert(newTime)
-                        to.times.add(newTime)
-                    }
-                }
 
                 if (to.id == null) to.id = saveGoal(to)
                 to.times.removeIf { toTime ->
@@ -1969,19 +1954,23 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         var shouldUpdate = true
                         var newTime = to.times.find { toTime -> toTime.id == time.cloneId }
                         if (newTime == null){
-                            newTime = GoalTaskDeliverableTime()
+                            newTime = GoalTaskDeliverableTime(
+                                parent = mutableLongStateOf(id),
+                                type = mutableStateOf(
+                                    GoalTaskDeliverableTime.TimesType.GOAL
+                                ))
                             shouldUpdate = false
                         }
+                        else{
+                            newTime.parent.value = id
+                            newTime.type.value = GoalTaskDeliverableTime.TimesType.GOAL
+                        }
 
-                        newTime.goal.value = time.goal.value
-                        newTime.task.value = id
-                        newTime.deliverable.value = time.deliverable.value
                         newTime.timeBlockType.value = time.timeBlockType.value
                         newTime.start.value = time.start.value
                         newTime.duration.value = time.duration.value
-                        if (shouldUpdate) saveGoalTaskDeliverableTime(newTime)
-                        else {
-                            newTime.id = dao.insert(newTime)
+                        newTime.id = saveGoalTaskDeliverableTime(newTime)
+                        if (!shouldUpdate)  {
                             newTime.cloneId = time.id
                             to.times.add(newTime)
                         }
@@ -2018,14 +2007,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun getTasks(parentId:Long, parentType: Task.TaskParentType): List<Task> {
-        return dao.getTasks(
+        return dao.getTasksWithTimes(
             parentId,
             parentType
         )
     }
 
     suspend fun getDeliverables(parentId:Long): List<Deliverable> {
-        return dao.getDeliverables(parentId)
+        return dao.getDeliverablesWithTimes(parentId)
     }
 
     suspend fun getMarkers(parentId:Long): List<Marker> {
@@ -2041,14 +2030,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.parent.value = from.parent.value
                 to.parentType.value = from.parentType.value
                 to.position.value = from.position.value
-                to.initialDateTime.setCalendar(from.initialDateTime.getCalendar())
-                to.endDateTime.setCalendar(from.endDateTime.getCalendar())
+                to.initialDateTime.value = from.initialDateTime.value
+                to.endDateTime.value = from.endDateTime.value
                 to.endType.value = from.endType.value
                 to.scrollPosition.requestScrollToItem(
                     from.scrollPosition.firstVisibleItemIndex,
                     from.scrollPosition.firstVisibleItemScrollOffset
                 )
                 to.task.setTextAndPlaceCursorAtEnd(from.task.text.toString())
+                to.type.value = from.type.value
+                to.quantity.value = from.quantity.value
+                to.time.value = from.time.value
                 to.status.value = from.status.value
                 to.colour.value = from.colour.value
                 to.location.setTextAndPlaceCursorAtEnd(from.location.text.toString())
@@ -2069,19 +2061,24 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         var shouldUpdate = true
                         var newTime = to.times.find { toTime -> toTime.id == time.cloneId }
                         if (newTime == null){
-                            newTime = GoalTaskDeliverableTime()
+                            newTime = GoalTaskDeliverableTime(
+                                parent = mutableLongStateOf(id),
+                                type = mutableStateOf(
+                                    GoalTaskDeliverableTime.TimesType.TASK
+                                )
+                            )
                             shouldUpdate = false
                         }
+                        else{
+                            newTime.parent.value = id
+                            newTime.type.value = GoalTaskDeliverableTime.TimesType.TASK
+                        }
 
-                        newTime.goal.value = time.goal.value
-                        newTime.task.value = id
-                        newTime.deliverable.value = time.deliverable.value
                         newTime.timeBlockType.value = time.timeBlockType.value
                         newTime.start.value = time.start.value
                         newTime.duration.value = time.duration.value
-                        if (shouldUpdate) saveGoalTaskDeliverableTime(newTime)
-                        else {
-                            newTime.id = dao.insert(newTime)
+                        newTime.id = saveGoalTaskDeliverableTime(newTime)
+                        if (!shouldUpdate)  {
                             newTime.cloneId = time.id
                             to.times.add(newTime)
                         }
@@ -2094,9 +2091,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun getTaskClone(task: Task): Task? {
         val mutableOriginal:MutableStateFlow<Task?> = MutableStateFlow(task)
         val mutableReturn:MutableStateFlow<Task?> = MutableStateFlow(Task(
-            parent = mutableStateOf(task.parent.value),
+            parent = mutableLongStateOf(task.parent.value),
             parentType = mutableStateOf(task.parentType.value),
-            position = mutableStateOf(task.position.value)
+            position = mutableLongStateOf(task.position.value),
+            type = mutableStateOf(task.type.value)
         ))
         cloneTaskTo(mutableOriginal,mutableReturn)
         return mutableReturn.value
@@ -2110,8 +2108,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
             to.value?.let { to ->
                 to.parent.value = from.parent.value
                 to.position.value = from.position.value
-                to.initialDateTime.setCalendar(from.initialDateTime.getCalendar())
-                to.endDateTime.setCalendar(from.endDateTime.getCalendar())
+                to.initialDateTime.value = from.initialDateTime.value
+                to.endDateTime.value = from.endDateTime.value
                 to.endType.value = from.endType.value
                 to.scrollPosition.requestScrollToItem(
                     from.scrollPosition.firstVisibleItemIndex,
@@ -2137,19 +2135,24 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         var shouldUpdate = true
                         var newTime = to.times.find { toTime -> toTime.id == time.cloneId }
                         if (newTime == null){
-                            newTime = GoalTaskDeliverableTime()
+                            newTime = GoalTaskDeliverableTime(
+                                parent = mutableLongStateOf(id),
+                                type = mutableStateOf(
+                                    GoalTaskDeliverableTime.TimesType.DELIVERABLE
+                                )
+                            )
                             shouldUpdate = false
                         }
+                        else{
+                            newTime.parent.value = id
+                            newTime.type.value = GoalTaskDeliverableTime.TimesType.DELIVERABLE
+                        }
 
-                        newTime.goal.value = time.goal.value
-                        newTime.task.value = id
-                        newTime.deliverable.value = time.deliverable.value
                         newTime.timeBlockType.value = time.timeBlockType.value
                         newTime.start.value = time.start.value
                         newTime.duration.value = time.duration.value
-                        if (shouldUpdate) saveGoalTaskDeliverableTime(newTime)
-                        else {
-                            newTime.id = dao.insert(newTime)
+                        newTime.id = saveGoalTaskDeliverableTime(newTime)
+                        if (!shouldUpdate) {
                             newTime.cloneId = time.id
                             to.times.add(newTime)
                         }
@@ -2177,7 +2180,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
             to.value?.let { to ->
                 to.parent.value = from.parent.value
                 to.position.value = from.position.value
-                to.dateTime.setCalendar(from.dateTime.getCalendar())
+                to.dateTime.value = from.dateTime.value
                 to.scrollPosition.requestScrollToItem(
                     from.scrollPosition.firstVisibleItemIndex,
                     from.scrollPosition.firstVisibleItemScrollOffset

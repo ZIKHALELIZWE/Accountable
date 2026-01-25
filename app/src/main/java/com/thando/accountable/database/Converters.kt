@@ -12,13 +12,19 @@ import androidx.room.TypeConverter
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AppResources
 import com.thando.accountable.database.tables.Content
+import com.thando.accountable.database.tables.Deliverable.DeliverableEndType
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.Goal.TimeBlockType
+import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
+import com.thando.accountable.database.tables.Task
+import com.thando.accountable.database.tables.Task.TaskEndType
+import com.thando.accountable.database.tables.Task.TaskParentType
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 
@@ -136,8 +142,18 @@ class Converters {
     }
 
     @TypeConverter
-    fun toScrollState(lazyListState: LazyListState?): Int {
-        return lazyListState?.firstVisibleItemIndex?:0
+    fun toScrollStateNull(lazyListState: LazyListState?): Int? {
+        return lazyListState?.firstVisibleItemIndex
+    }
+
+    @TypeConverter
+    fun fromScrollStateLazyNull(scrollValue: Int?): LazyListState? {
+        return scrollValue?.let{LazyListState(it)}
+    }
+
+    @TypeConverter
+    fun toScrollState(lazyListState: LazyListState): Int {
+        return lazyListState.firstVisibleItemIndex
     }
 
     @TypeConverter
@@ -266,20 +282,25 @@ class Converters {
     }
 
     @TypeConverter
-    fun toStateLocalDateTime(time: MutableState<LocalDateTime>): String {
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-        return time.value.format(formatter)
+    fun fromLocalDateTime(dateTime: MutableState<LocalDateTime>): Long {
+        return dateTime.value.toInstant(ZoneOffset.UTC).toEpochMilli()
+    }
+    @TypeConverter
+    fun toLocalDateTime(millis: Long): MutableState<LocalDateTime> {
+        return mutableStateOf(LocalDateTime.ofEpochSecond(
+            millis / 1000, 0, ZoneOffset.UTC
+        ))
     }
 
     @TypeConverter
-    fun fromStateLocalDateTime(time: String): MutableState<LocalDateTime> {
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-        try {
-            return mutableStateOf(LocalDateTime.parse(time, formatter))
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return mutableStateOf(LocalDateTime.now())
-        }
+    fun fromLocalDateTime(dateTime: MutableState<LocalDateTime?>): Long? {
+        return dateTime.value?.toInstant(ZoneOffset.UTC)?.toEpochMilli()
+    }
+    @TypeConverter
+    fun toLocalDateTime(millis: Long?): MutableState<LocalDateTime?> {
+        return mutableStateOf(millis?.let { millis -> LocalDateTime.ofEpochSecond(
+            millis / 1000, 0, ZoneOffset.UTC
+        )})
     }
 
     @TypeConverter
@@ -290,5 +311,65 @@ class Converters {
     @TypeConverter
     fun fromTimeBlockTimeStatus(goalStatus: String): MutableState<TimeBlockType> {
         return mutableStateOf(TimeBlockType.valueOf(goalStatus))
+    }
+
+    @TypeConverter
+    fun toTaskParentType(mutableState: MutableState<TaskParentType>): String {
+        return mutableState.value.name
+    }
+
+    @TypeConverter
+    fun fromTaskParentType(taskParentType: String): MutableState<TaskParentType> {
+        return mutableStateOf(TaskParentType.valueOf(taskParentType))
+    }
+
+    @TypeConverter
+    fun toTaskEndType(mutableState: MutableState<TaskEndType>): String {
+        return mutableState.value.name
+    }
+
+    @TypeConverter
+    fun fromTaskEndType(taskEndType: String): MutableState<TaskEndType> {
+        return mutableStateOf(TaskEndType.valueOf(taskEndType))
+    }
+
+    @TypeConverter
+    fun toDeliverableEndType(mutableState: MutableState<DeliverableEndType>): String {
+        return mutableState.value.name
+    }
+
+    @TypeConverter
+    fun fromDeliverableEndType(deliverableEndType: String): MutableState<DeliverableEndType> {
+        return mutableStateOf(DeliverableEndType.valueOf(deliverableEndType))
+    }
+
+    @TypeConverter
+    fun toTimesType(mutableState: MutableState<GoalTaskDeliverableTime.TimesType>): String {
+        return mutableState.value.name
+    }
+
+    @TypeConverter
+    fun fromTimesType(timesType: String): MutableState<GoalTaskDeliverableTime.TimesType> {
+        return mutableStateOf(GoalTaskDeliverableTime.TimesType.valueOf(timesType))
+    }
+
+    @TypeConverter
+    fun toTaskType(mutableState: MutableState<Task.TaskType>): String {
+        return mutableState.value.name
+    }
+
+    @TypeConverter
+    fun fromTaskType(taskType: String): MutableState<Task.TaskType> {
+        return mutableStateOf(Task.TaskType.valueOf(taskType))
+    }
+
+    @TypeConverter
+    fun toStateLongNull(mutableState: MutableState<Long?>): Long? {
+        return mutableState.value
+    }
+
+    @TypeConverter
+    fun fromStateLongNull(long: Long?): MutableState<Long?> {
+        return mutableStateOf(long)
     }
 }

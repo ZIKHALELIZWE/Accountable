@@ -13,6 +13,7 @@ import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.time.LocalDateTime
 
 @Entity(tableName= "script_table")
 data class Script (
@@ -26,7 +27,7 @@ data class Script (
     var scriptParent: Long,
 
     @ColumnInfo (name = "script_date_time")
-    var scriptDateTime: AppResources.CalendarResource,
+    var scriptDateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
 
     @ColumnInfo (name = "script_title")
     var scriptTitle: TextFieldState = TextFieldState(""),

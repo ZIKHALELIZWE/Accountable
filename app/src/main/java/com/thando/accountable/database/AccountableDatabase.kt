@@ -34,7 +34,7 @@ import kotlinx.coroutines.coroutineScope
     Task::class,
     Deliverable::class,
     Marker::class
-], version = 6, exportSchema = false)
+], version = 8, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AccountableDatabase: RoomDatabase() {
     abstract val repositoryDao : RepositoryDao
@@ -63,14 +63,6 @@ abstract class AccountableDatabase: RoomDatabase() {
                             db.execSQL("CREATE TABLE IF NOT EXISTS goal_table (goal_category TEXT NOT NULL, goal_parent INTEGER NOT NULL, goal_colour INTEGER NOT NULL, goal_date_of_completion INTEGER NULL, goal_date_time INTEGER NOT NULL, goal_goal TEXT NOT NULL, goal_location TEXT NOT NULL, goal_num_audios INTEGER NOT NULL, goal_num_documents INTEGER NOT NULL, goal_num_images INTEGER NOT NULL, goal_num_scripts INTEGER NOT NULL, goal_num_videos INTEGER NOT NULL, goal_picture TEXT NULL, goal_position INTEGER NOT NULL, goal_scroll_position INTEGER NOT NULL, goal_size REAL NOT NULL, goal_status TEXT NOT NULL, id INTEGER PRIMARY KEY AUTOINCREMENT NULL)")
                             db.execSQL("CREATE TABLE IF NOT EXISTS times_table (id INTEGER PRIMARY KEY AUTOINCREMENT NULL, times_deliverable INTEGER NOT NULL, times_duration TEXT NOT NULL, times_goal INTEGER NOT NULL," +
                                     " times_start TEXT NOT NULL, times_task INTEGER NOT NULL, times_time_block_type TEXT NOT NULL)")
-                        //    db.execSQL("ALTER TABLE content_table ADD content_file_name TEXT DEFAULT '' NOT NULL")
-                        //    db.execSQL("ALTER TABLE app_settings_table ADD scripts_order INTEGER DEFAULT 0 NOT NULL")
-                        //    db.execSQL("ALTER TABLE folder_table ADD folder_folders_order INTEGER DEFAULT 0 NOT NULL")
-                         //   db.execSQL("ALTER TABLE folder_table ADD folder_scripts_order INTEGER DEFAULT 0 NOT NULL")
-                            /*db.execSQL("ALTER TABLE app_settings_table DROP COLUMN num_folders")
-                    db.execSQL("ALTER TABLE app_settings_table DROP COLUMN num_scripts")
-                    db.execSQL("ALTER TABLE app_settings_table DROP COLUMN num_goal_folders")
-                    db.execSQL("ALTER TABLE app_settings_table DROP COLUMN num_goals")*/
                         },
                         Migration(2,3) { db ->
                             db.execSQL("ALTER TABLE app_settings_table ADD goal_folders_order INTEGER DEFAULT 1 NOT NULL")
@@ -83,7 +75,75 @@ abstract class AccountableDatabase: RoomDatabase() {
                             db.execSQL("ALTER TABLE goal_table ADD goal_tab_list_state INTEGER DEFAULT 0 NOT NULL")
                         },
                         Migration(5,6){ db ->
+                            db.execSQL("CREATE TABLE IF NOT EXISTS marker_table (id INTEGER PRIMARY KEY AUTOINCREMENT NULL, marker_parent INTEGER NOT NULL, marker_position INTEGER NOT NULL, marker_date_time INTEGER NOT NULL," +
+                                    " marker_edit_scroll_position INTEGER NOT NULL, marker_marker TEXT NOT NULL)")
+                            db.execSQL("CREATE TABLE IF NOT EXISTS deliverable_table (id INTEGER PRIMARY KEY AUTOINCREMENT NULL, deliverable_parent INTEGER NOT NULL, deliverable_position INTEGER NOT NULL, deliverable_initial_date INTEGER NOT NULL," +
+                                    " deliverable_end_date INTEGER NOT NULL, deliverable_end_type TEXT NOT NULL, deliverable_edit_scroll_position INTEGER NOT NULL, deliverable_deliverable TEXT NOT NULL, deliverable_status TEXT NOT NULL, " +
+                                    "deliverable_location TEXT NOT NULL, deliverable_size FLOAT NOT NULL, deliverable_num_images INTEGER NOT NULL, deliverable_num_videos INTEGER NOT NULL, deliverable_num_audios INTEGER NOT NULL, " +
+                                    "deliverable_num_documents INTEGER NOT NULL, deliverable_num_scripts INTEGER NOT NULL)")
+                            db.execSQL("CREATE TABLE IF NOT EXISTS task_table (id INTEGER PRIMARY KEY AUTOINCREMENT NULL, task_parent INTEGER NOT NULL, task_parent_type TEXT NOT NULL, task_position INTEGER NOT NULL," +
+                                    " task_initial_date INTEGER NOT NULL, task_end_date INTEGER NOT NULL, task_end_type TEXT NOT NULL, task_edit_scroll_position INTEGER NOT NULL, task_task TEXT NOT NULL, task_status TEXT NOT NULL, " +
+                                    "task_colour INTEGER NOT NULL, task_location TEXT NOT NULL, task_size FLOAT NOT NULL, task_num_images INTEGER NOT NULL, task_num_videos INTEGER NOT NULL, task_num_audios INTEGER NOT NULL, " +
+                                    "task_num_documents INTEGER NOT NULL, task_num_scripts INTEGER NOT NULL)")
 
+                            // 1. Create new table with updated default
+                             db.execSQL("""
+                             CREATE TABLE goal_table_new (
+                             id INTEGER PRIMARY KEY AUTOINCREMENT NULL,
+                             goal_category TEXT NOT NULL,
+                             goal_colour INTEGER NOT NULL,
+                             goal_date_of_completion INTEGER NOT NULL,
+                             goal_date_time INTEGER NOT NULL,
+                             goal_goal TEXT NOT NULL,
+                             goal_location TEXT NOT NULL,
+                             goal_num_audios INTEGER NOT NULL,
+                             goal_num_documents INTEGER NOT NULL,
+                             goal_num_images INTEGER NOT NULL,
+                             goal_num_scripts INTEGER NOT NULL,
+                             goal_num_videos INTEGER NOT NULL,
+                             goal_parent INTEGER NOT NULL,
+                             goal_picture TEXT NULL,
+                             goal_position INTEGER NOT NULL,
+                             goal_scroll_position INTEGER NOT NULL,
+                             goal_selected_tab TEXT NOT NULL,
+                             goal_size REAL NOT NULL,
+                             goal_status TEXT NOT NULL,
+                             goal_tab_list_state INTEGER NOT NULL
+                             )
+                             """.trimIndent())
+                             // 2. Drop old table
+                             db.execSQL("DROP TABLE goal_table")
+                             // 3. Rename new table
+                             db.execSQL("ALTER TABLE goal_table_new RENAME TO goal_table")
+
+                             // 1. Create new table with updated default
+                              db.execSQL("""
+                              CREATE TABLE times_table_new (
+                              id INTEGER PRIMARY KEY AUTOINCREMENT NULL,
+                              times_deliverable INTEGER NOT NULL,
+                              times_duration INTEGER NOT NULL,
+                              times_goal INTEGER NOT NULL,
+                              times_start INTEGER NOT NULL,
+                              times_task INTEGER NOT NULL,
+                              times_time_block_type TEXT NOT NULL
+                              )
+                              """.trimIndent())
+                              // 2. Drop old table
+                              db.execSQL("DROP TABLE times_table")
+                              // 3. Rename new table
+                              db.execSQL("ALTER TABLE times_table_new RENAME TO times_table")
+                        },
+                        Migration(6,7){ db ->
+                            db.execSQL("ALTER TABLE times_table DROP COLUMN times_goal")
+                            db.execSQL("ALTER TABLE times_table DROP COLUMN times_task")
+                            db.execSQL("ALTER TABLE times_table DROP COLUMN times_deliverable")
+                            db.execSQL("ALTER TABLE times_table ADD times_parent INTEGER NOT NULL")
+                            db.execSQL("ALTER TABLE times_table ADD times_type TEXT NOT NULL")
+                        },
+                        Migration(7,8){ db ->
+                            db.execSQL("ALTER TABLE task_table ADD task_type TEXT DEFAULT NORMAL NOT NULL")
+                            db.execSQL("ALTER TABLE task_table ADD task_quantity INTEGER DEFAULT 0 NOT NULL")
+                            db.execSQL("ALTER TABLE task_table ADD task_time INTEGER DEFAULT undefined NOT NULL")
                         }
                     )
                      //    .allowMainThreadQueries() // allow for testing only todo

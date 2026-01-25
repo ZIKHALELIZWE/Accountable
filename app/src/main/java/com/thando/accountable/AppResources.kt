@@ -13,8 +13,12 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.annotation.AnyRes
 import androidx.annotation.StringRes
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TimePickerState
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.drawable.toBitmap
@@ -34,7 +38,9 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.Period
 import java.util.Calendar
 import kotlin.coroutines.CoroutineContext
@@ -114,6 +120,133 @@ sealed class AppResources {
             ContentType.AUDIO to "audio/*",
             ContentType.VIDEO to "video/*"
         )
+
+        fun getTime(localDateTime: LocalDateTime): String{
+            return getDoubleDigitString(
+                localDateTime.hour.toString()
+            ) + ":" + getDoubleDigitString(localDateTime.minute.toString())
+        }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        fun getTime(timePickerState: TimePickerState): String{
+            return getDoubleDigitString(
+                timePickerState.hour.toString()
+            ) + ":" + getDoubleDigitString(timePickerState.minute.toString())
+        }
+
+        private fun getDoubleDigitString(value:String): String{
+            return when (value) {
+                "0" -> "00"
+                "1" -> "01"
+                "2" -> "02"
+                "3" -> "03"
+                "4" -> "04"
+                "5" -> "05"
+                "6" -> "06"
+                "7" -> "07"
+                "8" -> "08"
+                "9" -> "09"
+                else -> value
+            }
+        }
+
+        fun getStandardDate(context: Context, localDateTime: LocalDateTime): String{
+            return getDayNum(localDateTime)+" "+getMonthYear(context, localDateTime)
+        }
+
+        fun getMonthYear(context: Context,localDateTime: LocalDateTime): String{
+            return getMonth(
+                localDateTime.monthValue.toString(),
+                context
+            ) + " " + localDateTime.year.toString()
+        }
+
+        private fun getMonth(month: String?, context: Context): String {
+            return when (month) {
+                "0", "00" -> context.getString(R.string.Jan)
+                "1", "01" -> context.getString(R.string.Feb)
+                "2", "02" -> context.getString(R.string.Mar)
+                "3", "03" -> context.getString(R.string.Apr)
+                "4", "04" -> context.getString(R.string.May)
+                "5", "05" -> context.getString(R.string.Jun)
+                "6", "06" -> context.getString(R.string.Jul)
+                "7", "07" -> context.getString(R.string.Aug)
+                "8", "08" -> context.getString(R.string.Sep)
+                "9", "09" -> context.getString(R.string.Oct)
+                "10" -> context.getString(R.string.Nov)
+                else -> context.getString(R.string.Dec)
+            }
+        }
+
+        fun getFullDate(context: Context, localDateTime: LocalDateTime): String{
+            return getDayWord(
+                context,
+                localDateTime
+            )+" "+getDayNum(localDateTime)+" "+getMonthYear(context,localDateTime)
+        }
+
+        fun getTimeFullDate(context: Context, localDateTime: LocalDateTime): String {
+            return getTime(localDateTime)+" "+getFullDate(context,localDateTime)
+        }
+
+        fun getDaysFromToday(localDateTime: LocalDateTime): String{
+            val now = LocalDateTime.now()
+            return Period.between(
+                now.toLocalDate(),
+                localDateTime.toLocalDate()
+            ).days.toString()
+        }
+
+        fun getDayNum(localDateTime: LocalDateTime): String{
+            return getDoubleDigitString(localDateTime.dayOfMonth.toString())
+        }
+
+        fun getDayWord(context: Context, localDateTime: LocalDateTime): String{
+            return when (localDateTime.dayOfWeek) {
+                DayOfWeek.FRIDAY -> context.getString(R.string.Fri)
+                DayOfWeek.MONDAY -> context.getString(R.string.Mon)
+                DayOfWeek.SATURDAY -> context.getString(R.string.Sat)
+                DayOfWeek.SUNDAY -> context.getString(R.string.Sun)
+                DayOfWeek.THURSDAY -> context.getString(R.string.Thu)
+                DayOfWeek.TUESDAY -> context.getString(R.string.Tue)
+                DayOfWeek.WEDNESDAY -> context.getString(R.string.Wed)
+            }
+        }
+
+        @Composable
+        fun getDurationString(duration: LocalDateTime): String{
+            val builder = StringBuilder()
+            builder.append(if (duration.hour == 1) stringResource(
+                R.string.hour_pre_arg,
+                duration.hour
+            )
+            else if (duration.hour != 0) stringResource(R.string.hours_pre_arg, duration.hour) else "")
+            builder.append(if (duration.hour != 0 && duration.minute != 0) stringResource(R.string.and_with_spaces) else "")
+            builder.append(if (duration.minute == 1) stringResource(
+                R.string.minute_pre_arg,
+                duration.minute
+            )
+            else if (duration.minute != 0) stringResource(R.string.minutes_pre_arg, duration.minute) else "")
+            builder.append(if (duration.hour==0 && duration.minute==0) stringResource(R.string.please_select_a_duration) else "")
+            return builder.toString()
+        }
+
+        fun getDurationString(context: Context, duration: LocalDateTime): String{
+            val builder = StringBuilder()
+            builder.append(if (duration.hour == 1) context.getString(
+                R.string.hour_pre_arg,
+                duration.hour
+            )
+            else if (duration.hour != 0) context.getString(R.string.hours_pre_arg, duration.hour) else "")
+            builder.append(if (duration.hour != 0 && duration.minute != 0) context.getString(R.string.and_with_spaces) else "")
+            builder.append(if (duration.minute == 1) context.getString(
+                R.string.minute_pre_arg,
+                duration.minute
+            )
+            else if (duration.minute != 0) context.getString(R.string.minutes_pre_arg, duration.minute) else "")
+            builder.append(if (duration.hour==0 && duration.minute==0) context.getString(R.string.please_select_a_duration) else "")
+            return builder.toString()
+        }
     }
 
     enum class ContentType{
@@ -121,7 +254,6 @@ sealed class AppResources {
     }
 
     class CalendarResource(inputCalendar: Calendar) {
-
         private val calendar = MutableStateFlow(inputCalendar)
         private var time = MutableStateFlow(getTime())
         private var dayNum = MutableStateFlow(getDayNum())

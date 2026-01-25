@@ -46,10 +46,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.TimePickerState
+import androidx.compose.material3.getSelectedDate
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -79,6 +79,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
+import com.thando.accountable.AppResources.Companion.getStandardDate
+import com.thando.accountable.AppResources.Companion.getTime
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
@@ -90,9 +92,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
-import java.util.Calendar
 import kotlin.enums.EnumEntries
 import kotlin.random.Random
 
@@ -441,12 +443,7 @@ fun TimeInputView(
                         checkDuration(stateTime, pickedDuration){ newDuration ->
                             pickedDuration = newDuration
                         }
-                        val c = Calendar.getInstance()
-                        c.set(Calendar.HOUR_OF_DAY, pickedDate.hour)
-                        c.set(Calendar.MINUTE, pickedDate.minute)
-                        val date = AppResources.CalendarResource(c)
-                        val pickedTimeString by date.getTimeStateFlow(context).collectAsStateWithLifecycle()
-                        Text(stringResource(R.string.start_time, pickedTimeString))
+                        Text(stringResource(R.string.start_time, getTime(pickedDate)))
                     }
                     DurationPickerButton(
                         pickedDate,
@@ -512,15 +509,10 @@ fun TimeInputView(
                         checkDuration(stateTime,pickedDuration){ newDuration ->
                             pickedDuration = newDuration
                         }
-                        val c = Calendar.getInstance()
-                        c.set( Calendar.HOUR_OF_DAY, stateTime.hour)
-                        c.set( Calendar.MINUTE, stateTime.minute)
-                        val date = AppResources.CalendarResource(c)
-                        val pickedTimeString by date.getTimeStateFlow(context).collectAsStateWithLifecycle()
                         Text(
                             stringResource(
                                 R.string.start_time_and_weekday,
-                                pickedTimeString,
+                                getTime(stateTime),
                                 selectedDay
                             ))
                     }
@@ -563,28 +555,19 @@ fun TimeInputView(
                         .padding(4.dp),
                         onClick = { buttonDatePick = true }
                     ) {
-                        stateDate.selectedDateMillis?.let {
-                            val c = Calendar.getInstance()
-                            c.timeInMillis = it
-                            c.set( Calendar.HOUR_OF_DAY, stateTime.hour)
-                            c.set( Calendar.MINUTE, stateTime.minute)
-                            val l = LocalDateTime.of(
-                                c.get(Calendar.YEAR),
-                                c.get(Calendar.MONTH)+1,
-                                c.get(Calendar.DAY_OF_MONTH),
-                                c.get(Calendar.HOUR_OF_DAY),
-                                c.get(Calendar.MINUTE))
+                        stateDate.getSelectedDate()?.let { localDate ->
                             checkDuration(stateTime,pickedDuration){ newDuration ->
                                 pickedDuration = newDuration
                             }
-                            pickedDate = l
-                            val date = AppResources.CalendarResource(c)
-                            val pickedTimeString by date.getTimeStateFlow(context).collectAsStateWithLifecycle()
+                            pickedDate = LocalDateTime.of(
+                                localDate,
+                                LocalTime.of(stateTime.hour,stateTime.minute)
+                            )
                             Text(
                                 stringResource(
                                     R.string.start_time_and_date,
-                                    pickedTimeString,
-                                    date.getStandardDate(context)
+                                    getTime(pickedDate),
+                                    getStandardDate(context, pickedDate)
                                 ))
                         }?: run {
                             Text(stringResource(R.string.pick_time_frequency))

@@ -16,14 +16,11 @@ data class GoalTaskDeliverableTime (
     @PrimaryKey (autoGenerate = true)
     var id: Long? = null,
 
-    @ColumnInfo(name = "times_goal")
-    val goal: MutableState<Long> = mutableLongStateOf(-1),
+    @ColumnInfo(name = "times_parent")
+    val parent: MutableState<Long>,
 
-    @ColumnInfo(name = "times_task")
-    val task: MutableState<Long> = mutableLongStateOf(-1),
-
-    @ColumnInfo(name = "times_deliverable")
-    val deliverable: MutableState<Long> = mutableLongStateOf(-1),
+    @ColumnInfo(name = "times_type")
+    val type: MutableState<TimesType>,
 
     @ColumnInfo(name = "times_time_block_type")
     val timeBlockType: MutableState<TimeBlockType> = mutableStateOf(TimeBlockType.ONCE),
@@ -34,6 +31,9 @@ data class GoalTaskDeliverableTime (
     @ColumnInfo(name = "times_duration")
     val duration: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now().withHour(0).withMinute(0))
 ){
+    enum class TimesType{
+        GOAL, TASK, DELIVERABLE
+    }
     @Ignore
     val durationPickerFocusRequester = FocusRequester()
 

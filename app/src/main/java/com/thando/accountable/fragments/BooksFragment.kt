@@ -751,21 +751,17 @@ fun ScriptCard(
     var contentPreview by remember { mutableStateOf<AccountableRepository.ContentPreview?>(null) }
     val context = LocalContext.current
     var uriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
-    var timeStateFlow by remember { mutableStateOf<StateFlow<String?>>(MutableStateFlow(null)) }
-    var dateStateFlow by remember { mutableStateOf<StateFlow<String?>>(MutableStateFlow(null)) }
+
     LaunchedEffect(script) {
         uriStateFlow = script.getUri(context)
-        timeStateFlow = script.scriptDateTime.getTimeStateFlow(context)
-        dateStateFlow = script.scriptDateTime.getFullDateStateFlow(context)
         contentPreview = script.scriptId?.let { getScriptContentPreview(it) }
         contentPreview?.init {
             contentPreviewAsync = null
         }
     }
     val scriptUri by uriStateFlow.collectAsStateWithLifecycle()
-    val time by timeStateFlow.collectAsStateWithLifecycle()
-    val date by dateStateFlow.collectAsStateWithLifecycle()
 
+    val scriptDateTime by remember { script.scriptDateTime }
     val title = remember { script.scriptTitle }
     val description by contentPreview?.getDescription()?.collectAsStateWithLifecycle("")
         ?:MutableStateFlow(null).collectAsStateWithLifecycle()
@@ -863,28 +859,25 @@ fun ScriptCard(
                         .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    time?.let { time ->
-                        Text(
-                            text = time,
-                            modifier = Modifier.padding(end = 5.dp),
-                            textAlign = TextAlign.Start,
-                            fontSize = 12.sp
-                        ) // Entry Time
-                    }
+                    Text(
+                        text = AppResources.getTime(scriptDateTime),
+                        modifier = Modifier.padding(end = 5.dp),
+                        textAlign = TextAlign.Start,
+                        fontSize = 12.sp
+                    ) // Entry Time
                     val modifier = Modifier
                     numImages?.let { numImages -> MediaIcon(numImages, Icons.Default.Image,modifier) }
                     numVideos?.let { numVideos -> MediaIcon(numVideos, Icons.Default.Videocam,modifier) }
                     numAudios?.let { numAudios -> MediaIcon(numAudios, Icons.Default.Mic,modifier) }
                     numDocuments?.let { numDocuments -> MediaIcon(numDocuments, Icons.Default.Book,modifier) }
                     numScript?.let { numScript -> MediaIcon(numScript, Icons.AutoMirrored.Filled.LibraryBooks,modifier) }
-                    date?.let { date ->
-                        Text(
-                            text = date,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.End,
-                            fontSize = 12.sp
-                        ) // Entry Date
-                    }
+
+                    Text(
+                        text = AppResources.getFullDate(context, scriptDateTime),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.End,
+                        fontSize = 12.sp
+                    ) // Entry Date
                 }
                 //Text() // Entry Size
             }
@@ -912,21 +905,18 @@ fun GoalCard(
     var contentPreview by remember { mutableStateOf<AccountableRepository.GoalContentPreview?>(null) }
     val context = LocalContext.current
     var uriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
-    var initialDateTimeStateFlow by remember { mutableStateOf<StateFlow<String?>>(MutableStateFlow(null)) }
-    var dateOfCompletionStateFlow by remember { mutableStateOf<StateFlow<String?>>(MutableStateFlow(null)) }
+
     LaunchedEffect(goal) {
         uriStateFlow = goal.getUri(context)
-        initialDateTimeStateFlow = goal.initialDateTime.getFullDateStateFlow(context)
-        goal.dateOfCompletion?.let { dateOfCompletionStateFlow = it.getFullDateStateFlow(context) }
         contentPreview = goal.id?.let { getGoalContentPreview(it) }
         contentPreview?.init {
             contentPreviewAsync = null
         }
     }
     val scriptUri by uriStateFlow.collectAsStateWithLifecycle()
-    val initialDateTime by initialDateTimeStateFlow.collectAsStateWithLifecycle()
-    val dateOfCompletion by dateOfCompletionStateFlow.collectAsStateWithLifecycle()
 
+    val goalInitialDateTime by remember { goal.initialDateTime }
+    val goalDateOfCompletion by remember { goal.dateOfCompletion }
     val title = remember { goal.goal }
     val location = remember { goal.location }
     val goalColour by remember { goal.colour }
@@ -1028,23 +1018,22 @@ fun GoalCard(
                         .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    initialDateTime?.let { initialDateTime ->
-                        Text(
-                            text = stringResource(R.string.start_date, initialDateTime),
-                            modifier = Modifier.padding(end = 5.dp),
-                            textAlign = TextAlign.Start,
-                            fontSize = 12.sp
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.start_date,
+                            AppResources.getFullDate(context, goalInitialDateTime)),
+                        modifier = Modifier.padding(end = 5.dp),
+                        textAlign = TextAlign.Start,
+                        fontSize = 12.sp
+                    )
                     val modifier = Modifier
                     numImages?.let { numImages -> MediaIcon(numImages, Icons.Default.Image,modifier) }
                     numVideos?.let { numVideos -> MediaIcon(numVideos, Icons.Default.Videocam,modifier) }
                     numAudios?.let { numAudios -> MediaIcon(numAudios, Icons.Default.Mic,modifier) }
                     numDocuments?.let { numDocuments -> MediaIcon(numDocuments, Icons.Default.Book,modifier) }
                     numScript?.let { numScript -> MediaIcon(numScript, Icons.AutoMirrored.Filled.LibraryBooks,modifier) }
-                    dateOfCompletion?.let { dateOfCompletion ->
+                    goalDateOfCompletion?.let { goalDateOfCompletion ->
                         Text(
-                            text = dateOfCompletion,
+                            text = AppResources.getFullDate(context, goalDateOfCompletion),
                             modifier = Modifier.weight(1f),
                             textAlign = TextAlign.End,
                             fontSize = 12.sp

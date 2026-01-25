@@ -13,8 +13,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
-import com.thando.accountable.AppResources
-import java.util.Calendar
+import java.time.LocalDateTime
 
 @Entity(tableName = "deliverable_table")
 data class Deliverable (
@@ -28,14 +27,10 @@ data class Deliverable (
     val position: MutableState<Long>,
 
     @ColumnInfo (name = "deliverable_initial_date")
-    var initialDateTime: AppResources.CalendarResource = AppResources.CalendarResource(
-        Calendar.getInstance()
-    ),
+    var initialDateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
 
     @ColumnInfo (name = "deliverable_end_date")
-    var endDateTime: AppResources.CalendarResource = AppResources.CalendarResource(
-        Calendar.getInstance()
-    ),
+    var endDateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
 
     @ColumnInfo (name = "deliverable_end_type")
     val endType: MutableState<DeliverableEndType> = mutableStateOf(DeliverableEndType.UNDEFINED),

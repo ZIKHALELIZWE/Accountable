@@ -94,6 +94,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDateTime
 import java.util.Calendar
 import kotlin.random.Random
 
@@ -221,14 +222,13 @@ fun ScriptFragmentView(
             var bottomSheet by remember { mutableStateOf<Pair<Int?,Content>?>(null) }
             var textIndex by remember { mutableStateOf<Triple<Int?,Content, (String,Int)->Unit>?>(null) }
             var menuAddTimeStampTitle by remember { viewModel.menuAddTimeStampTitle }
-            val cal = AppResources.CalendarResource(Calendar.getInstance())
-            val date =
-                cal.getFullDateStateFlow(LocalContext.current).collectAsState().value
+            val context = LocalContext.current
+            val date = LocalDateTime.now()
+            val scriptDateTime by remember { script.scriptDateTime }
             menuAddTimeStampTitle =
-                if (script.scriptDateTime.getFullDateStateFlow(LocalContext.current)
-                        .collectAsState().value
+                if (AppResources.getFullDate(context,scriptDateTime)
                     ==
-                    date
+                    AppResources.getFullDate(context,date)
                 ) {
                     stringResource(R.string.add_time_stamp)
                 } else {
@@ -728,13 +728,12 @@ fun ScriptFragmentCatalog(
     onBottomSheetChange: (Pair<Int?, Content>?) -> Unit,
     onTextIndexChange: (Triple<Int, Content, (String, Int) -> Unit>?) -> Unit
 ) {
+    val context = LocalContext.current
+
     val listState = remember { viewModel.listState }
 
     val scriptTitle = remember { script.scriptTitle }
-    val scriptTime by script.scriptDateTime.getTimeStateFlow(LocalContext.current).collectAsStateWithLifecycle()
-    val scriptDayNum by script.scriptDateTime.getDayNumStateFlow(LocalContext.current).collectAsStateWithLifecycle()
-    val scriptDayWord by script.scriptDateTime.getDayWordStateFlow(LocalContext.current).collectAsStateWithLifecycle()
-    val scriptMonthYear by script.scriptDateTime.getMonthYearStateFlow(LocalContext.current).collectAsStateWithLifecycle()
+    val scriptDateTime by remember { script.scriptDateTime }
     val teleprompterBackgroundColour by teleprompterSettings?.backgroundColour?.collectAsStateWithLifecycle()?:remember { mutableStateOf(null) }
     val teleprompterTextColor by teleprompterSettings?.textColour?.collectAsStateWithLifecycle()?:remember { mutableStateOf(null) }
     val teleprompterTextSize by (teleprompterSettings?.textSize?:MutableStateFlow(null)).collectAsStateWithLifecycle()
@@ -774,7 +773,7 @@ fun ScriptFragmentCatalog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = scriptTime,
+                            text = AppResources.getTime(scriptDateTime),
                             fontSize = 40.sp,
                             modifier = backgroundModifier.weight(1f),
                             textAlign = TextAlign.Start,
@@ -786,17 +785,20 @@ fun ScriptFragmentCatalog(
                         ) {
                             Text(
                                 modifier = backgroundModifier,
-                                text = scriptDayNum,
+                                text = AppResources.getDayNum(scriptDateTime),
                                 fontSize = 40.sp,
                                 color = teleprompterTextColor
                             )
                             Column {
                                 Text(
                                     modifier = backgroundModifier,
-                                    text = scriptDayWord,
+                                    text = AppResources.getDayWord(context,scriptDateTime),
                                     color = teleprompterTextColor.let { if (it!=Color.Black) it else Color.Cyan }
                                 )
-                                Text(modifier = backgroundModifier, text = scriptMonthYear,
+                                Text(modifier = backgroundModifier, text = AppResources.getMonthYear(
+                                    context,
+                                    scriptDateTime
+                                ),
                                     color = teleprompterTextColor)
                             }
                         }
