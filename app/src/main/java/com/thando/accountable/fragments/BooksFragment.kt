@@ -97,8 +97,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AccountableRepository
 import com.thando.accountable.AppResources
-import com.thando.accountable.IntentActivity
-import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Folder

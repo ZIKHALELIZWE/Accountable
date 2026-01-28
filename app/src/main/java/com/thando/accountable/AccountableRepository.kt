@@ -262,6 +262,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                     goalsList.forEach { goal ->
                         goal.loadGoalTimes(dao)
+                        goal.loadDeliverables(dao)
                     }
                 }
             }

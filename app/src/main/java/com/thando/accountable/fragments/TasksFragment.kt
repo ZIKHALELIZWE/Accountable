@@ -2,7 +2,6 @@ package com.thando.accountable.fragments
 
 import android.app.Activity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -22,14 +21,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.InputTransformation
-import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
@@ -56,7 +51,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.getSelectedDate
 import androidx.compose.material3.rememberDatePickerState
@@ -65,6 +59,8 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableIntState
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,34 +83,30 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.graphics.alpha
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.coroutineScope
-import androidx.lifecycle.lifecycleScope
-import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.internal.ToolbarUtils
 import com.thando.accountable.AppResources
 import com.thando.accountable.AppResources.Companion.getStandardDate
 import com.thando.accountable.AppResources.Companion.getTime
-import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
+import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.fragments.viewmodels.TaskViewModel
 import com.thando.accountable.ui.MenuItemData
+import com.thando.accountable.ui.cards.ColourPickerDialog
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.LocalDateTime
@@ -157,9 +149,7 @@ fun TaskView(
                     }
                 }
                 Lifecycle.Event.ON_DESTROY -> {
-                    if (activity?.isChangingConfigurations == true) {
-
-                    } else {
+                    if (activity?.isChangingConfigurations == false) {
                         runBlocking {
                             viewModel.dismissBottomSheet()
                         }
@@ -273,32 +263,106 @@ fun TaskView(
                     goal,
                     modifier = Modifier.padding(innerPadding)
                 )
-                bottomSheetType?.let { bottomSheetType ->
-                    val sheetState = rememberModalBottomSheetState()
-                    ModalBottomSheet(
-                        onDismissRequest = {
-                            scope.launch { viewModel.dismissBottomSheet() }
-                        },
-                        sheetState = sheetState
-                    ) {
-                        when (bottomSheetType) {
-                            Goal.GoalTab.TASKS -> {
-                                AddTaskView(
-                                    viewModel
-                                )
-                            }
-                            Goal.GoalTab.DELIVERABLES -> {
-                                AddDeliverableView(
-                                    viewModel
-                                )
-                            }
-                            Goal.GoalTab.MARKERS -> {
-                                AddMarkerView(
-                                    viewModel
-                                )
-                            }
-                        }
-                    }
+                TaskDeliverableMarkerBottomSheet(
+                    bottomSheetType = bottomSheetType,
+                    dismissBottomSheet = viewModel::dismissBottomSheet,
+                    triedToSaveInput = viewModel.triedToSave,
+                    colourPickerDialog = viewModel.colourPickerDialog,
+                    processBottomSheetAdd = viewModel::processBottomSheetAdd,
+                    showErrorMessage = viewModel.showErrorMessage,
+                    errorMessage = viewModel.errorMessage,
+                    pickColour = viewModel::pickColour,
+                    addTimeBlock = viewModel::addTimeBlock,
+                    deleteTimeBlock = viewModel::deleteTimeBlock,
+                    deleteTaskClicked = viewModel::deleteTaskClicked,
+                    originalTask = viewModel.originalTask,
+                    task = viewModel.task,
+                    deleteDeliverableClicked = viewModel::deleteDeliverableClicked,
+                    originalDeliverable = viewModel.originalDeliverable,
+                    deliverable = viewModel.deliverable,
+                    deleteMarkerClicked = viewModel::deleteMarkerClicked,
+                    originalMarker = viewModel.originalMarker,
+                    marker = viewModel.marker
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TaskDeliverableMarkerBottomSheet(
+    bottomSheetType: Goal.GoalTab?,
+    dismissBottomSheet: suspend () -> Unit,
+    triedToSaveInput: MutableStateFlow<Boolean>,
+    colourPickerDialog: ColourPickerDialog,
+    processBottomSheetAdd: suspend () -> Unit,
+    showErrorMessage: MutableState<Boolean>,
+    errorMessage: MutableIntState,
+    pickColour: (Color?) -> Unit,
+    addTimeBlock: suspend () -> Unit,
+    deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
+    deleteTaskClicked: (suspend () -> Unit)?=null,
+    originalTask: MutableStateFlow<Task?>?=null,
+    task: MutableStateFlow<Task?>?=null,
+    deleteDeliverableClicked: (suspend () -> Unit)?=null,
+    originalDeliverable: MutableStateFlow<Deliverable?>?=null,
+    deliverable: MutableStateFlow<Deliverable?>?=null,
+    deleteMarkerClicked: (suspend () -> Unit)?=null,
+    originalMarker: MutableStateFlow<Marker?>?=null,
+    marker: MutableStateFlow<Marker?>?=null
+){
+    val scope = rememberCoroutineScope()
+    bottomSheetType?.let { bottomSheetType ->
+        val sheetState = rememberModalBottomSheetState()
+        ModalBottomSheet(
+            onDismissRequest = {
+                scope.launch { dismissBottomSheet() }
+            },
+            sheetState = sheetState
+        ) {
+            when (bottomSheetType) {
+                Goal.GoalTab.TASKS -> {
+                    if (originalTask != null && task != null && deleteTaskClicked != null)
+                    AddTaskView(
+                        originalTask = originalTask,
+                        task = task,
+                        triedToSaveInput = triedToSaveInput,
+                        colourPickerDialog = colourPickerDialog,
+                        processBottomSheetAdd = processBottomSheetAdd,
+                        showErrorMessage = showErrorMessage,
+                        errorMessage = errorMessage,
+                        pickColour = pickColour,
+                        addTimeBlock = addTimeBlock,
+                        deleteTimeBlock = deleteTimeBlock,
+                        deleteTaskClicked = deleteTaskClicked
+                    )
+                }
+                Goal.GoalTab.DELIVERABLES -> {
+                    if (originalDeliverable != null && deliverable != null && deleteDeliverableClicked != null)
+                    AddDeliverableView(
+                        originalDeliverable = originalDeliverable,
+                        deliverable = deliverable,
+                        triedToSaveInput = triedToSaveInput,
+                        processBottomSheetAdd = processBottomSheetAdd,
+                        showErrorMessage = showErrorMessage,
+                        errorMessage = errorMessage,
+                        addTimeBlock = addTimeBlock,
+                        deleteTimeBlock = deleteTimeBlock,
+                        deleteDeliverableClicked = deleteDeliverableClicked
+                    )
+                }
+                Goal.GoalTab.MARKERS -> {
+                    if (originalMarker != null && marker != null && deleteMarkerClicked != null)
+                        AddMarkerView(
+                            originalMarker = originalMarker,
+                            marker = marker,
+                            triedToSaveInput = triedToSaveInput,
+                            processBottomSheetAdd = processBottomSheetAdd,
+                            showErrorMessage = showErrorMessage,
+                            errorMessage = errorMessage,
+                            deleteMarkerClicked = deleteMarkerClicked
+                        )
                 }
             }
         }
@@ -384,7 +448,7 @@ fun TasksFragmentView(
             }
             Goal.GoalTab.DELIVERABLES -> {
                 items(items = deliverablesList) { deliverable ->
-                    DeliverableCardView(deliverable, viewModel)
+                    DeliverableCardView(deliverable, viewModel::editDeliverable)
                 }
             }
             Goal.GoalTab.MARKERS -> {
@@ -533,7 +597,9 @@ fun TaskCardView(
                     else Color.Black
                 )
                 Text(
-                    text = endType.name,
+                    text = endType.name + if (endType == Task.TaskEndType.DATE)
+                        "\n${AppResources.getTimeFullDate(context,endDateTime)}"
+                    else "",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -568,10 +634,20 @@ fun getOnlyOneQuantityText(inputString: String) : String?{
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTaskView(
-    viewModel: TaskViewModel
+    originalTask: MutableStateFlow<Task?>,
+    task: MutableStateFlow<Task?>,
+    triedToSaveInput: MutableStateFlow<Boolean>,
+    colourPickerDialog: ColourPickerDialog,
+    processBottomSheetAdd: suspend () -> Unit,
+    showErrorMessage: MutableState<Boolean>,
+    errorMessage: MutableIntState,
+    pickColour: (Color?) -> Unit,
+    addTimeBlock: suspend () -> Unit,
+    deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
+    deleteTaskClicked: suspend () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val originalTask by viewModel.originalTask.collectAsStateWithLifecycle()
+    val originalTask by originalTask.collectAsStateWithLifecycle()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -610,7 +686,7 @@ fun AddTaskView(
                 modifier = Modifier
                     .padding(horizontal = 5.dp)
                     .align(Alignment.CenterEnd),
-                onClick = { scope.launch { viewModel.processBottomSheetAdd() } }
+                onClick = { scope.launch { processBottomSheetAdd() } }
             ) {
                 Icon(
                     imageVector = Icons.Default.Done,
@@ -620,13 +696,13 @@ fun AddTaskView(
             }
         }
     }
-    val task by viewModel.task.collectAsStateWithLifecycle()
+    val task by task.collectAsStateWithLifecycle()
     task?.let { task ->
         val context = LocalContext.current
 
-        val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
-        var showErrorMessage by remember { viewModel.showErrorMessage }
-        val errorMessage by remember { viewModel.errorMessage }
+        val triedToSave by triedToSaveInput.collectAsStateWithLifecycle()
+        var showErrorMessage by remember { showErrorMessage }
+        val errorMessage by remember { errorMessage }
 
         val bottomSheetLazyListState = remember { task.scrollPosition }
         var taskType by remember { task.type }
@@ -648,7 +724,7 @@ fun AddTaskView(
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
-            viewModel.colourPickerDialog.ColourPicker()
+            colourPickerDialog.ColourPicker()
             AnimatedVisibility(visible = showErrorMessage) {
                 Box(
                     modifier = Modifier
@@ -673,7 +749,7 @@ fun AddTaskView(
             ) {
                 item {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(3.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         Task.TaskType.entries.forEach { boxType ->
@@ -750,7 +826,7 @@ fun AddTaskView(
                                 )) },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 3.dp)
+                                    .padding(3.dp)
                                     .focusRequester(taskTextFocusRequester),
                                 trailingIcon = {
                                     if (triedToSave && taskText.text.isEmpty()){
@@ -815,7 +891,7 @@ fun AddTaskView(
                             }
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth()
-                                    .padding(horizontal = 3.dp),
+                                    .padding(3.dp),
                                 maxItemsInEachRow = Int.MAX_VALUE // allow natural wrapping
                             ) {
                                 OutlinedTextField(
@@ -853,7 +929,7 @@ fun AddTaskView(
                         label = { Text(stringResource(R.string.location)) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 3.dp)
+                            .padding(3.dp)
                             .focusRequester(locationFocusRequester),
                         trailingIcon = {
                             if (triedToSave && location.text.isEmpty()){
@@ -872,8 +948,8 @@ fun AddTaskView(
                 item {
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(IntrinsicSize.Max),
+                            .fillMaxWidth().padding(3.dp)
+                            .height(IntrinsicSize.Min),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (colour != -1) {
@@ -881,20 +957,23 @@ fun AddTaskView(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .fillMaxHeight()
-                                    .padding(12.dp)
-                                    .background(Color(colour), shape = RoundedCornerShape(8.dp))
+                                    .padding(end = 3.dp)
+                                    .background(
+                                        Color(colour),
+                                        shape = RectangleShape
+                                    )
                                     .weight(1f)
                             )
                         }
                         Button(
-                            onClick = { viewModel.pickColour(
+                            onClick = { pickColour(
                                 Color(task.colour.value)
                             ) },
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp)
+                                .fillMaxWidth().fillMaxHeight()
                                 .weight(2f)
-                                .focusRequester(colourFocusRequester)
+                                .focusRequester(colourFocusRequester),
+                            shape = RectangleShape
                         ) {
                             Row {
                                 Text(stringResource(R.string.pick_colour))
@@ -941,8 +1020,7 @@ fun AddTaskView(
                     OutlinedButton(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .wrapContentHeight()
-                            .padding(4.dp),
+                            .padding(3.dp),
                         onClick = {
                             endTypeOptions = listOf(
                                 MenuItemData(Task.TaskEndType.UNDEFINED.name){
@@ -963,7 +1041,9 @@ fun AddTaskView(
                                 }
                             )
                             showEndTypeOptions = true
-                        }
+                        },
+                        shape = RectangleShape,
+                        border = BorderStroke(1.dp,Color.DarkGray)
                     ) {
                         if (showEndTypeOptions) {
                             DropdownMenu(
@@ -984,13 +1064,12 @@ fun AddTaskView(
                         when (endType) {
                             Task.TaskEndType.UNDEFINED -> {
                                 Text(
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier,
                                     text = stringResource(
                                         R.string.end_type,
                                         stringResource(R.string.undefined),
                                         ""
-                                    ),
-                                    textAlign = TextAlign.Center
+                                    ).trim()
                                 )
                             }
                             Task.TaskEndType.DATE -> {
@@ -1004,7 +1083,7 @@ fun AddTaskView(
                                             R.string.end_type,
                                             stringResource(R.string.date),
                                             stringResource(
-                                                R.string.start_time_and_date,
+                                                R.string.end_time_and_date,
                                                 getTime(pickedDate),
                                                 getStandardDate(context, pickedDate)
                                             )
@@ -1020,7 +1099,7 @@ fun AddTaskView(
                                         R.string.end_type,
                                         stringResource(R.string.goal),
                                         ""
-                                    )
+                                    ).trim()
                                 )
                             }
                             Task.TaskEndType.DELIVERABLE -> {
@@ -1029,7 +1108,7 @@ fun AddTaskView(
                                         R.string.end_type,
                                         stringResource(R.string.deliverable),
                                         ""
-                                    )
+                                    ).trim()
                                 )
                             }
                             Task.TaskEndType.MARKER -> {
@@ -1038,7 +1117,7 @@ fun AddTaskView(
                                         R.string.end_type,
                                         stringResource(R.string.marker),
                                         ""
-                                    )
+                                    ).trim()
                                 )
                             }
                         }
@@ -1049,17 +1128,18 @@ fun AddTaskView(
                 }
                 stickyHeader {
                     Button(
-                        onClick = { scope.launch { viewModel.addTimeBlock() } },
+                        onClick = { scope.launch { addTimeBlock() } },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp)
+                            .padding(3.dp),
+                        shape = RectangleShape
                     ) { Text(stringResource(R.string.add_time_block)) }
                 }
                 items(items = times, key = { it.id?:Random.nextLong() }) { item ->
                     TimeInputView(
                         item,
-                        viewModel.triedToSave,
-                        viewModel::deleteTimeBlock
+                        triedToSaveInput,
+                        deleteTimeBlock
                     )
                     if (times.indexOf(item) != times.lastIndex) {
                         Spacer(modifier = Modifier.width(2.dp))
@@ -1073,9 +1153,9 @@ fun AddTaskView(
                         IconButton(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(4.dp)
+                                .padding(3.dp)
                                 .background(color = Color.Red),
-                            onClick = { scope.launch { viewModel.deleteTaskClicked() } }
+                            onClick = { scope.launch { deleteTaskClicked() } }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
@@ -1092,7 +1172,7 @@ fun AddTaskView(
 @Composable
 fun DeliverableCardView(
     deliverable: Deliverable,
-    viewModel: TaskViewModel
+    editDeliverable: suspend (Deliverable) -> Unit
 ){
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1104,7 +1184,7 @@ fun DeliverableCardView(
             .padding(3.dp)
             .wrapContentHeight()
             .combinedClickable(onClick = {
-                scope.launch { viewModel.editDeliverable(deliverable) }
+                scope.launch { editDeliverable(deliverable) }
             }),
         elevation = CardDefaults.cardElevation(),
         colors = CardColors(
@@ -1134,10 +1214,18 @@ fun DeliverableCardView(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddDeliverableView(
-    viewModel: TaskViewModel
+    originalDeliverable: MutableStateFlow<Deliverable?>,
+    deliverable: MutableStateFlow<Deliverable?>,
+    triedToSaveInput: MutableStateFlow<Boolean>,
+    processBottomSheetAdd: suspend () -> Unit,
+    showErrorMessage: MutableState<Boolean>,
+    errorMessage: MutableIntState,
+    addTimeBlock: suspend () -> Unit,
+    deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
+    deleteDeliverableClicked: suspend () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val originalDeliverable by viewModel.originalDeliverable.collectAsStateWithLifecycle()
+    val originalDeliverable by originalDeliverable.collectAsStateWithLifecycle()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1176,7 +1264,7 @@ fun AddDeliverableView(
                 modifier = Modifier
                     .padding(horizontal = 5.dp)
                     .align(Alignment.CenterEnd),
-                onClick = { scope.launch { viewModel.processBottomSheetAdd() } }
+                onClick = { scope.launch { processBottomSheetAdd() } }
             ) {
                 Icon(
                     imageVector = Icons.Default.Done,
@@ -1186,13 +1274,13 @@ fun AddDeliverableView(
             }
         }
     }
-    val deliverable by viewModel.deliverable.collectAsStateWithLifecycle()
+    val deliverable by deliverable.collectAsStateWithLifecycle()
     deliverable?.let { deliverable ->
         val context = LocalContext.current
 
-        val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
-        var showErrorMessage by remember { viewModel.showErrorMessage }
-        val errorMessage by remember { viewModel.errorMessage }
+        val triedToSave by triedToSaveInput.collectAsStateWithLifecycle()
+        var showErrorMessage by remember { showErrorMessage }
+        val errorMessage by remember { errorMessage }
 
         val bottomSheetLazyListState = remember { deliverable.scrollPosition }
         val deliverableText = remember { deliverable.deliverable }
@@ -1397,7 +1485,7 @@ fun AddDeliverableView(
                 }
                 stickyHeader {
                     Button(
-                        onClick = { scope.launch { viewModel.addTimeBlock() } },
+                        onClick = { scope.launch { addTimeBlock() } },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(8.dp)
@@ -1406,8 +1494,8 @@ fun AddDeliverableView(
                 items(items = times, key = { it.id?:Random.nextLong() }) { item ->
                     TimeInputView(
                         item,
-                        viewModel.triedToSave,
-                        viewModel::deleteTimeBlock
+                        triedToSaveInput,
+                        deleteTimeBlock
                     )
                     if (times.indexOf(item) != times.lastIndex) {
                         Spacer(modifier = Modifier.width(2.dp))
@@ -1423,7 +1511,7 @@ fun AddDeliverableView(
                                 .fillMaxWidth()
                                 .padding(4.dp)
                                 .background(color = Color.Red),
-                            onClick = { scope.launch { viewModel.deleteDeliverableClicked() } }
+                            onClick = { scope.launch { deleteDeliverableClicked() } }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
@@ -1515,10 +1603,16 @@ fun MarkerCardView(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMarkerView(
-    viewModel: TaskViewModel
+    originalMarker: MutableStateFlow<Marker?>,
+    marker: MutableStateFlow<Marker?>,
+    triedToSaveInput: MutableStateFlow<Boolean>,
+    processBottomSheetAdd: suspend () -> Unit,
+    showErrorMessage: MutableState<Boolean>,
+    errorMessage: MutableIntState,
+    deleteMarkerClicked: suspend () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val originalMarker by viewModel.originalMarker.collectAsStateWithLifecycle()
+    val originalMarker by originalMarker.collectAsStateWithLifecycle()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1557,7 +1651,7 @@ fun AddMarkerView(
                 modifier = Modifier
                     .padding(horizontal = 5.dp)
                     .align(Alignment.CenterEnd),
-                onClick = { scope.launch { viewModel.processBottomSheetAdd() } }
+                onClick = { scope.launch { processBottomSheetAdd() } }
             ) {
                 Icon(
                     imageVector = Icons.Default.Done,
@@ -1567,13 +1661,13 @@ fun AddMarkerView(
             }
         }
     }
-    val marker by viewModel.marker.collectAsStateWithLifecycle()
+    val marker by marker.collectAsStateWithLifecycle()
     marker?.let { marker ->
         val context = LocalContext.current
 
-        val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
-        var showErrorMessage by remember { viewModel.showErrorMessage }
-        val errorMessage by remember { viewModel.errorMessage }
+        val triedToSave by triedToSaveInput.collectAsStateWithLifecycle()
+        var showErrorMessage by remember { showErrorMessage }
+        val errorMessage by remember { errorMessage }
 
         val bottomSheetLazyListState = remember { marker.scrollPosition }
         val markerText = remember { marker.marker }
@@ -1685,7 +1779,7 @@ fun AddMarkerView(
                                 .fillMaxWidth()
                                 .padding(4.dp)
                                 .background(color = Color.Red),
-                            onClick = { scope.launch { viewModel.deleteMarkerClicked() } }
+                            onClick = { scope.launch { deleteMarkerClicked() } }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,

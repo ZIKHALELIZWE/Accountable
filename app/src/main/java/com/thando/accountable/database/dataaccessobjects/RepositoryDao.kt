@@ -564,6 +564,9 @@ interface RepositoryDao {
     @Query("SELECT * FROM times_table WHERE id = :goalTaskDeliverableTimeId")
     suspend fun getGoalTaskDeliverableTime(goalTaskDeliverableTimeId: Long?): GoalTaskDeliverableTime?
 
+    @Query("SELECT * FROM deliverable_table WHERE deliverable_goal_id = :goalId")
+    suspend fun getGoalDeliverables(goalId: Long?): List<Deliverable>
+
     @Transaction
     suspend fun appSettings(): AppSettings {
         var appSettings = getAppSettingsNow()

@@ -372,4 +372,14 @@ class Converters {
     fun fromStateLongNull(long: Long?): MutableState<Long?> {
         return mutableStateOf(long)
     }
+
+    @TypeConverter
+    fun toGoalEndType(mutableState: MutableState<Goal.GoalEndType>): String {
+        return mutableState.value.name
+    }
+
+    @TypeConverter
+    fun fromGoalEndType(goalEndType: String): MutableState<Goal.GoalEndType> {
+        return mutableStateOf(Goal.GoalEndType.valueOf(goalEndType))
+    }
 }

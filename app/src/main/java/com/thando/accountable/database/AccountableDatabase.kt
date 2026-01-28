@@ -19,7 +19,8 @@ import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.database.tables.TeleprompterSettings
-import kotlinx.coroutines.coroutineScope
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @Database(entities = [
     Folder::class,
@@ -34,7 +35,7 @@ import kotlinx.coroutines.coroutineScope
     Task::class,
     Deliverable::class,
     Marker::class
-], version = 8, exportSchema = false)
+], version = 10, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AccountableDatabase: RoomDatabase() {
     abstract val repositoryDao : RepositoryDao
@@ -144,6 +145,13 @@ abstract class AccountableDatabase: RoomDatabase() {
                             db.execSQL("ALTER TABLE task_table ADD task_type TEXT DEFAULT NORMAL NOT NULL")
                             db.execSQL("ALTER TABLE task_table ADD task_quantity INTEGER DEFAULT 0 NOT NULL")
                             db.execSQL("ALTER TABLE task_table ADD task_time INTEGER DEFAULT undefined NOT NULL")
+                        },
+                        Migration(8,9){ db ->
+                            db.execSQL("ALTER TABLE goal_table ADD goal_end_date INTEGER DEFAULT ${LocalDateTime.now().toInstant(ZoneOffset.UTC)?.toEpochMilli()} NOT NULL")
+                            db.execSQL("ALTER TABLE goal_table ADD goal_end_type TEXT DEFAULT ${Goal.GoalEndType.UNDEFINED.name} NOT NULL")
+                        },
+                        Migration(9,10) { db ->
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_goal_id INTEGER DEFAULT ${null} NULL")
                         }
                     )
                      //    .allowMainThreadQueries() // allow for testing only todo

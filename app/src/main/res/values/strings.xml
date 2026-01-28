@@ -261,6 +261,7 @@
     <string name="please_select_a_colour">Please select a colour.</string>
     <string name="please_select_a_duration">Please Select A Duration</string>
     <string name="start_time_and_date">Start Time and Date: %1$s %2$s</string>
+    <string name="end_time_and_date">End Time and Date: %1$s %2$s</string>
     <string name="start_time_and_weekday">Start Time and Weekday: %1$s %2$s</string>
     <string name="start_time">Start Time: %1$s</string>
     <string name="start_date">Start Date: %1$s</string>
@@ -306,4 +307,5 @@
     <string name="time_string">Time</string>
     <string name="please_enter_a_quantity">Please Enter A Quantity</string>
     <string name="task_with_time">Task With Time</string>
+    <string name="select_deliverable">Select Deliverable</string>
 </resources>

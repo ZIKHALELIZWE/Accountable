@@ -163,17 +163,17 @@ sealed class AppResources {
 
         private fun getMonth(month: String?, context: Context): String {
             return when (month) {
-                "0", "00" -> context.getString(R.string.Jan)
-                "1", "01" -> context.getString(R.string.Feb)
-                "2", "02" -> context.getString(R.string.Mar)
-                "3", "03" -> context.getString(R.string.Apr)
-                "4", "04" -> context.getString(R.string.May)
-                "5", "05" -> context.getString(R.string.Jun)
-                "6", "06" -> context.getString(R.string.Jul)
-                "7", "07" -> context.getString(R.string.Aug)
-                "8", "08" -> context.getString(R.string.Sep)
-                "9", "09" -> context.getString(R.string.Oct)
-                "10" -> context.getString(R.string.Nov)
+                "1", "01" -> context.getString(R.string.Jan)
+                "2", "02" -> context.getString(R.string.Feb)
+                "3", "03" -> context.getString(R.string.Mar)
+                "4", "04" -> context.getString(R.string.Apr)
+                "5", "05" -> context.getString(R.string.May)
+                "6", "06" -> context.getString(R.string.Jun)
+                "7", "07" -> context.getString(R.string.Jul)
+                "8", "08" -> context.getString(R.string.Aug)
+                "9", "09" -> context.getString(R.string.Sep)
+                "10" -> context.getString(R.string.Oct)
+                "11" -> context.getString(R.string.Nov)
                 else -> context.getString(R.string.Dec)
             }
         }
@@ -392,17 +392,17 @@ sealed class AppResources {
 
         private fun getMonth(month: String?, context: Context): String {
             return when (month) {
-                "0", "00" -> context.getString(R.string.Jan)
-                "1", "01" -> context.getString(R.string.Feb)
-                "2", "02" -> context.getString(R.string.Mar)
-                "3", "03" -> context.getString(R.string.Apr)
-                "4", "04" -> context.getString(R.string.May)
-                "5", "05" -> context.getString(R.string.Jun)
-                "6", "06" -> context.getString(R.string.Jul)
-                "7", "07" -> context.getString(R.string.Aug)
-                "8", "08" -> context.getString(R.string.Sep)
-                "9", "09" -> context.getString(R.string.Oct)
-                "10" -> context.getString(R.string.Nov)
+                "1", "01" -> context.getString(R.string.Jan)
+                "2", "02" -> context.getString(R.string.Feb)
+                "3", "03" -> context.getString(R.string.Mar)
+                "4", "04" -> context.getString(R.string.Apr)
+                "5", "05" -> context.getString(R.string.May)
+                "6", "06" -> context.getString(R.string.Jun)
+                "7", "07" -> context.getString(R.string.Jul)
+                "8", "08" -> context.getString(R.string.Aug)
+                "9", "09" -> context.getString(R.string.Sep)
+                "10" -> context.getString(R.string.Oct)
+                "11" -> context.getString(R.string.Nov)
                 else -> context.getString(R.string.Dec)
             }
         }

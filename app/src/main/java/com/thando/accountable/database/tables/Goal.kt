@@ -66,6 +66,12 @@ data class Goal(
     @ColumnInfo (name = "goal_date_of_completion")
     var dateOfCompletion : MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
 
+    @ColumnInfo (name = "goal_end_date")
+    var endDateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
+
+    @ColumnInfo (name = "goal_end_type")
+    val endType: MutableState<GoalEndType> = mutableStateOf(GoalEndType.UNDEFINED),
+
     @ColumnInfo (name = "goal_picture")
     private var goalPicture : String? = null,
 
@@ -90,12 +96,16 @@ data class Goal(
         private const val GOAL_IMAGE_PREFIX = "Goal_"
     }
 
+    enum class GoalEndType {
+        UNDEFINED, DATE, DELIVERABLE
+    }
+
     enum class GoalTab{
         TASKS, DELIVERABLES, MARKERS
     }
 
     enum class Status{
-        OVERDUE, PENDING, PAUSED, BREAK, COMPLETED, FUTURE
+        OVERDUE, PENDING, PAUSED, BREAK, COMPLETED, FAILED, FUTURE
     }
 
     enum class TimeBlockType{
@@ -106,6 +116,9 @@ data class Goal(
     val times: SnapshotStateList<GoalTaskDeliverableTime> = mutableStateListOf()
 
     @Ignore
+    val goalDeliverables: SnapshotStateList<Deliverable> = mutableStateListOf()
+
+    @Ignore
     val imageResource = AppResources.ImageResource(goalPicture?:"")
 
     suspend fun loadGoalTimes(dao: RepositoryDao){
@@ -113,6 +126,15 @@ data class Goal(
         times.addAll(
             withContext(Dispatchers.IO){
                 dao.getTimes(id, GoalTaskDeliverableTime.TimesType.GOAL)
+            }
+        )
+    }
+
+    suspend fun loadDeliverables(dao: RepositoryDao) {
+        goalDeliverables.clear()
+        goalDeliverables.addAll(
+            withContext(Dispatchers.IO) {
+                dao.getGoalDeliverables(id)
             }
         )
     }

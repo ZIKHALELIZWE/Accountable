@@ -1,7 +1,9 @@
 package com.thando.accountable.fragments
 
+import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,7 +55,9 @@ import androidx.compose.material3.getSelectedDate
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +71,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -77,6 +82,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
 import com.thando.accountable.AppResources.Companion.getStandardDate
@@ -85,16 +93,20 @@ import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
+import com.thando.accountable.database.tables.Task
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
+import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
+import kotlin.collections.forEach
 import kotlin.enums.EnumEntries
 import kotlin.random.Random
 
@@ -106,6 +118,8 @@ fun EditGoalView(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val activity = context as? Activity
+    val lifecycleOwner = LocalLifecycleOwner.current
     var showErrorMessage by remember { viewModel.showErrorMessage }
     val errorMessage by remember { viewModel.errorMessage }
 
@@ -129,7 +143,32 @@ fun EditGoalView(
         scope.launch { viewModel.closeGoal() }
     }
 
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    scope.launch {
+                        viewModel.saveDeliverable()
+                    }
+                }
+                Lifecycle.Event.ON_DESTROY -> {
+                    if (activity?.isChangingConfigurations == false) {
+                        runBlocking {
+                            viewModel.dismissBottomSheet()
+                        }
+                    }
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     AccountableTheme {
+        val bottomSheetType by remember { viewModel.bottomSheetType }
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
@@ -149,7 +188,7 @@ fun EditGoalView(
                     },
                     actions = {
                         IconButton(onClick = {
-                            scope.launch { viewModel.saveAndCloseGoal(context) }
+                            scope.launch { viewModel.saveAndCloseGoal() }
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Done,
@@ -172,7 +211,7 @@ fun EditGoalView(
                             .align(Alignment.CenterHorizontally)
                     ) {
                         Text(
-                            text = errorMessage,
+                            text = stringResource(errorMessage),
                             modifier = Modifier
                                 .padding(4.dp)
                                 .align(Alignment.Center),
@@ -184,11 +223,33 @@ fun EditGoalView(
                     viewModel,
                     mainActivityViewModel
                 )
+                TaskDeliverableMarkerBottomSheet(
+                    bottomSheetType = bottomSheetType,
+                    dismissBottomSheet = viewModel::dismissBottomSheet,
+                    triedToSaveInput = viewModel.triedToSave,
+                    colourPickerDialog = viewModel.colourPickerDialog,
+                    processBottomSheetAdd = viewModel::processBottomSheetAdd,
+                    showErrorMessage = viewModel.showErrorMessage,
+                    errorMessage = viewModel.errorMessage,
+                    pickColour = viewModel::pickColour,
+                    addTimeBlock = viewModel::addTimeBlock,
+                    deleteTimeBlock = viewModel::deleteTimeBlock,
+                    deleteTaskClicked = null,
+                    originalTask = null,
+                    task = null,
+                    deleteDeliverableClicked = viewModel::deleteDeliverableClicked,
+                    originalDeliverable = viewModel.originalDeliverable,
+                    deliverable = viewModel.deliverable,
+                    deleteMarkerClicked = null,
+                    originalMarker = null,
+                    marker = null
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditGoalFragmentView(
     viewModel: EditGoalViewModel,
@@ -197,6 +258,13 @@ fun EditGoalFragmentView(
 ){
     val newGoal by viewModel.newGoal.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    LaunchedEffect(newGoal) {
+        if (newGoal!=null){
+            viewModel.loadLists()
+        }
+    }
+
     newGoal?.let { newGoal ->
         val scrollState = remember { newGoal.scrollPosition }
         val uri by newGoal.getUri(context).collectAsStateWithLifecycle()
@@ -204,6 +272,8 @@ fun EditGoalFragmentView(
         var colour by remember { newGoal.colour }
         val location = remember { newGoal.location }
         val times = remember { newGoal.times }
+        val selectedGoalDeliverables = remember { newGoal.goalDeliverables }
+        var endType by remember { newGoal.endType }
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
 
@@ -211,6 +281,7 @@ fun EditGoalFragmentView(
         val goalFocusRequester = remember { viewModel.goalFocusRequester }
         val locationFocusRequester = remember { viewModel.locationFocusRequester }
         val colourFocusRequester = remember { viewModel.colourFocusRequester }
+        val bottomSheetType by remember { viewModel.bottomSheetType }
 
         LazyColumn(
             state = scrollState,
@@ -340,6 +411,145 @@ fun EditGoalFragmentView(
                             }
                         }
                     }
+                }
+            }
+            item {
+                Spacer(modifier = Modifier.width(2.dp))
+            }
+            item {
+                var pickedDate by remember { newGoal.endDateTime }
+                val stateTime = rememberTimePickerState(
+                    pickedDate.hour,
+                    pickedDate.minute,
+                    true
+                )
+                val stateDate = rememberDatePickerState(
+                    initialSelectedDateMillis = pickedDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                )
+                var buttonDatePick by remember { mutableStateOf(false) }
+                var buttonTimePick by remember { mutableStateOf(false) }
+                if (buttonDatePick) {
+                    PickDate(stateDate){ pickTime ->
+                        buttonDatePick = false
+                        buttonTimePick = pickTime
+                    }
+                }
+                if (buttonTimePick) {
+                    PickTime(stateTime){
+                        buttonTimePick = false
+                        pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+                    }
+                }
+                var showEndTypeOptions by remember { mutableStateOf(false) }
+                var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>()) }
+                OutlinedButton(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(3.dp),
+                    onClick = {
+                        endTypeOptions = listOf(
+                            MenuItemData(Goal.GoalEndType.UNDEFINED.name){
+                                endType = Goal.GoalEndType.UNDEFINED
+                            },
+                            MenuItemData(Goal.GoalEndType.DATE.name){
+                                endType = Goal.GoalEndType.DATE
+                                buttonDatePick = true
+                            },
+                            MenuItemData(Goal.GoalEndType.DELIVERABLE.name){
+                                endType = Goal.GoalEndType.DELIVERABLE
+                            }
+                        )
+                        showEndTypeOptions = true
+                    },
+                    shape = RectangleShape,
+                    border = BorderStroke(1.dp,Color.DarkGray)
+                ) {
+                    if (showEndTypeOptions) {
+                        DropdownMenu(
+                            expanded = true,
+                            onDismissRequest = { showEndTypeOptions = false }
+                        ) {
+                            endTypeOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.text) },
+                                    onClick = {
+                                        option.onClick.invoke()
+                                        showEndTypeOptions = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    when (endType) {
+                        Goal.GoalEndType.UNDEFINED -> {
+                            Text(
+                                modifier = Modifier,
+                                text = stringResource(
+                                    R.string.end_type,
+                                    stringResource(R.string.undefined),
+                                    ""
+                                ).trim()
+                            )
+                        }
+                        Goal.GoalEndType.DATE -> {
+                            stateDate.getSelectedDate()?.let { localDate ->
+                                pickedDate = LocalDateTime.of(
+                                    localDate,
+                                    LocalTime.of(stateTime.hour,stateTime.minute)
+                                )
+                                Text(
+                                    stringResource(
+                                        R.string.end_type,
+                                        stringResource(R.string.date),
+                                        stringResource(
+                                            R.string.end_time_and_date,
+                                            getTime(pickedDate),
+                                            getStandardDate(context, pickedDate)
+                                        )
+                                    )
+                                )
+                            }?: run {
+                                Text(stringResource(R.string.pick_a_date))
+                            }
+                        }
+                        Goal.GoalEndType.DELIVERABLE -> {
+                            Text(
+                                stringResource(
+                                    R.string.end_type,
+                                    stringResource(R.string.deliverable),
+                                    ""
+                                ).trim()
+                            )
+                        }
+                    }
+                }
+            }
+            if (endType == Goal.GoalEndType.DELIVERABLE){
+                stickyHeader {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Button(
+                            onClick = { scope.launch { viewModel.addDeliverable() } },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                        ) { Text(stringResource(R.string.add_deliverable)) }
+                        Button(
+                            onClick = { scope.launch { viewModel.selectDeliverable() } },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                        ) { Text(stringResource(R.string.select_deliverable)) }
+                    }
+                }
+                items(items = selectedGoalDeliverables, key = { it.id?:Random.nextLong() }) {
+                    deliverable ->
+                    DeliverableCardView(
+                        deliverable,
+                        viewModel::editDeliverable
+                    )
                 }
             }
             item {

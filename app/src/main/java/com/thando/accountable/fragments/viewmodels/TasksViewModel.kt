@@ -1,6 +1,8 @@
 package com.thando.accountable.fragments.viewmodels
 
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.runtime.MutableIntState
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -45,29 +47,28 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     val marker: MutableStateFlow<Marker?> = MutableStateFlow(null)
 
     suspend fun loadLists(){
-        tasksList.clear()
-        tasksList.addAll(
-                repository.getTasks(goal.value?.id?:return,
-                    Task.TaskParentType.GOAL
-                )
+        loadTaskDeliverableMarkerLists(
+            repository = repository,
+            goalId = goal.value?.id,
+            task = task,
+            tasksList = tasksList,
+            deliverable = deliverable,
+            deliverablesList = deliverablesList,
+            marker = marker,
+            markersList = markersList,
         )
-        tasksList.removeIf { taskInstance ->
-            taskInstance.id != null && taskInstance.id == task.value?.id
-        }
-        deliverablesList.clear()
-        deliverablesList.addAll(
-            repository.getDeliverables(goal.value?.id?:return)
+    }
+
+    private fun showError(
+        message: Int,
+        focusRequester: FocusRequester
+    ){
+        showInputError(
+            errorMessage,
+            showErrorMessage,
+            message,
+            focusRequester
         )
-        deliverablesList.removeIf { deliverableInstance ->
-            deliverableInstance.id != null && deliverableInstance.id == deliverable.value?.id
-        }
-        markersList.clear()
-        markersList.addAll(
-            repository.getMarkers(goal.value?.id?:return)
-        )
-        markersList.removeIf { markerInstance ->
-            markerInstance.id != null && markerInstance.id == marker.value?.id
-        }
     }
 
     fun canSaveTask(): Boolean {
@@ -106,28 +107,6 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         return true
     }
 
-    fun canSaveDeliverable(): Boolean{
-        deliverable.value?.let { deliverable ->
-            if (deliverable.deliverable.text.isEmpty()) {
-                showError(
-                    R.string.please_enter_a_deliverable,
-                    deliverable.deliverableTextFocusRequester
-                )
-                return false
-            }
-            deliverable.times.forEach { time ->
-                if (time.duration.value.hour == 0 && time.duration.value.minute == 0) {
-                    showError(
-                        R.string.please_select_a_duration,
-                        time.durationPickerFocusRequester
-                    )
-                    return false
-                }
-            }
-        }?:return false
-        return true
-    }
-
     fun canSaveMarker(): Boolean{
         marker.value?.let { marker ->
             if (marker.marker.text.isEmpty()) {
@@ -141,12 +120,6 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         return true
     }
 
-    private fun showError(message: Int, focusRequester: FocusRequester){
-        errorMessage.intValue = message
-        showErrorMessage.value = true
-        focusRequester.requestFocus()
-    }
-
     fun pickColour(originalColour: Color? = null){
         task.value?.let { task ->
             colourPickerDialog.pickColour(originalColour) { selectedColour: Int ->
@@ -156,59 +129,30 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     suspend fun processBottomSheetAdd(){
-        triedToSave.value = true
-        when (bottomSheetType.value) {
-            Goal.GoalTab.TASKS
-                if task.value != null
-                -> {
-                if (!canSaveTask()) return
-                if (originalTask.value != null) {
-                    deleteTask()
-                    repository.cloneTaskTo(task, originalTask)
-                    task.value = originalTask.value
-                    saveTask()
-                } else {
-                    saveTask()
-                    tasksList.add(task.value!!)
-                }
-                task.value = null
-            }
-
-            Goal.GoalTab.DELIVERABLES
-                if deliverable.value != null
-                -> {
-                if (!canSaveDeliverable()) return
-                if (originalDeliverable.value != null) {
-                    deleteDeliverable()
-                    repository.cloneDeliverableTo(deliverable, originalDeliverable)
-                    deliverable.value = originalDeliverable.value
-                    saveDeliverable()
-                } else {
-                    saveDeliverable()
-                    deliverablesList.add(deliverable.value!!)
-                }
-                deliverable.value = null
-            }
-
-            Goal.GoalTab.MARKERS
-                if marker.value != null
-                -> {
-                if (!canSaveMarker()) return
-                if (originalMarker.value != null) {
-                    deleteMarker()
-                    repository.cloneMarkerTo(marker, originalMarker)
-                    marker.value = originalMarker.value
-                    saveMarker()
-                } else {
-                    saveMarker()
-                    markersList.add(marker.value!!)
-                }
-                marker.value = null
-            }
-
-            else -> {}
-        }
-        dismissBottomSheet()
+        processBottomSheetAddCompanionObject(
+            repository,
+            triedToSave,
+            bottomSheetType,
+            task,
+            originalTask,
+            tasksList,
+            ::deleteTask,
+            ::canSaveTask,
+            ::saveTask,
+            deliverable,
+            originalDeliverable,
+            deliverablesList,
+            ::deleteDeliverable,
+            ::saveDeliverable,
+            marker,
+            originalMarker,
+            markersList,
+            ::deleteMarker,
+            ::canSaveMarker,
+            ::saveMarker,
+            ::showError,
+            ::dismissBottomSheet
+        )
     }
 
     suspend fun addTask(){
@@ -233,20 +177,16 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     suspend fun addDeliverable(){
-        originalTask.value = null
-        originalDeliverable.value = null
-        originalMarker.value = null
-        goal.value?.let { goal ->
-            deliverable.value = Deliverable(
-                parent = goal.id?.let { mutableLongStateOf(it) }?:return,
-                position = mutableLongStateOf(repository.getDeliverables(
-                    goal.id?:return
-                ).size.toLong()),
-                location = TextFieldState(goal.location.text.toString())
-            )
-        }?:return
-        saveDeliverable()
-        showBottomSheet(Goal.GoalTab.DELIVERABLES)
+        addDeliverableCompanionObject(
+            repository = repository,
+            goal = goal.value,
+            saveDeliverable = ::saveDeliverable,
+            showBottomSheet = ::showBottomSheet,
+            deliverable = deliverable,
+            originalTask = originalTask,
+            originalDeliverable = originalDeliverable,
+            originalMarker = originalMarker
+        )
     }
 
     suspend fun addMarker(){
@@ -275,12 +215,16 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     suspend fun editDeliverable(originalDeliverableInput: Deliverable){
-        originalTask.value = null
-        originalDeliverable.value = originalDeliverableInput
-        originalMarker.value = null
-        deliverable.value = repository.getDeliverableClone(originalDeliverableInput)?:return
-        saveDeliverable()
-        showBottomSheet(Goal.GoalTab.DELIVERABLES)
+        editClickedDeliverable(
+            originalDeliverableInput = originalDeliverableInput,
+            repository = repository,
+            originalTask = originalTask,
+            originalDeliverable = originalDeliverable,
+            originalMarker = originalMarker,
+            deliverable = deliverable,
+            saveDeliverable = ::saveDeliverable,
+            showBottomSheet = ::showBottomSheet
+        )
     }
 
     suspend fun editMarker(originalMarkerInput: Marker){
@@ -302,12 +246,13 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     suspend fun deleteDeliverableClicked() {
-        originalDeliverable.value?.let { deliverableToDelete ->
-            deliverablesList.remove(deliverableToDelete)
-            deleteDeliverable()
-            deliverable.value = deliverableToDelete
-        }
-        dismissBottomSheet()
+        deleteDeliverableClickedCompanionObject(
+            deliverable,
+            originalDeliverable,
+            deliverablesList,
+            ::deleteDeliverable,
+            ::dismissBottomSheet
+        )
     }
 
     suspend fun deleteMarkerClicked() {
@@ -327,9 +272,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     suspend fun saveDeliverable() {
-        deliverable.value?.let { deliverable ->
-            deliverable.id = repository.saveDeliverable(deliverable)
-        }
+        saveClickedDeliverable(repository, deliverable)
     }
 
     suspend fun saveMarker() {
@@ -348,12 +291,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     suspend fun deleteDeliverable(){
-        deliverable.value?.let { deliverable ->
-            repository.deleteDeliverable(deliverable)
-            deliverable.times.forEach {
-                repository.deleteGoalTaskDeliverableTime(it)
-            }
-        }
+        deleteClickedDeliverable(repository, deliverable)
     }
 
     suspend fun deleteMarker() {
@@ -363,63 +301,24 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     suspend fun addTimeBlock(){
-        withContext(Dispatchers.IO){
-            if (
-                bottomSheetType.value == Goal.GoalTab.TASKS
-                && task.value != null
-            ){
-                if (task.value?.id == null) saveTask()
-                task.value?.id?.let {
-                    val newTime = GoalTaskDeliverableTime(
-                        parent = mutableLongStateOf(it),
-                        type = mutableStateOf(GoalTaskDeliverableTime.TimesType.TASK)
-                    )
-                    newTime.id = saveTime(newTime)
-                    withContext(Dispatchers.Main) {
-                        task.value?.times?.add(newTime)
-                    }
-                }
-            }
-            else if (
-                bottomSheetType.value == Goal.GoalTab.DELIVERABLES
-                && deliverable.value != null
-            ){
-                if (deliverable.value?.id == null) saveDeliverable()
-                deliverable.value?.id?.let {
-                    val newTime = GoalTaskDeliverableTime(
-                        parent = mutableLongStateOf(it),
-                        type = mutableStateOf(GoalTaskDeliverableTime.TimesType.DELIVERABLE)
-                    )
-                    newTime.id = saveTime(newTime)
-                    withContext(Dispatchers.Main) {
-                        deliverable.value?.times?.add(newTime)
-                    }
-                }
-            }
-        }
+        addTimeBlockCompanionObject(
+            bottomSheetType,
+            ::saveTime,
+            task,
+            ::saveTask,
+            deliverable,
+            ::saveDeliverable,
+        )
     }
 
     suspend fun deleteTimeBlock(timeBlock: GoalTaskDeliverableTime){
-        withContext(Dispatchers.IO) {
-            if (
-                bottomSheetType.value == Goal.GoalTab.TASKS
-                && task.value != null
-            ){
-                repository.deleteGoalTaskDeliverableTime(timeBlock)
-                withContext(Dispatchers.Main) {
-                    task.value?.times?.remove(timeBlock)
-                }
-            }
-            else if (
-                bottomSheetType.value == Goal.GoalTab.DELIVERABLES
-                && deliverable.value != null
-            ){
-                repository.deleteGoalTaskDeliverableTime(timeBlock)
-                withContext(Dispatchers.Main) {
-                    deliverable.value?.times?.remove(timeBlock)
-                }
-            }
-        }
+        deleteTimeBlockCompanionObject(
+            repository = repository,
+            bottomSheetType = bottomSheetType,
+            timeBlock = timeBlock,
+            task = task,
+            deliverable = deliverable
+        )
     }
 
     suspend fun saveTime(time: GoalTaskDeliverableTime): Long {
@@ -427,28 +326,27 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     suspend fun dismissBottomSheet() {
-        task.value?.let {
-            deleteTask()
-            tasksList.remove(task.value)
-            task.value = null
-        }
-        deliverable.value?.let {
-            deleteDeliverable()
-            deliverablesList.remove(deliverable.value)
-            deliverable.value = null
-        }
-        marker.value?.let {
-            deleteMarker()
-            markersList.remove(marker.value)
-            marker.value = null
-        }
-        triedToSave.value = false
-        bottomSheetType.value = null
+        dismissBottomSheetCompanionObject(
+            triedToSave,
+            bottomSheetType,
+            task,
+            tasksList,
+            ::deleteTask,
+            deliverable,
+            deliverablesList,
+            ::deleteDeliverable,
+            marker,
+            markersList,
+            ::deleteMarker,
+        )
     }
 
     fun showBottomSheet(sheetType: Goal.GoalTab) {
-        triedToSave.value = false
-        bottomSheetType.value = sheetType
+        showBottomSheetCompanionObject(
+            sheetType,
+            triedToSave,
+            bottomSheetType
+        )
     }
 
     suspend fun closeTasks(){
@@ -459,6 +357,350 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     companion object{
+        suspend fun loadTaskDeliverableMarkerLists(
+            repository: AccountableRepository,
+            goalId: Long?,
+            task: MutableStateFlow<Task?>?=null,
+            tasksList: SnapshotStateList<Task>?=null,
+            deliverable: MutableStateFlow<Deliverable?>?=null,
+            deliverablesList: SnapshotStateList<Deliverable>?=null,
+            marker: MutableStateFlow<Marker?>?=null,
+            markersList: SnapshotStateList<Marker>?=null
+        ){
+            tasksList?.clear()
+            tasksList?.addAll(
+                repository.getTasks(goalId?:return,
+                    Task.TaskParentType.GOAL
+                )
+            )
+            tasksList?.removeIf { taskInstance ->
+                taskInstance.id != null && taskInstance.id == task?.value?.id
+            }
+            deliverablesList?.clear()
+            deliverablesList?.addAll(
+                repository.getDeliverables(goalId?:return)
+            )
+            deliverablesList?.removeIf { deliverableInstance ->
+                deliverableInstance.id != null && deliverableInstance.id == deliverable?.value?.id
+            }
+            markersList?.clear()
+            markersList?.addAll(
+                repository.getMarkers(goalId?:return)
+            )
+            markersList?.removeIf { markerInstance ->
+                markerInstance.id != null && markerInstance.id == marker?.value?.id
+            }
+        }
+
+        fun canSaveDeliverable(deliverable: MutableStateFlow<Deliverable?>, showError:(Int, FocusRequester)->Unit): Boolean{
+            deliverable.value?.let { deliverable ->
+                if (deliverable.deliverable.text.isEmpty()) {
+                    showError(
+                        R.string.please_enter_a_deliverable,
+                        deliverable.deliverableTextFocusRequester
+                    )
+                    return false
+                }
+                deliverable.times.forEach { time ->
+                    if (time.duration.value.hour == 0 && time.duration.value.minute == 0) {
+                        showError(
+                            R.string.please_select_a_duration,
+                            time.durationPickerFocusRequester
+                        )
+                        return false
+                    }
+                }
+            }?:return false
+            return true
+        }
+
+        fun showInputError(
+            errorMessage: MutableIntState,
+            showErrorMessage: MutableState<Boolean>,
+            message: Int,
+            focusRequester: FocusRequester
+        ){
+            errorMessage.intValue = message
+            showErrorMessage.value = true
+            focusRequester.requestFocus()
+        }
+
+        suspend fun editClickedDeliverable(
+            originalDeliverableInput: Deliverable,
+            repository: AccountableRepository,
+            originalTask: MutableStateFlow<Task?>?=null,
+            originalDeliverable: MutableStateFlow<Deliverable?>,
+            originalMarker: MutableStateFlow<Marker?>?=null,
+            deliverable: MutableStateFlow<Deliverable?>,
+            saveDeliverable: suspend () -> Unit,
+            showBottomSheet: suspend (Goal.GoalTab) -> Unit
+        ){
+            originalTask?.value = null
+            originalDeliverable.value = originalDeliverableInput
+            originalMarker?.value = null
+            deliverable.value = repository.getDeliverableClone(originalDeliverableInput)?:return
+            saveDeliverable()
+            showBottomSheet(Goal.GoalTab.DELIVERABLES)
+        }
+
+        suspend fun saveClickedDeliverable(
+            repository: AccountableRepository,
+            deliverable: MutableStateFlow<Deliverable?>
+        ) {
+            deliverable.value?.let { deliverable ->
+                deliverable.id = repository.saveDeliverable(deliverable)
+            }
+        }
+
+        suspend fun deleteClickedDeliverable(
+            repository: AccountableRepository,
+            deliverable: MutableStateFlow<Deliverable?>
+        ) {
+            deliverable.value?.let { deliverable ->
+                repository.deleteDeliverable(deliverable)
+                deliverable.times.forEach {
+                    repository.deleteGoalTaskDeliverableTime(it)
+                }
+            }
+        }
+
+        suspend fun deleteDeliverableClickedCompanionObject(
+            deliverable: MutableStateFlow<Deliverable?>,
+            originalDeliverable: MutableStateFlow<Deliverable?>,
+            deliverablesList: SnapshotStateList<Deliverable>,
+            deleteDeliverable: suspend () -> Unit,
+            dismissBottomSheet: suspend () -> Unit
+        ) {
+            originalDeliverable.value?.let { deliverableToDelete ->
+                deliverablesList.remove(deliverableToDelete)
+                deleteDeliverable()
+                deliverable.value = deliverableToDelete
+            }
+            dismissBottomSheet()
+        }
+
+        suspend fun dismissBottomSheetCompanionObject(
+            triedToSave: MutableStateFlow<Boolean>,
+            bottomSheetType: MutableState<Goal.GoalTab?>,
+            task: MutableStateFlow<Task?>?=null,
+            tasksList: SnapshotStateList<Task>?=null,
+            deleteTask: (suspend () -> Unit)?=null,
+            deliverable: MutableStateFlow<Deliverable?>?=null,
+            deliverablesList: SnapshotStateList<Deliverable>?=null,
+            deleteDeliverable: (suspend () -> Unit)?=null,
+            marker: MutableStateFlow<Marker?>?=null,
+            markersList: SnapshotStateList<Marker>?=null,
+            deleteMarker: (suspend () -> Unit)?=null,
+        ) {
+            task?.value?.let {
+                deleteTask?.invoke()
+                tasksList?.remove(task.value)
+                task.value = null
+            }
+            deliverable?.value?.let {
+                deleteDeliverable?.invoke()
+                deliverablesList?.remove(deliverable.value)
+                deliverable.value = null
+            }
+            marker?.value?.let {
+                deleteMarker?.invoke()
+                markersList?.remove(marker.value)
+                marker.value = null
+            }
+            triedToSave.value = false
+            bottomSheetType.value = null
+        }
+
+        fun showBottomSheetCompanionObject(
+                sheetType: Goal.GoalTab,
+                triedToSave: MutableStateFlow<Boolean>,
+                bottomSheetType: MutableState<Goal.GoalTab?>
+        ) {
+            triedToSave.value = false
+            bottomSheetType.value = sheetType
+        }
+
+        suspend fun processBottomSheetAddCompanionObject(
+            repository: AccountableRepository,
+            triedToSave: MutableStateFlow<Boolean>,
+            bottomSheetType: MutableState<Goal.GoalTab?>,
+            task: MutableStateFlow<Task?>?=null,
+            originalTask: MutableStateFlow<Task?>?=null,
+            tasksList: SnapshotStateList<Task>?=null,
+            deleteTask: (suspend () -> Unit)?=null,
+            canSaveTask: (() -> Boolean)?=null,
+            saveTask: (suspend () -> Unit)?=null,
+            deliverable: MutableStateFlow<Deliverable?>?=null,
+            originalDeliverable: MutableStateFlow<Deliverable?>?=null,
+            deliverablesList: SnapshotStateList<Deliverable>?=null,
+            deleteDeliverable: (suspend () -> Unit)?=null,
+            saveDeliverable: (suspend () -> Unit)?=null,
+            marker: MutableStateFlow<Marker?>?=null,
+            originalMarker: MutableStateFlow<Marker?>?=null,
+            markersList: SnapshotStateList<Marker>?=null,
+            deleteMarker: (suspend () -> Unit)?=null,
+            canSaveMarker: (() -> Boolean)?=null,
+            saveMarker: (suspend () -> Unit)?=null,
+            showError: (Int, FocusRequester) -> Unit,
+            dismissBottomSheet: (suspend () -> Unit)
+        ) {
+            triedToSave.value = true
+            when (bottomSheetType.value) {
+                Goal.GoalTab.TASKS
+                    if task?.value != null
+                    -> {
+                    if (!(canSaveTask?.invoke()?:return)) return
+                    if (originalTask?.value != null) {
+                        deleteTask?.invoke()
+                        repository.cloneTaskTo(task, originalTask)
+                        task.value = originalTask.value
+                        saveTask?.invoke()
+                    } else {
+                        saveTask?.invoke()
+                        tasksList?.add(task.value!!)
+                    }
+                    task.value = null
+                }
+
+                Goal.GoalTab.DELIVERABLES
+                    if deliverable?.value != null
+                    -> {
+                    if (!canSaveDeliverable(
+                            deliverable,
+                            showError
+                        )) return
+                    if (originalDeliverable?.value != null) {
+                        deleteDeliverable?.invoke()
+                        repository.cloneDeliverableTo(deliverable, originalDeliverable)
+                        deliverable.value = originalDeliverable.value
+                        saveDeliverable?.invoke()
+                    } else {
+                        saveDeliverable?.invoke()
+                        deliverablesList?.add(deliverable.value!!)
+                    }
+                    deliverable.value = null
+                }
+
+                Goal.GoalTab.MARKERS
+                    if marker?.value != null
+                    -> {
+                    if (!(canSaveMarker?.invoke()?:return)) return
+                    if (originalMarker?.value != null) {
+                        deleteMarker?.invoke()
+                        repository.cloneMarkerTo(marker, originalMarker)
+                        marker.value = originalMarker.value
+                        saveMarker?.invoke()
+                    } else {
+                        saveMarker?.invoke()
+                        markersList?.add(marker.value!!)
+                    }
+                    marker.value = null
+                }
+
+                else -> {}
+            }
+            dismissBottomSheet()
+        }
+
+        suspend fun addDeliverableCompanionObject(
+            repository: AccountableRepository,
+            goal: Goal?,
+            saveDeliverable: (suspend () -> Unit),
+            showBottomSheet: (Goal.GoalTab) -> Unit,
+            deliverable: MutableStateFlow<Deliverable?>,
+            originalTask: MutableStateFlow<Task?>?=null,
+            originalDeliverable: MutableStateFlow<Deliverable?>?=null,
+            originalMarker: MutableStateFlow<Marker?>?=null
+        ) {
+            originalTask?.value = null
+            originalDeliverable?.value = null
+            originalMarker?.value = null
+            goal?.let { goal ->
+                deliverable.value = Deliverable(
+                    parent = goal.id?.let { mutableLongStateOf(it) }?:return,
+                    position = mutableLongStateOf(repository.getDeliverables(
+                        goal.id?:return
+                    ).size.toLong()),
+                    location = TextFieldState(goal.location.text.toString())
+                )
+            }?:return
+            saveDeliverable()
+            showBottomSheet(Goal.GoalTab.DELIVERABLES)
+        }
+
+        suspend fun addTimeBlockCompanionObject(
+            bottomSheetType: MutableState<Goal.GoalTab?>,
+            saveTime: (suspend (GoalTaskDeliverableTime) -> Long),
+            task: MutableStateFlow<Task?>?=null,
+            saveTask: (suspend () -> Unit)?=null,
+            deliverable: MutableStateFlow<Deliverable?>?=null,
+            saveDeliverable: (suspend () -> Unit)?=null,
+        ) {
+            withContext(Dispatchers.IO){
+                if (
+                    bottomSheetType.value == Goal.GoalTab.TASKS
+                    && task?.value != null
+                ){
+                    if (task.value?.id == null) saveTask?.invoke()
+                    task.value?.id?.let {
+                        val newTime = GoalTaskDeliverableTime(
+                            parent = mutableLongStateOf(it),
+                            type = mutableStateOf(GoalTaskDeliverableTime.TimesType.TASK)
+                        )
+                        newTime.id = saveTime(newTime)
+                        withContext(Dispatchers.Main) {
+                            task.value?.times?.add(newTime)
+                        }
+                    }
+                }
+                else if (
+                    bottomSheetType.value == Goal.GoalTab.DELIVERABLES
+                    && deliverable?.value != null
+                ){
+                    if (deliverable.value?.id == null) saveDeliverable?.invoke()
+                    deliverable.value?.id?.let {
+                        val newTime = GoalTaskDeliverableTime(
+                            parent = mutableLongStateOf(it),
+                            type = mutableStateOf(GoalTaskDeliverableTime.TimesType.DELIVERABLE)
+                        )
+                        newTime.id = saveTime(newTime)
+                        withContext(Dispatchers.Main) {
+                            deliverable.value?.times?.add(newTime)
+                        }
+                    }
+                }
+            }
+        }
+
+        suspend fun deleteTimeBlockCompanionObject(
+            repository: AccountableRepository,
+            bottomSheetType: MutableState<Goal.GoalTab?>,
+            timeBlock: GoalTaskDeliverableTime,
+            task: MutableStateFlow<Task?>?=null,
+            deliverable: MutableStateFlow<Deliverable?>?=null,
+        ) {
+            withContext(Dispatchers.IO) {
+                if (
+                    bottomSheetType.value == Goal.GoalTab.TASKS
+                    && task?.value != null
+                ){
+                    repository.deleteGoalTaskDeliverableTime(timeBlock)
+                    withContext(Dispatchers.Main) {
+                        task.value?.times?.remove(timeBlock)
+                    }
+                }
+                else if (
+                    bottomSheetType.value == Goal.GoalTab.DELIVERABLES
+                    && deliverable?.value != null
+                ){
+                    repository.deleteGoalTaskDeliverableTime(timeBlock)
+                    withContext(Dispatchers.Main) {
+                        deliverable.value?.times?.remove(timeBlock)
+                    }
+                }
+            }
+        }
+
         val Factory : ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T

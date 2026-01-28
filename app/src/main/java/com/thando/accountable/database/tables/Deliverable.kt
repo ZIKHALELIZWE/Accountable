@@ -13,6 +13,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.LocalDateTime
 
 @Entity(tableName = "deliverable_table")
@@ -46,6 +47,9 @@ data class Deliverable (
 
     @ColumnInfo (name = "deliverable_location")
     val location: TextFieldState = TextFieldState(""),
+
+    @ColumnInfo (name = "deliverable_goal_id")
+    val goalId: MutableStateFlow<Long?> = MutableStateFlow(null),
 
     @ColumnInfo (name = "deliverable_size")
     val size: MutableState<Float> = mutableFloatStateOf(0F),
