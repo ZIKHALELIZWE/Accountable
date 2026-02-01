@@ -21,8 +21,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -81,6 +83,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.unpackInt1
+import androidx.compose.ui.util.unpackInt2
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -89,6 +93,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
 import com.thando.accountable.AppResources.Companion.getStandardDate
 import com.thando.accountable.AppResources.Companion.getTime
+import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
@@ -99,12 +104,15 @@ import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.temporal.TemporalAdjusters
 import kotlin.collections.forEach
 import kotlin.enums.EnumEntries
@@ -234,6 +242,7 @@ fun EditGoalView(
                     pickColour = viewModel::pickColour,
                     addTimeBlock = viewModel::addTimeBlock,
                     deleteTimeBlock = viewModel::deleteTimeBlock,
+                    updateTimeBlock = viewModel::updateTimeBlock,
                     deleteTaskClicked = null,
                     originalTask = null,
                     task = null,
@@ -256,153 +265,74 @@ fun EditGoalFragmentView(
     mainActivityViewModel: MainActivityViewModel,
     modifier: Modifier = Modifier
 ){
-    val newGoal by viewModel.newGoal.collectAsStateWithLifecycle()
+    val newGoalStateFlow by viewModel.newGoal.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(newGoal) {
-        if (newGoal!=null){
-            viewModel.loadLists()
-        }
+    LaunchedEffect(newGoalStateFlow) {
+        MainActivity.log("New Goal State Flow: $newGoalStateFlow")
     }
 
-    newGoal?.let { newGoal ->
-        val scrollState = remember { newGoal.scrollPosition }
-        val uri by newGoal.getUri(context).collectAsStateWithLifecycle()
-        val goal = remember { newGoal.goal }
-        var colour by remember { newGoal.colour }
-        val location = remember { newGoal.location }
-        val times = remember { newGoal.times }
-        val selectedGoalDeliverables = remember { newGoal.goalDeliverables }
-        var endType by remember { newGoal.endType }
-        val scope = rememberCoroutineScope()
-        val context = LocalContext.current
+    newGoalStateFlow?.let { newGoalFlow ->
+        val newGoal by newGoalFlow.collectAsStateWithLifecycle(null)
 
-        val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
-        val goalFocusRequester = remember { viewModel.goalFocusRequester }
-        val locationFocusRequester = remember { viewModel.locationFocusRequester }
-        val colourFocusRequester = remember { viewModel.colourFocusRequester }
-        val bottomSheetType by remember { viewModel.bottomSheetType }
-
-        LazyColumn(
-            state = scrollState,
-            modifier = modifier
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            item {
-                OutlinedTextField(
-                    state = goal,
-                    label = { Text(stringResource(R.string.goal)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 3.dp)
-                        .focusRequester(goalFocusRequester),
-                    trailingIcon = {
-                        if (triedToSave && goal.text.isEmpty()){
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = stringResource(R.string.empty_field),
-                                tint = Color.Red
-                            )
-                        }
-                    }
+        newGoal?.let { newGoal ->
+            val scrollState = remember {
+                LazyListState(
+                    unpackInt1(newGoal.scrollPosition),
+                    unpackInt2(newGoal.scrollPosition)
                 )
             }
-            item {
-                Spacer(modifier = Modifier.width(2.dp))
+            val uri by newGoal.getUri(context).collectAsStateWithLifecycle()
+            val goal = remember { TextFieldState(newGoal.goal) }
+            val location = remember { TextFieldState(newGoal.location) }
+
+            val scope = rememberCoroutineScope()
+            val context = LocalContext.current
+
+            val selectedGoalDeliverablesFlow by newGoal.selectedGoalDeliverables.collectAsStateWithLifecycle()
+            val selectedGoalDeliverables by (selectedGoalDeliverablesFlow
+                ?: MutableStateFlow(emptyList()))
+                .collectAsStateWithLifecycle(emptyList())
+            val goalDeliverablesFlow by newGoal.goalDeliverables.collectAsStateWithLifecycle()
+            val goalDeliverables by (goalDeliverablesFlow
+                ?: MutableStateFlow(emptyList()))
+                .collectAsStateWithLifecycle(emptyList())
+            val timesFlow by newGoal.times.collectAsStateWithLifecycle()
+            val times by (timesFlow ?: MutableStateFlow(emptyList()))
+                .collectAsStateWithLifecycle(emptyList())
+
+            val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
+            val goalFocusRequester = remember { viewModel.goalFocusRequester }
+            val locationFocusRequester = remember { viewModel.locationFocusRequester }
+            val colourFocusRequester = remember { viewModel.colourFocusRequester }
+            val bottomSheetType by remember { viewModel.bottomSheetType }
+
+            LaunchedEffect(goal.text) {
+                viewModel.updateGoalString(goal.text.toString())
             }
-            uri?.let {
+
+            LaunchedEffect(location.text) {
+                viewModel.updateLocation(location.text.toString())
+            }
+
+            LazyColumn(
+                state = scrollState,
+                modifier = modifier
+                    .fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            )
+            {
                 item {
-                    Image(
-                        bitmap = AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
-                            ?: ImageBitmap(1, 1),
-                        contentDescription = stringResource(R.string.goal_image),
-                        contentScale = ContentScale.FillWidth
-                    )
-                }
-                item {
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-            }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = { mainActivityViewModel.launchGalleryLauncher(
-                            AppResources.ContentType.IMAGE
-                        ) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(8.dp),
-                    ) { Text(stringResource(R.string.choose_image)) }
-                    uri?.let {
-                        Button(
-                            onClick = { scope.launch { viewModel.removeImage() } },
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(8.dp),
-                            // enabled =
-                        ) { Text(stringResource(R.string.remove_image)) }
-                    }
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.width(2.dp))
-            }
-            item {
-                OutlinedTextField(
-                    state = location,
-                    label = { Text(stringResource(R.string.location)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 3.dp)
-                        .focusRequester(locationFocusRequester),
-                    trailingIcon = {
-                        if (triedToSave && location.text.isEmpty()){
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = stringResource(R.string.empty_field),
-                                tint = Color.Red
-                            )
-                        }
-                    }
-                )
-            }
-            item {
-                Spacer(modifier = Modifier.width(2.dp))
-            }
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Max),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (colour != -1) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight()
-                                .padding(12.dp)
-                                .background(Color(colour), shape = RoundedCornerShape(8.dp))
-                                .weight(1f)
-                        )
-                    }
-                    Button(
-                        onClick = { viewModel.pickColour(
-                            Color(newGoal.colour.value)
-                        ) },
+                    OutlinedTextField(
+                        state = goal,
+                        label = { Text(stringResource(R.string.goal)) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp)
-                            .weight(2f)
-                            .focusRequester(colourFocusRequester)
-                    ) {
-                        Row {
-                            Text(stringResource(R.string.pick_colour))
-                            if (triedToSave && colour==-1){
+                            .padding(horizontal = 3.dp)
+                            .focusRequester(goalFocusRequester),
+                        trailingIcon = {
+                            if (triedToSave && goal.text.isEmpty()) {
                                 Icon(
                                     imageVector = Icons.Default.Warning,
                                     contentDescription = stringResource(R.string.empty_field),
@@ -410,176 +340,312 @@ fun EditGoalFragmentView(
                                 )
                             }
                         }
-                    }
+                    )
                 }
-            }
-            item {
-                Spacer(modifier = Modifier.width(2.dp))
-            }
-            item {
-                var pickedDate by remember { newGoal.endDateTime }
-                val stateTime = rememberTimePickerState(
-                    pickedDate.hour,
-                    pickedDate.minute,
-                    true
-                )
-                val stateDate = rememberDatePickerState(
-                    initialSelectedDateMillis = pickedDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                )
-                var buttonDatePick by remember { mutableStateOf(false) }
-                var buttonTimePick by remember { mutableStateOf(false) }
-                if (buttonDatePick) {
-                    PickDate(stateDate){ pickTime ->
-                        buttonDatePick = false
-                        buttonTimePick = pickTime
-                    }
+                item {
+                    Spacer(modifier = Modifier.width(2.dp))
                 }
-                if (buttonTimePick) {
-                    PickTime(stateTime){
-                        buttonTimePick = false
-                        pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
-                    }
-                }
-                var showEndTypeOptions by remember { mutableStateOf(false) }
-                var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>()) }
-                OutlinedButton(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(3.dp),
-                    onClick = {
-                        endTypeOptions = listOf(
-                            MenuItemData(Goal.GoalEndType.UNDEFINED.name){
-                                endType = Goal.GoalEndType.UNDEFINED
-                            },
-                            MenuItemData(Goal.GoalEndType.DATE.name){
-                                endType = Goal.GoalEndType.DATE
-                                buttonDatePick = true
-                            },
-                            MenuItemData(Goal.GoalEndType.DELIVERABLE.name){
-                                endType = Goal.GoalEndType.DELIVERABLE
-                            }
+                uri?.let {
+                    item {
+                        Image(
+                            bitmap = AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
+                                ?: ImageBitmap(1, 1),
+                            contentDescription = stringResource(R.string.goal_image),
+                            contentScale = ContentScale.FillWidth
                         )
-                        showEndTypeOptions = true
-                    },
-                    shape = RectangleShape,
-                    border = BorderStroke(1.dp,Color.DarkGray)
-                ) {
-                    if (showEndTypeOptions) {
-                        DropdownMenu(
-                            expanded = true,
-                            onDismissRequest = { showEndTypeOptions = false }
-                        ) {
-                            endTypeOptions.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option.text) },
-                                    onClick = {
-                                        option.onClick.invoke()
-                                        showEndTypeOptions = false
-                                    }
+                    }
+                    item {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                }
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                mainActivityViewModel.launchGalleryLauncher(
+                                    AppResources.ContentType.IMAGE
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(8.dp),
+                        ) { Text(stringResource(R.string.choose_image)) }
+                        uri?.let {
+                            Button(
+                                onClick = { scope.launch { viewModel.removeImage() } },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(8.dp),
+                                // enabled =
+                            ) { Text(stringResource(R.string.remove_image)) }
+                        }
+                    }
+                }
+                item {
+                    Spacer(modifier = Modifier.width(2.dp))
+                }
+                item {
+                    OutlinedTextField(
+                        state = location,
+                        label = { Text(stringResource(R.string.location)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 3.dp)
+                            .focusRequester(locationFocusRequester),
+                        trailingIcon = {
+                            if (triedToSave && location.text.isEmpty()) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = stringResource(R.string.empty_field),
+                                    tint = Color.Red
                                 )
                             }
                         }
-                    }
-                    when (endType) {
-                        Goal.GoalEndType.UNDEFINED -> {
-                            Text(
-                                modifier = Modifier,
-                                text = stringResource(
-                                    R.string.end_type,
-                                    stringResource(R.string.undefined),
-                                    ""
-                                ).trim()
+                    )
+                }
+                item {
+                    Spacer(modifier = Modifier.width(2.dp))
+                }
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (newGoal.colour != -1) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .fillMaxHeight()
+                                    .padding(12.dp)
+                                    .background(
+                                        Color(newGoal.colour),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .weight(1f)
                             )
                         }
-                        Goal.GoalEndType.DATE -> {
-                            stateDate.getSelectedDate()?.let { localDate ->
-                                pickedDate = LocalDateTime.of(
-                                    localDate,
-                                    LocalTime.of(stateTime.hour,stateTime.minute)
+                        Button(
+                            onClick = {
+                                MainActivity.log("Button Colour: ${newGoal.colour}")
+                                viewModel.pickColour(
+                                    Color(newGoal.colour)
                                 )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                                .weight(2f)
+                                .focusRequester(colourFocusRequester)
+                        ) {
+                            Row {
+                                Text(stringResource(R.string.pick_colour))
+                                if (triedToSave && newGoal.colour == -1) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = stringResource(R.string.empty_field),
+                                        tint = Color.Red
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                item {
+                    Spacer(modifier = Modifier.width(2.dp))
+                }
+                item {
+                    var pickedDate by remember {
+                        mutableStateOf(
+                            LocalDateTime.ofEpochSecond(
+                                newGoal.endDateTime/1000, 0,
+                                ZoneOffset.UTC
+                            )
+                        )
+                    }
+                    val stateTime = rememberTimePickerState(
+                        pickedDate.hour,
+                        pickedDate.minute,
+                        true
+                    )
+                    val stateDate = rememberDatePickerState(
+                        initialSelectedDateMillis = pickedDate
+                            .toInstant(ZoneOffset.UTC).toEpochMilli()
+                    )
+                    var buttonDatePick by remember { mutableStateOf(false) }
+                    var buttonTimePick by remember { mutableStateOf(false) }
+                    if (buttonDatePick) {
+                        PickDate(stateDate) { pickTime ->
+                            buttonDatePick = false
+                            buttonTimePick = pickTime
+                        }
+                    }
+                    if (buttonTimePick) {
+                        PickTime(stateTime) {
+                            buttonTimePick = false
+                            pickedDate =
+                                pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+                        }
+                    }
+                    var showEndTypeOptions by remember { mutableStateOf(false) }
+                    var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>()) }
+                    OutlinedButton(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(3.dp),
+                        onClick = {
+                            endTypeOptions = listOf(
+                                MenuItemData(Goal.GoalEndType.UNDEFINED.name) {
+                                    scope.launch {
+                                        viewModel.updateEndType(Goal.GoalEndType.UNDEFINED)
+                                    }
+                                },
+                                MenuItemData(Goal.GoalEndType.DATE.name) {
+                                    scope.launch {
+                                        viewModel.updateEndType(Goal.GoalEndType.DATE)
+                                    }
+                                    buttonDatePick = true
+                                },
+                                MenuItemData(Goal.GoalEndType.DELIVERABLE.name) {
+                                    scope.launch {
+                                        viewModel.updateEndType(Goal.GoalEndType.DELIVERABLE)
+                                    }
+                                }
+                            )
+                            showEndTypeOptions = true
+                        },
+                        shape = RectangleShape,
+                        border = BorderStroke(1.dp, Color.DarkGray)
+                    ) {
+                        if (showEndTypeOptions) {
+                            DropdownMenu(
+                                expanded = true,
+                                onDismissRequest = { showEndTypeOptions = false }
+                            ) {
+                                endTypeOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.text) },
+                                        onClick = {
+                                            option.onClick.invoke()
+                                            showEndTypeOptions = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        when (Goal.GoalEndType.valueOf(newGoal.endType)) {
+                            Goal.GoalEndType.UNDEFINED -> {
+                                Text(
+                                    modifier = Modifier,
+                                    text = stringResource(
+                                        R.string.end_type,
+                                        stringResource(R.string.undefined),
+                                        ""
+                                    ).trim()
+                                )
+                            }
+
+                            Goal.GoalEndType.DATE -> {
+                                stateDate.getSelectedDate()?.let { localDate ->
+                                    pickedDate = LocalDateTime.of(
+                                        localDate,
+                                        LocalTime.of(stateTime.hour, stateTime.minute)
+                                    )
+                                    LaunchedEffect(pickedDate) {
+                                        viewModel.updatePickedDate(pickedDate)
+                                    }
+                                    Text(
+                                        stringResource(
+                                            R.string.end_type,
+                                            stringResource(R.string.date),
+                                            stringResource(
+                                                R.string.end_time_and_date,
+                                                getTime(pickedDate),
+                                                getStandardDate(context, pickedDate)
+                                            )
+                                        )
+                                    )
+                                } ?: run {
+                                    Text(stringResource(R.string.pick_a_date))
+                                }
+                            }
+
+                            Goal.GoalEndType.DELIVERABLE -> {
                                 Text(
                                     stringResource(
                                         R.string.end_type,
-                                        stringResource(R.string.date),
-                                        stringResource(
-                                            R.string.end_time_and_date,
-                                            getTime(pickedDate),
-                                            getStandardDate(context, pickedDate)
-                                        )
-                                    )
+                                        stringResource(R.string.deliverable),
+                                        ""
+                                    ).trim()
                                 )
-                            }?: run {
-                                Text(stringResource(R.string.pick_a_date))
                             }
                         }
-                        Goal.GoalEndType.DELIVERABLE -> {
-                            Text(
-                                stringResource(
-                                    R.string.end_type,
-                                    stringResource(R.string.deliverable),
-                                    ""
-                                ).trim()
-                            )
+                    }
+                }
+                if (Goal.GoalEndType.valueOf(newGoal.endType) == Goal.GoalEndType.DELIVERABLE) {
+                    stickyHeader {
+                        Row(
+                            Modifier.fillMaxWidth()
+                        ) {
+                            Button(
+                                onClick = { scope.launch { viewModel.addDeliverable() } },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp).weight(1f)
+                            ) { Text(stringResource(R.string.add_deliverable)) }
+                            Button(
+                                onClick = { scope.launch { viewModel.selectDeliverable() } },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp).weight(1f)
+                            ) { Text(stringResource(R.string.select_deliverable)) }
                         }
                     }
-                }
-            }
-            if (endType == Goal.GoalEndType.DELIVERABLE){
-                stickyHeader {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Button(
-                            onClick = { scope.launch { viewModel.addDeliverable() } },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp)
-                        ) { Text(stringResource(R.string.add_deliverable)) }
-                        Button(
-                            onClick = { scope.launch { viewModel.selectDeliverable() } },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp)
-                        ) { Text(stringResource(R.string.select_deliverable)) }
+                    items(
+                        items = selectedGoalDeliverables,
+                        key = { it.id ?: Random.nextLong() }) { deliverable ->
+                        DeliverableCardView(
+                            deliverable,
+                            viewModel::editDeliverable
+                        )
                     }
                 }
-                items(items = selectedGoalDeliverables, key = { it.id?:Random.nextLong() }) {
-                    deliverable ->
-                    DeliverableCardView(
-                        deliverable,
-                        viewModel::editDeliverable
-                    )
-                }
-            }
-            item {
-                Spacer(modifier = Modifier.width(2.dp))
-            }
-            stickyHeader {
-                Button(
-                    onClick = { scope.launch { viewModel.addTimeBlock() } },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                ) { Text(stringResource(R.string.add_time_block)) }
-            }
-            items(items = times, key = { it.id?:Random.nextLong() }) { item ->
-                TimeInputView(
-                    item,
-                    viewModel.triedToSave,
-                    viewModel::deleteTimeBlock
-                )
-                if (times.indexOf(item) != times.lastIndex) {
+                item {
                     Spacer(modifier = Modifier.width(2.dp))
                 }
+                stickyHeader {
+                    Button(
+                        onClick = { scope.launch { viewModel.addTimeBlock() } },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    ) { Text(stringResource(R.string.add_time_block)) }
+                }
+                items(items = times, key = { it.id ?: Random.nextLong() }) { item ->
+                    TimeInputView(
+                        item,
+                        viewModel.triedToSave,
+                        viewModel::deleteTimeBlock,
+                        viewModel::updateTimeBlock
+                    )
+                    if (times.indexOf(item) != times.lastIndex) {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                }
             }
-        }
-    }?: run {
-        // New Goal not loaded yet
-        Box(contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize()) {
-            // Indeterminate spinner
-            CircularProgressIndicator()
+        } ?: run {
+            // New Goal not loaded yet
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Indeterminate spinner
+                CircularProgressIndicator()
+            }
         }
     }
 }
@@ -589,11 +655,13 @@ fun EditGoalFragmentView(
 fun TimeInputView(
     time: GoalTaskDeliverableTime,
     triedToSaveStateFlow: MutableStateFlow<Boolean>,
-    deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit
+    deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
+    updateGoalTaskDeliverableTime: suspend (GoalTaskDeliverableTime) -> Unit
 ){
-    var timeBlockType by remember { time.timeBlockType }
-    var pickedDate by remember { time.start }
-    var pickedDuration by remember { time.duration }
+    var pickedDate by remember { mutableStateOf(LocalDateTime.ofEpochSecond(time.start/1000,0,
+        ZoneOffset.UTC)) }
+    var pickedDuration by remember { mutableStateOf(LocalDateTime.ofEpochSecond(time.duration/1000,0,
+        ZoneOffset.UTC)) }
     val resources = LocalResources.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -614,8 +682,10 @@ fun TimeInputView(
                 PickerMenu(
                     modifier = Modifier.weight(4f),
                     options = Goal.TimeBlockType.entries,
-                    selectedOption = timeBlockType
-                ) { timeBlockType = it }
+                    selectedOption = Goal.TimeBlockType.valueOf(time.timeBlockType)
+                ) { scope.launch {
+                    updateGoalTaskDeliverableTime(time.copy(timeBlockType = it.name))
+                } }
                 IconButton(
                     modifier = Modifier
                         .fillMaxSize()
@@ -630,7 +700,7 @@ fun TimeInputView(
                     )
                 }
             }
-            when(timeBlockType){
+            when(Goal.TimeBlockType.valueOf(time.timeBlockType)){
                 Goal.TimeBlockType.DAILY -> {
                     val stateTime = rememberTimePickerState(
                         pickedDate.hour,
@@ -643,6 +713,13 @@ fun TimeInputView(
                         PickTime(stateTime){
                             buttonTimePick = false
                             pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+                            scope.launch {
+                                updateGoalTaskDeliverableTime(
+                                    time.copy(
+                                        start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                    )
+                                )
+                            }
                         }
                     }
                     OutlinedButton(modifier = Modifier
@@ -652,6 +729,13 @@ fun TimeInputView(
                     ) {
                         checkDuration(stateTime, pickedDuration){ newDuration ->
                             pickedDuration = newDuration
+                            scope.launch {
+                                updateGoalTaskDeliverableTime(
+                                    time.copy(
+                                        duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                    )
+                                )
+                            }
                         }
                         Text(stringResource(R.string.start_time, getTime(pickedDate)))
                     }
@@ -662,6 +746,13 @@ fun TimeInputView(
                         durationPickerFocusRequester
                     ){ newDuration ->
                         pickedDuration = newDuration
+                        scope.launch {
+                            updateGoalTaskDeliverableTime(
+                                time.copy(
+                                    duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                )
+                            )
+                        }
                     }
                 }
                 Goal.TimeBlockType.WEEKLY -> {
@@ -701,6 +792,13 @@ fun TimeInputView(
                                         else -> DayOfWeek.MONDAY
                                     }
                                 ))
+                                scope.launch {
+                                    updateGoalTaskDeliverableTime(
+                                        time.copy(
+                                            start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                        )
+                                    )
+                                }
                                 buttonTimePick = true
                             }
                         }
@@ -709,6 +807,14 @@ fun TimeInputView(
                         PickTime(stateTime){
                             buttonTimePick = false
                             pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+
+                            scope.launch {
+                                updateGoalTaskDeliverableTime(
+                                    time.copy(
+                                        start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                    )
+                                )
+                            }
                         }
                     }
                     OutlinedButton(modifier = Modifier
@@ -718,6 +824,13 @@ fun TimeInputView(
                     ) {
                         checkDuration(stateTime,pickedDuration){ newDuration ->
                             pickedDuration = newDuration
+                            scope.launch {
+                                updateGoalTaskDeliverableTime(
+                                    time.copy(
+                                        duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                    )
+                                )
+                            }
                         }
                         Text(
                             stringResource(
@@ -733,6 +846,13 @@ fun TimeInputView(
                         durationPickerFocusRequester
                     ){ newDuration ->
                         pickedDuration = newDuration
+                        scope.launch {
+                            updateGoalTaskDeliverableTime(
+                                time.copy(
+                                    duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                )
+                            )
+                        }
                     }
                 }
                 Goal.TimeBlockType.MONTHLY,
@@ -744,7 +864,7 @@ fun TimeInputView(
                         true
                     )
                     val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = pickedDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        initialSelectedDateMillis = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
                     )
                     var buttonDatePick by remember { mutableStateOf(false) }
                     var buttonTimePick by remember { mutableStateOf(false) }
@@ -758,6 +878,14 @@ fun TimeInputView(
                         PickTime(stateTime){
                             buttonTimePick = false
                             pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+
+                            scope.launch {
+                                updateGoalTaskDeliverableTime(
+                                    time.copy(
+                                        start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                    )
+                                )
+                            }
                         }
                     }
                     OutlinedButton(modifier = Modifier
@@ -768,11 +896,25 @@ fun TimeInputView(
                         stateDate.getSelectedDate()?.let { localDate ->
                             checkDuration(stateTime,pickedDuration){ newDuration ->
                                 pickedDuration = newDuration
+                                scope.launch {
+                                    updateGoalTaskDeliverableTime(
+                                        time.copy(
+                                            duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                        )
+                                    )
+                                }
                             }
                             pickedDate = LocalDateTime.of(
                                 localDate,
                                 LocalTime.of(stateTime.hour,stateTime.minute)
                             )
+                            scope.launch {
+                                updateGoalTaskDeliverableTime(
+                                    time.copy(
+                                        start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                    )
+                                )
+                            }
                             Text(
                                 stringResource(
                                     R.string.start_time_and_date,
@@ -791,6 +933,13 @@ fun TimeInputView(
                             durationPickerFocusRequester
                         ){ newDuration ->
                             pickedDuration = newDuration
+                            scope.launch {
+                                updateGoalTaskDeliverableTime(
+                                    time.copy(
+                                        duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                    )
+                                )
+                            }
                         }
                     }
                 }

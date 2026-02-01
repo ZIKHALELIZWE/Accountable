@@ -71,6 +71,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -106,9 +107,13 @@ import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import kotlin.random.Random
 
 private val bottomBarHeightFraction = 0.14f
@@ -366,7 +371,8 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
 
         when (listShown) {
             Folder.FolderListType.FOLDERS -> {
-                val foldersList = remember { viewModel.foldersList }
+                val foldersListFlow by viewModel.foldersList.collectAsStateWithLifecycle()
+                val foldersList by (foldersListFlow?:MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
 
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
@@ -390,7 +396,8 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
             }
 
             Folder.FolderListType.SCRIPTS -> {
-                val scriptsList = remember { viewModel.scriptsList }
+                val scriptsListFlow by viewModel.scriptsList.collectAsStateWithLifecycle()
+                val scriptsList by (scriptsListFlow?:MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
                 LazyColumn(
                     state = scrollStateParent,
                     contentPadding = PaddingValues(0.dp),
@@ -441,57 +448,59 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
             }
 
             Folder.FolderListType.GOALS -> {
-                val goalsList = remember { viewModel.goalsList }
-
-                LazyColumn(
-                    state = scrollStateParent,
-                    contentPadding = PaddingValues(0.dp),
-                    modifier = modifier.fillMaxSize()
-                ) {
-                    items(items = goalsList, key = {it.id?:Random.nextLong()}) { goal ->
-                        GoalCard(
-                            goal = goal,
-                            modifier = Modifier
-                                .padding(2.dp)
-                                .fillMaxWidth()
-                                .padding(2.dp)
-                                .onGloballyPositioned {
-                                    if (scriptHeight == 0.dp) scriptHeight =
-                                        (it.size.height / density).dp
-                                },
-                            getGoalContentPreview = { viewModel.getGoalContentPreview(it) },
-                            onLongClick = {
-                                if (viewModel.setOnLongClick()) {
-                                    viewModel.bottomSheetListeners.update {
-                                        BooksViewModel.BottomSheetListeners(
-                                            displayView = {
-                                                GoalCard(
-                                                    goal,
-                                                    modifier = Modifier,
-                                                    clickable = false,
-                                                    onLongClick = {},
-                                                    onClick = {},
-                                                    getGoalContentPreview = { viewModel.getGoalContentPreview(it) }
-                                                )
-                                            },
-                                            onEditClickListener = {
-                                                scope.launch {
-                                                    viewModel.onGoalEdit(goal.id)
+                val goalsListStateFlow by viewModel.goalsList.collectAsStateWithLifecycle()
+                goalsListStateFlow?.let { goalsListFlow ->
+                    val goalsList by goalsListFlow.collectAsStateWithLifecycle(emptyList())
+                    LazyColumn(
+                        state = scrollStateParent,
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = modifier.fillMaxSize()
+                    ) {
+                        items(items = goalsList, key = {it.id?:Random.nextLong()}) { goal ->
+                            GoalCard(
+                                goal = goal,
+                                modifier = Modifier
+                                    .padding(2.dp)
+                                    .fillMaxWidth()
+                                    .padding(2.dp)
+                                    .onGloballyPositioned {
+                                        if (scriptHeight == 0.dp) scriptHeight =
+                                            (it.size.height / density).dp
+                                    },
+                                getGoalContentPreview = { viewModel.getGoalContentPreview(it) },
+                                onLongClick = {
+                                    if (viewModel.setOnLongClick()) {
+                                        viewModel.bottomSheetListeners.update {
+                                            BooksViewModel.BottomSheetListeners(
+                                                displayView = {
+                                                    GoalCard(
+                                                        goal,
+                                                        modifier = Modifier,
+                                                        clickable = false,
+                                                        onLongClick = {},
+                                                        onClick = {},
+                                                        getGoalContentPreview = { viewModel.getGoalContentPreview(it) }
+                                                    )
+                                                },
+                                                onEditClickListener = {
+                                                    scope.launch {
+                                                        viewModel.onGoalEdit(goal.id)
+                                                    }
+                                                },
+                                                onDeleteClickListener = {
+                                                    scope.launch {
+                                                        viewModel.onDeleteGoal(goal.id)
+                                                    }
                                                 }
-                                            },
-                                            onDeleteClickListener = {
-                                                scope.launch {
-                                                    viewModel.onDeleteGoal(goal.id)
-                                                }
-                                            }
-                                        )
+                                            )
+                                        }
                                     }
+                                },
+                                onClick = {
+                                    goal.id?.let { viewModel.onGoalClick(it) }
                                 }
-                            },
-                            onClick = {
-                                goal.id?.let { viewModel.onGoalClick(it) }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -913,11 +922,13 @@ fun GoalCard(
     }
     val scriptUri by uriStateFlow.collectAsStateWithLifecycle()
 
-    val goalInitialDateTime by remember { goal.initialDateTime }
-    val goalDateOfCompletion by remember { goal.dateOfCompletion }
-    val title = remember { goal.goal }
-    val location = remember { goal.location }
-    val goalColour by remember { goal.colour }
+    val goalInitialDateTime = remember { LocalDateTime.ofEpochSecond(goal.initialDateTime/1000,0,
+        ZoneOffset.UTC) }
+    val goalDateOfCompletion = remember { LocalDateTime.ofEpochSecond(goal.dateOfCompletion/1000,0,
+        ZoneOffset.UTC) }
+    val title = remember { TextFieldState(goal.goal) }
+    val location = remember { TextFieldState(goal.location) }
+    val goalColour by remember { mutableIntStateOf(goal.colour) }
     val description by contentPreview?.getDescription()?.collectAsStateWithLifecycle("")
         ?:MutableStateFlow(null).collectAsStateWithLifecycle()
     val displayImage by contentPreview?.getDisplayImage()?.collectAsStateWithLifecycle()

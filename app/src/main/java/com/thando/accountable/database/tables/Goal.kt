@@ -2,25 +2,19 @@ package com.thando.accountable.database.tables
 
 import android.content.Context
 import android.net.Uri
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.util.packInts
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.map
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @Entity(tableName = "goal_table")
 data class Goal(
@@ -28,67 +22,67 @@ data class Goal(
     var id: Long? = null,
 
     @ColumnInfo (name = "goal_parent")
-    val parent: MutableState<Long> = mutableLongStateOf(1L),
+    var parent: Long,
 
     @ColumnInfo (name = "goal_category")
-    var goalCategory: MutableState<String> = mutableStateOf(""),
+    var goalCategory: String = "",
 
     @ColumnInfo (name = "goal_date_time")
-    var initialDateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
+    var initialDateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
 
     @ColumnInfo (name = "goal_position")
-    val position: MutableState<Long> = mutableLongStateOf(0L),
+    var position: Long = 0L,
 
     @ColumnInfo (name = "goal_scroll_position")
-    val scrollPosition: LazyListState = LazyListState(0,0),
+    var scrollPosition: Long = packInts(0,0),
 
     @ColumnInfo (name = "goal_size")
-    val size: MutableState<Float> = mutableFloatStateOf(0F),
+    var size: Float = 0F,
 
     @ColumnInfo (name = "goal_num_images")
-    val numImages: MutableState<Int> = mutableIntStateOf(0),
+    var numImages: Int = 0,
 
     @ColumnInfo (name = "goal_num_videos")
-    val numVideos: MutableState<Int> = mutableIntStateOf(0),
+    var numVideos: Int = 0,
 
     @ColumnInfo (name = "goal_num_audios")
-    val numAudios: MutableState<Int> = mutableIntStateOf(0),
+    var numAudios: Int = 0,
 
     @ColumnInfo (name = "goal_num_documents")
-    val numDocuments: MutableState<Int> = mutableIntStateOf(0),
+    var numDocuments: Int = 0,
 
     @ColumnInfo (name = "goal_num_scripts")
-    val numScripts: MutableState<Int> = mutableIntStateOf(0),
+    var numScripts: Int = 0,
 
     @ColumnInfo (name = "goal_goal")
-    val goal : TextFieldState = TextFieldState(""),
+    var goal : String = "",
 
     @ColumnInfo (name = "goal_date_of_completion")
-    var dateOfCompletion : MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
+    var dateOfCompletion : Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
 
     @ColumnInfo (name = "goal_end_date")
-    var endDateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
+    var endDateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
 
     @ColumnInfo (name = "goal_end_type")
-    val endType: MutableState<GoalEndType> = mutableStateOf(GoalEndType.UNDEFINED),
+    var endType: String = GoalEndType.UNDEFINED.name,
 
     @ColumnInfo (name = "goal_picture")
     private var goalPicture : String? = null,
 
     @ColumnInfo (name = "goal_status")
-    val status : MutableState<Status> = mutableStateOf(Status.PENDING),
+    var status : String = Status.PENDING.name,
 
     @ColumnInfo (name = "goal_colour") // -1 For no colour selected
-    val colour: MutableState<Int> = mutableIntStateOf(-1),
+    var colour: Int = -1,
 
     @ColumnInfo (name = "goal_location")
-    val location: TextFieldState = TextFieldState(""),
+    var location: String = "",
 
     @ColumnInfo (name = "goal_selected_tab")
-    val selectedTab: MutableState<GoalTab> = mutableStateOf(GoalTab.TASKS),
+    var selectedTab: String = GoalTab.TASKS.name,
 
     @ColumnInfo (name = "goal_tab_list_state")
-    val tabListState: LazyListState = LazyListState()
+    var tabListState: Long = packInts(0,0)
 
 ) {
     companion object {
@@ -113,30 +107,43 @@ data class Goal(
     }
 
     @Ignore
-    val times: SnapshotStateList<GoalTaskDeliverableTime> = mutableStateListOf()
+    val times: MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?> = MutableStateFlow(null)
 
     @Ignore
-    val goalDeliverables: SnapshotStateList<Deliverable> = mutableStateListOf()
+    val goalDeliverables: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+
+    @Ignore
+    val goalTasks: MutableStateFlow<Flow<List<Task>>?> = MutableStateFlow(null)
+
+    @Ignore
+    val goalMarkers: MutableStateFlow<Flow<List<Marker>>?> = MutableStateFlow(null)
+
+    @Ignore
+    val selectedGoalDeliverables: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
 
     @Ignore
     val imageResource = AppResources.ImageResource(goalPicture?:"")
 
-    suspend fun loadGoalTimes(dao: RepositoryDao){
-        times.clear()
-        times.addAll(
-            withContext(Dispatchers.IO){
-                dao.getTimes(id, GoalTaskDeliverableTime.TimesType.GOAL)
-            }
-        )
+    fun loadGoalTimes(dao: RepositoryDao){
+        times.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.GOAL)
     }
 
-    suspend fun loadDeliverables(dao: RepositoryDao) {
-        goalDeliverables.clear()
-        goalDeliverables.addAll(
-            withContext(Dispatchers.IO) {
-                dao.getGoalDeliverables(id)
+    fun loadDeliverables(dao: RepositoryDao) {
+        selectedGoalDeliverables.value = dao.getGoalDeliverables(id)
+        goalDeliverables.value = dao.getDeliverables(id)
+    }
+
+    fun loadTasks(dao: RepositoryDao) {
+        goalTasks.value = dao.getTasks(id, Task.TaskParentType.GOAL).map { tasks ->
+            tasks.forEach { task ->
+                task.loadTimes(dao)
             }
-        )
+            tasks
+        }
+    }
+
+    fun loadMarkers(dao: RepositoryDao) {
+        goalMarkers.value = dao.getMarkers(id)
     }
 
     fun getGoalPicture(): String? { return goalPicture }

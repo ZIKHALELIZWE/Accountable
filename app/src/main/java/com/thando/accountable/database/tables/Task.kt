@@ -14,6 +14,9 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
+import com.thando.accountable.database.dataaccessobjects.RepositoryDao
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.time.LocalDateTime
 
 @Entity(tableName = "task_table")
@@ -95,7 +98,7 @@ data class Task(
     }
 
     @Ignore
-    val times: SnapshotStateList<GoalTaskDeliverableTime> = mutableStateListOf()
+    val times = MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>(null)
 
     @Ignore
     val taskTextFocusRequester = FocusRequester()
@@ -105,4 +108,8 @@ data class Task(
 
     @Ignore
     val colourFocusRequester = FocusRequester()
+
+    fun loadTimes(dao: RepositoryDao) {
+        times.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.TASK)
+    }
 }

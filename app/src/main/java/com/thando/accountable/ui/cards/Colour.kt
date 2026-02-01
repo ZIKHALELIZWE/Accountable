@@ -1,5 +1,6 @@
 package com.thando.accountable.ui.cards
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,15 +41,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.thando.accountable.R
+import kotlinx.coroutines.launch
 import kotlin.math.atan2
 import kotlin.math.hypot
 
 class ColourPickerDialog {
     val pickedColour = mutableStateOf(Color.Black)
     val showColourPickerDialog = mutableStateOf(false)
-    val processSelectedColour = mutableStateOf<((Int)->Unit)?>(null)
+    val processSelectedColour = mutableStateOf<(suspend (Int)->Unit)?>(null)
 
-    fun pickColour(originalColour: Color? = null, processPickedColour:(Int) -> Unit){
+    fun pickColour(originalColour: Color? = null, processPickedColour:suspend (Int) -> Unit){
         originalColour?.let { pickedColour.value = it }
         processSelectedColour.value = { selectedColour: Int ->
             pickedColour.value = Color(selectedColour)
@@ -61,13 +64,16 @@ class ColourPickerDialog {
         val pickedColour by remember { pickedColour }
         var showColourPickerDialog by remember { showColourPickerDialog }
         val processSelectedColour by remember { processSelectedColour }
+        val scope = rememberCoroutineScope()
 
         if (showColourPickerDialog) {
             ColourPickerDialog(
                 inputColour = pickedColour,
                 processSelectedColour = { selectedColour ->
+                   scope.launch {
+                       processSelectedColour?.invoke(selectedColour)
+                   }
                     showColourPickerDialog = false
-                    processSelectedColour?.invoke(selectedColour)
                 },
                 onDismiss = { showColourPickerDialog = false },
             )
@@ -75,6 +81,7 @@ class ColourPickerDialog {
     }
 
     @Composable
+    @SuppressLint("NotConstructor")
     fun ColourPickerDialog(
         inputColour: Color,
         processSelectedColour: (selectedColour: Int) -> Unit,

@@ -1,11 +1,8 @@
 package com.thando.accountable.fragments.viewmodels
 
-import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
@@ -19,19 +16,20 @@ import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.addDeliverableCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.addTimeBlockCompanionObject
-import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.canSaveDeliverable
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.deleteClickedDeliverable
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.deleteDeliverableClickedCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.deleteTimeBlockCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.dismissBottomSheetCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.editClickedDeliverable
-import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.loadTaskDeliverableMarkerLists
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.processBottomSheetAddCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.saveClickedDeliverable
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showBottomSheetCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showInputError
 import com.thando.accountable.ui.cards.ColourPickerDialog
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 class EditGoalViewModel(
     private val repository: AccountableRepository
@@ -46,22 +44,8 @@ class EditGoalViewModel(
     val colourPickerDialog = ColourPickerDialog()
     val deliverable: MutableStateFlow<Deliverable?> = MutableStateFlow(null)
     val originalDeliverable = MutableStateFlow<Deliverable?>(null)
-    val deliverablesList: SnapshotStateList<Deliverable> = mutableStateListOf()
     val triedToSaveBottomSheet = MutableStateFlow(false)
     val bottomSheetType = mutableStateOf<Goal.GoalTab?>(null)
-
-    suspend fun loadLists() {
-        loadTaskDeliverableMarkerLists(
-            repository = repository,
-            goalId = newGoal.value?.id,
-            task = null,
-            tasksList = null,
-            deliverable = deliverable,
-            deliverablesList = deliverablesList,
-            marker = null,
-            markersList = null
-        )
-    }
 
     private fun showError(
         message: Int,
@@ -85,9 +69,37 @@ class EditGoalViewModel(
         repository.deleteNewGoalImage()
     }
 
+    suspend fun updateGoalString(goal: String) {
+        newGoal.value?.first()?.let{ newGoal ->
+            repository.update(newGoal.copy(goal = goal))
+        }
+    }
+
+    suspend fun updateLocation(location: String) {
+        newGoal.value?.first()?.let{ newGoal ->
+            repository.update(newGoal.copy(location = location))
+        }
+    }
+
+    suspend fun updatePickedDate(pickedDate: LocalDateTime) {
+        newGoal.value?.first()?.let{ newGoal ->
+            repository.update(newGoal.copy(
+                endDateTime = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+            ))
+        }
+    }
+
+    suspend fun updateEndType( endType: Goal.GoalEndType) {
+        newGoal.value?.first()?.let{ newGoal ->
+            repository.update(newGoal.copy(
+                endType = endType.name
+            ))
+        }
+    }
+
     fun pickColour(originalColour: Color? = null){
         colourPickerDialog.pickColour(originalColour){ selectedColour: Int ->
-            newGoal.value?.colour?.value = selectedColour
+            newGoal.value?.first()?.let { goal -> repository.update(goal.copy(colour = selectedColour)) }
         }
     }
 
@@ -118,6 +130,10 @@ class EditGoalViewModel(
         )
     }
 
+    suspend fun updateTimeBlock(timeBlock: GoalTaskDeliverableTime) {
+        repository.update(timeBlock)
+    }
+
     suspend fun closeGoal(){
         if (bottomSheetType.value != null){
             dismissBottomSheet()
@@ -144,7 +160,7 @@ class EditGoalViewModel(
     suspend fun addDeliverable() {
         addDeliverableCompanionObject(
             repository = repository,
-            goal = newGoal.value,
+            goal = newGoal.value?.first(),
             saveDeliverable = ::saveDeliverable,
             showBottomSheet = ::showBottomSheet,
             deliverable = deliverable,
@@ -173,7 +189,6 @@ class EditGoalViewModel(
         deleteDeliverableClickedCompanionObject(
             deliverable,
             originalDeliverable,
-            deliverablesList,
             ::deleteDeliverable,
             ::dismissBottomSheet
         )
@@ -186,18 +201,15 @@ class EditGoalViewModel(
             bottomSheetType = bottomSheetType,
             task = null,
             originalTask = null,
-            tasksList = null,
             deleteTask = null,
             canSaveTask = null,
             saveTask = null,
             deliverable = deliverable,
             originalDeliverable = originalDeliverable,
-            deliverablesList = deliverablesList,
             deleteDeliverable = ::deleteDeliverable,
             saveDeliverable = ::saveDeliverable,
             marker = null,
             originalMarker = null,
-            markersList = null,
             deleteMarker = null,
             canSaveMarker = null,
             saveMarker = null,
@@ -211,13 +223,10 @@ class EditGoalViewModel(
             triedToSave = triedToSaveBottomSheet,
             bottomSheetType = bottomSheetType,
             task = null,
-            tasksList = null,
             deleteTask = null,
             deliverable = deliverable,
-            deliverablesList = deliverablesList,
             deleteDeliverable = ::deleteDeliverable,
             marker = null,
-            markersList = null,
             deleteMarker = null
         )
     }
@@ -232,29 +241,30 @@ class EditGoalViewModel(
 
     suspend fun saveAndCloseGoal(){
         triedToSave.value = true
-        if (newGoal.value?.goal?.text?.isEmpty() == true) {
+        if (newGoal.value?.first()?.goal?.isEmpty() == true) {
             showError(
                 R.string.please_enter_a_goal,
                 goalFocusRequester
             )
             return
         }
-        if (newGoal.value?.location?.text?.isEmpty() == true) {
+        if (newGoal.value?.first()?.location?.isEmpty() == true) {
             showError(
                 R.string.please_enter_a_location,
                 locationFocusRequester
             )
             return
         }
-        if (newGoal.value?.colour?.value == -1) {
+        if (newGoal.value?.first()?.colour == -1) {
             showError(
                 R.string.please_select_a_colour,
                 colourFocusRequester
             )
             return
         }
-        newGoal.value?.times?.forEach { time ->
-            if (time.duration.value.hour == 0 && time.duration.value.minute == 0) {
+        newGoal.value?.first()?.times?.value?.first()?.forEach { time ->
+            val duration = LocalDateTime.ofEpochSecond(time.duration/1000,0, ZoneOffset.UTC)
+            if (duration.hour == 0 && duration.minute == 0) {
                 showError(
                     R.string.please_select_a_duration,
                     time.durationPickerFocusRequester

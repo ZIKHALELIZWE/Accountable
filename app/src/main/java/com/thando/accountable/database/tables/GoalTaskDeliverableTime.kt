@@ -1,8 +1,5 @@
 package com.thando.accountable.database.tables
 
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.focus.FocusRequester
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -10,6 +7,7 @@ import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.database.tables.Goal.TimeBlockType
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @Entity(tableName = "times_table")
 data class GoalTaskDeliverableTime (
@@ -17,19 +15,19 @@ data class GoalTaskDeliverableTime (
     var id: Long? = null,
 
     @ColumnInfo(name = "times_parent")
-    val parent: MutableState<Long>,
+    var parent: Long,
 
     @ColumnInfo(name = "times_type")
-    val type: MutableState<TimesType>,
+    var type: String,
 
     @ColumnInfo(name = "times_time_block_type")
-    val timeBlockType: MutableState<TimeBlockType> = mutableStateOf(TimeBlockType.ONCE),
+    var timeBlockType: String = TimeBlockType.ONCE.name,
 
     @ColumnInfo(name = "times_start")
-    val start: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
+    var start: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
 
     @ColumnInfo(name = "times_duration")
-    val duration: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now().withHour(0).withMinute(0))
+    var duration: Long = LocalDateTime.now().withHour(0).withMinute(0).toInstant(ZoneOffset.UTC).toEpochMilli()
 ){
     enum class TimesType{
         GOAL, TASK, DELIVERABLE

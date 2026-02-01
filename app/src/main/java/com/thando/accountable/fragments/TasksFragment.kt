@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
@@ -62,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -87,6 +90,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.unpackInt1
+import androidx.compose.ui.util.unpackInt2
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -98,6 +103,7 @@ import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
+import com.thando.accountable.database.tables.Goal.GoalTab
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.Task
@@ -112,7 +118,7 @@ import kotlinx.coroutines.runBlocking
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.Period
-import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -126,7 +132,8 @@ fun TaskView(
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = context as? Activity
 
-    val goal by viewModel.goal.collectAsStateWithLifecycle()
+    val goalFlow by viewModel.goal.collectAsStateWithLifecycle()
+    val goal by (goalFlow?:MutableStateFlow(null)).collectAsStateWithLifecycle(null)
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val imageHeight = (
@@ -164,17 +171,11 @@ fun TaskView(
         }
     }
 
-    LaunchedEffect(goal) {
-        if (goal!=null){
-            viewModel.loadLists()
-        }
-    }
-
     AccountableTheme {
         goal?.let { goal ->
             val goalUri by goal.getUri(context).collectAsStateWithLifecycle(null)
-            val goalColour by remember { goal.colour }
-            val selectedTab by remember { goal.selectedTab }
+            val goalColour by remember { mutableIntStateOf( goal.colour) }
+            val selectedTab by remember { mutableStateOf(GoalTab.valueOf(goal.selectedTab)) }
             val bottomSheetType by remember { viewModel.bottomSheetType }
 
             var image by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -232,13 +233,13 @@ fun TaskView(
                                 TextButton(
                                     onClick = {
                                         when (selectedTab) {
-                                            Goal.GoalTab.TASKS -> scope.launch {
+                                            GoalTab.TASKS -> scope.launch {
                                                 viewModel.addTask()
                                             }
-                                            Goal.GoalTab.DELIVERABLES -> scope.launch {
+                                            GoalTab.DELIVERABLES -> scope.launch {
                                                 viewModel.addDeliverable()
                                             }
-                                            Goal.GoalTab.MARKERS -> scope.launch {
+                                            GoalTab.MARKERS -> scope.launch {
                                                 viewModel.addMarker()
                                             }
                                         }
@@ -246,9 +247,9 @@ fun TaskView(
                                 ) {
                                     Text(
                                         text = when (selectedTab){
-                                            Goal.GoalTab.TASKS -> stringResource(R.string.add_task)
-                                            Goal.GoalTab.DELIVERABLES -> stringResource(R.string.add_deliverable)
-                                            Goal.GoalTab.MARKERS -> stringResource(R.string.add_marker)
+                                            GoalTab.TASKS -> stringResource(R.string.add_task)
+                                            GoalTab.DELIVERABLES -> stringResource(R.string.add_deliverable)
+                                            GoalTab.MARKERS -> stringResource(R.string.add_marker)
                                         },
                                         color = Color(goalColour)
                                     )
@@ -274,6 +275,7 @@ fun TaskView(
                     pickColour = viewModel::pickColour,
                     addTimeBlock = viewModel::addTimeBlock,
                     deleteTimeBlock = viewModel::deleteTimeBlock,
+                    updateTimeBlock = viewModel::updateTimeBlock,
                     deleteTaskClicked = viewModel::deleteTaskClicked,
                     originalTask = viewModel.originalTask,
                     task = viewModel.task,
@@ -292,7 +294,7 @@ fun TaskView(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskDeliverableMarkerBottomSheet(
-    bottomSheetType: Goal.GoalTab?,
+    bottomSheetType: GoalTab?,
     dismissBottomSheet: suspend () -> Unit,
     triedToSaveInput: MutableStateFlow<Boolean>,
     colourPickerDialog: ColourPickerDialog,
@@ -302,6 +304,7 @@ fun TaskDeliverableMarkerBottomSheet(
     pickColour: (Color?) -> Unit,
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
+    updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     deleteTaskClicked: (suspend () -> Unit)?=null,
     originalTask: MutableStateFlow<Task?>?=null,
     task: MutableStateFlow<Task?>?=null,
@@ -322,7 +325,7 @@ fun TaskDeliverableMarkerBottomSheet(
             sheetState = sheetState
         ) {
             when (bottomSheetType) {
-                Goal.GoalTab.TASKS -> {
+                GoalTab.TASKS -> {
                     if (originalTask != null && task != null && deleteTaskClicked != null)
                     AddTaskView(
                         originalTask = originalTask,
@@ -335,10 +338,11 @@ fun TaskDeliverableMarkerBottomSheet(
                         pickColour = pickColour,
                         addTimeBlock = addTimeBlock,
                         deleteTimeBlock = deleteTimeBlock,
+                        updateTimeBlock = updateTimeBlock,
                         deleteTaskClicked = deleteTaskClicked
                     )
                 }
-                Goal.GoalTab.DELIVERABLES -> {
+                GoalTab.DELIVERABLES -> {
                     if (originalDeliverable != null && deliverable != null && deleteDeliverableClicked != null)
                     AddDeliverableView(
                         originalDeliverable = originalDeliverable,
@@ -349,10 +353,11 @@ fun TaskDeliverableMarkerBottomSheet(
                         errorMessage = errorMessage,
                         addTimeBlock = addTimeBlock,
                         deleteTimeBlock = deleteTimeBlock,
-                        deleteDeliverableClicked = deleteDeliverableClicked
+                        deleteDeliverableClicked = deleteDeliverableClicked,
+                        updateTimeBlock = updateTimeBlock
                     )
                 }
-                Goal.GoalTab.MARKERS -> {
+                GoalTab.MARKERS -> {
                     if (originalMarker != null && marker != null && deleteMarkerClicked != null)
                         AddMarkerView(
                             originalMarker = originalMarker,
@@ -375,18 +380,31 @@ fun TasksFragmentView(
     goal: Goal,
     modifier: Modifier = Modifier
 ) {
-    val tabListState = remember { goal.tabListState }
-    val goalTitle = remember { goal.goal }
-    var selectedTab by remember { goal.selectedTab }
+    val tabListState = remember { LazyListState(
+        unpackInt1(goal.tabListState),
+        unpackInt2(goal.tabListState)
+    ) }
+    val goalTitle = remember { TextFieldState(goal.goal) }
+    var selectedTab by remember { mutableStateOf(GoalTab.valueOf(goal.selectedTab)) }
     val tabs = listOf(
         stringResource(R.string.tasks),
         stringResource(R.string.deliverables),
         stringResource(R.string.markers)
     )
-    val goalColour by remember { goal.colour }
-    val tasksList = remember { viewModel.tasksList }
-    val deliverablesList = remember { viewModel.deliverablesList }
-    val markersList = remember { viewModel.markersList }
+    val goalColour by remember { mutableIntStateOf(goal.colour) }
+
+    val tasksListFlow by goal.goalTasks.collectAsStateWithLifecycle()
+    val tasksList by (tasksListFlow
+        ?: MutableStateFlow(emptyList()))
+        .collectAsStateWithLifecycle(emptyList())
+    val deliverablesListFlow by goal.goalDeliverables.collectAsStateWithLifecycle()
+    val deliverablesList by (deliverablesListFlow
+        ?: MutableStateFlow(emptyList()))
+        .collectAsStateWithLifecycle(emptyList())
+    val markersListFlow by goal.goalMarkers.collectAsStateWithLifecycle()
+    val markersList by (markersListFlow
+        ?: MutableStateFlow(emptyList()))
+        .collectAsStateWithLifecycle(emptyList())
 
     LazyColumn(
         state = tabListState,
@@ -431,7 +449,7 @@ fun TasksFragmentView(
                 tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = selectedTab.ordinal == index,
-                        onClick = { selectedTab = Goal.GoalTab.entries[index] },
+                        onClick = { selectedTab = GoalTab.entries[index] },
                         text = { Text(title) },
                         selectedContentColor = Color(goalColour),
                         unselectedContentColor = Color.Black,
@@ -441,17 +459,17 @@ fun TasksFragmentView(
             }
         }
         when (selectedTab) {
-            Goal.GoalTab.TASKS -> {
+            GoalTab.TASKS -> {
                 items(items = tasksList){ task ->
                     TaskCardView(task, viewModel)
                 }
             }
-            Goal.GoalTab.DELIVERABLES -> {
+            GoalTab.DELIVERABLES -> {
                 items(items = deliverablesList) { deliverable ->
                     DeliverableCardView(deliverable, viewModel::editDeliverable)
                 }
             }
-            Goal.GoalTab.MARKERS -> {
+            GoalTab.MARKERS -> {
                 items(items = markersList) { marker ->
                     MarkerCardView(marker, viewModel)
                 }
@@ -644,6 +662,7 @@ fun AddTaskView(
     pickColour: (Color?) -> Unit,
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
+    updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     deleteTaskClicked: suspend () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -710,7 +729,8 @@ fun AddTaskView(
         val taskTextFocusRequester = remember { task.taskTextFocusRequester }
         val location = remember { task.location }
         val locationFocusRequester = remember { task.locationFocusRequester }
-        val times = remember { task.times }
+        val timesFlow by task.times.collectAsStateWithLifecycle()
+        val times by (timesFlow?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
         var colour by remember { task.colour }
         val colourFocusRequester = remember { task.colourFocusRequester }
         var endType by remember { task.endType }
@@ -999,7 +1019,7 @@ fun AddTaskView(
                         true
                     )
                     val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = pickedDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        initialSelectedDateMillis = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
                     )
                     var buttonDatePick by remember { mutableStateOf(false) }
                     var buttonTimePick by remember { mutableStateOf(false) }
@@ -1139,7 +1159,8 @@ fun AddTaskView(
                     TimeInputView(
                         item,
                         triedToSaveInput,
-                        deleteTimeBlock
+                        deleteTimeBlock,
+                        updateTimeBlock
                     )
                     if (times.indexOf(item) != times.lastIndex) {
                         Spacer(modifier = Modifier.width(2.dp))
@@ -1198,7 +1219,7 @@ fun DeliverableCardView(
         Column(modifier = Modifier
             .fillMaxWidth()
             .wrapContentHeight()) {
-            Text(text = deliverableText.text.toString(),
+            Text(text = deliverableText,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1222,7 +1243,8 @@ fun AddDeliverableView(
     errorMessage: MutableIntState,
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
-    deleteDeliverableClicked: suspend () -> Unit
+    deleteDeliverableClicked: suspend () -> Unit,
+    updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val originalDeliverable by originalDeliverable.collectAsStateWithLifecycle()
@@ -1282,13 +1304,19 @@ fun AddDeliverableView(
         var showErrorMessage by remember { showErrorMessage }
         val errorMessage by remember { errorMessage }
 
-        val bottomSheetLazyListState = remember { deliverable.scrollPosition }
-        val deliverableText = remember { deliverable.deliverable }
+        val bottomSheetLazyListState = remember {
+            LazyListState(
+                unpackInt1(deliverable.scrollPosition),
+                unpackInt2(deliverable.scrollPosition)
+            )
+        }
+        val deliverableText = remember { TextFieldState(deliverable.deliverable) }
         val deliverableTextFocusRequester = remember { deliverable.deliverableTextFocusRequester }
-        val location = remember { deliverable.location }
+        val location = remember { TextFieldState(deliverable.location) }
         val locationFocusRequester = remember { deliverable.locationFocusRequester }
-        val times = remember { deliverable.times }
-        var endType by remember { deliverable.endType }
+        val timesFlow by deliverable.times.collectAsStateWithLifecycle()
+        val times by (timesFlow?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
+        var endType by remember { mutableStateOf(Deliverable.DeliverableEndType.valueOf(deliverable.endType)) }
 
         LaunchedEffect(showErrorMessage) {
             if (showErrorMessage) {
@@ -1365,14 +1393,16 @@ fun AddDeliverableView(
                     Spacer(modifier = Modifier.width(2.dp))
                 }
                 item {
-                    var pickedDate by remember { deliverable.endDateTime }
+                    var pickedDate by remember { mutableStateOf(LocalDateTime.ofEpochSecond(
+                        deliverable.endDateTime/1000,0,
+                        ZoneOffset.UTC)) }
                     val stateTime = rememberTimePickerState(
                         pickedDate.hour,
                         pickedDate.minute,
                         true
                     )
                     val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = pickedDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        initialSelectedDateMillis = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
                     )
                     var buttonDatePick by remember { mutableStateOf(false) }
                     var buttonTimePick by remember { mutableStateOf(false) }
@@ -1495,7 +1525,8 @@ fun AddDeliverableView(
                     TimeInputView(
                         item,
                         triedToSaveInput,
-                        deleteTimeBlock
+                        deleteTimeBlock,
+                        updateTimeBlock
                     )
                     if (times.indexOf(item) != times.lastIndex) {
                         Spacer(modifier = Modifier.width(2.dp))
@@ -1732,7 +1763,7 @@ fun AddMarkerView(
                         true
                     )
                     val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = pickedDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        initialSelectedDateMillis = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
                     )
                     var buttonDatePick by remember { mutableStateOf(false) }
                     var buttonTimePick by remember { mutableStateOf(false) }

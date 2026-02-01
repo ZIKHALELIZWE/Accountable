@@ -2,15 +2,14 @@ package com.thando.accountable.database.dataaccessobjects
 
 import android.content.Context
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.thando.accountable.AppResources
-import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Deliverable
@@ -29,9 +28,10 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.coroutineContext
 
 @Dao
 interface RepositoryDao {
@@ -39,7 +39,7 @@ interface RepositoryDao {
     @Insert
     suspend fun insert(folder: Folder): Long
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(goal: Goal): Long
 
     @Insert
@@ -60,13 +60,13 @@ interface RepositoryDao {
     @Insert
     suspend fun insert(specialCharacters: SpecialCharacters): Long
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(goalTaskDeliverableTime: GoalTaskDeliverableTime): Long
 
     @Insert
     suspend fun insert(task: Task): Long
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(deliverable: Deliverable): Long
 
     @Insert
@@ -143,7 +143,7 @@ interface RepositoryDao {
 
     @Transaction
     suspend fun deleteGoal(goalId: Long?, context: Context){
-        val goal = getGoalNow(goalId) ?: return
+        val goal = getGoal(goalId).first()?:return
         /* todo this is where you delete whatever is inside goal
 
         val contentList = getContentListNow(script.scriptId)
@@ -167,23 +167,23 @@ interface RepositoryDao {
 
     @Transaction
     suspend fun deleteFolder(folderId: Long?, context: Context){
-        val folder = getFolderNow(folderId) ?: return
+        val folder = getFolder(folderId).first() ?: return
         when(folder.folderType){
             Folder.FolderType.SCRIPTS -> {
-                val scripts = getScriptsNow(folder.folderId)
+                val scripts = getScripts(folder.folderId).first()
                 scripts.forEach { deleteScript(it.scriptId, context) }
             }
             Folder.FolderType.GOALS -> {
-                val goals = getGoalsNow(folder.folderId)
+                val goals = getGoals(folder.folderId).first()
                 goals.forEach { deleteGoal(it.id, context) }
             }
         }
-        val folders = getFoldersNow(folder.folderId,folder.folderType)
+        val folders = getFolders(folder.folderId,folder.folderType).first()
         folders.forEach { deleteFolder(it.folderId, context) }
 
         folder.deleteFile(context)
         // Fix folder Positions
-        val parentFolders = getFoldersNow(folder.folderParent,folder.folderType)
+        val parentFolders = getFolders(folder.folderParent,folder.folderType).first()
         var passedFolder = false
         parentFolders.forEach {
             if (!passedFolder) {
@@ -209,7 +209,7 @@ interface RepositoryDao {
             Script.ScriptParentType.SCRIPT, // Stored in content. Content will update its own positions
             Script.ScriptParentType.TASK -> {}//Order does not matter because it is not stored in a list
             Script.ScriptParentType.FOLDER -> {
-                val scripts = getScriptsNow(script.scriptParent)
+                val scripts = getScripts(script.scriptParent).first()
                 var passedScript = false
                 scripts.forEach {
                     if (!passedScript) {
@@ -323,7 +323,7 @@ interface RepositoryDao {
     @Transaction
     suspend fun upsert(task: Task): Long {
         if (task.id!=null){
-            val existingEntity = getTask(task.id)
+            val existingEntity = getTask(task.id).first()
             if (existingEntity!=null){
                 update(task)
                 return task.id!!
@@ -339,7 +339,7 @@ interface RepositoryDao {
     @Transaction
     suspend fun upsert(deliverable: Deliverable): Long {
         if (deliverable.id!=null){
-            val existingEntity = getDeliverable(deliverable.id)
+            val existingEntity = getDeliverable(deliverable.id).first()
             if (existingEntity!=null){
                 update(deliverable)
             }
@@ -356,7 +356,7 @@ interface RepositoryDao {
     @Transaction
     suspend fun upsert(marker: Marker): Long {
         if (marker.id!=null){
-            val existingEntity = getMarker(marker.id)
+            val existingEntity = getMarker(marker.id).first()
             if (existingEntity!=null){
                 update(marker)
                 return marker.id!!
@@ -372,7 +372,7 @@ interface RepositoryDao {
     @Transaction
     suspend fun upsert(goalTaskDeliverableTime: GoalTaskDeliverableTime): Long {
         if (goalTaskDeliverableTime.id!=null){
-            val existingEntity = getGoalTaskDeliverableTime(goalTaskDeliverableTime.id)
+            val existingEntity = getGoalTaskDeliverableTime(goalTaskDeliverableTime.id).first()
             if (existingEntity!=null){
                 update(goalTaskDeliverableTime)
                 return goalTaskDeliverableTime.id!!
@@ -388,7 +388,7 @@ interface RepositoryDao {
     @Transaction
     suspend fun upsert(goal: Goal): Long {
         if (goal.id!=null){
-            val existingEntity = getGoalNow(goal.id)
+            val existingEntity = getGoal(goal.id).first()
             if (existingEntity!=null){
                 update(goal)
                 return goal.id!!
@@ -401,90 +401,32 @@ interface RepositoryDao {
         return insert(goal)
     }
 
-    @Transaction
-    suspend fun getGoalWithTimes(goalId:Long?) = getGoalNow(goalId).apply {
-        this?.times?.clear()
-        this?.times?.addAll(getTimes(
-            goalId,
-            GoalTaskDeliverableTime.TimesType.GOAL
-            )
-        )
-    }
-
-    @Transaction
-    suspend fun getTasksWithTimes(
-        parentId:Long?,
-        parentType: Task.TaskParentType
-    ) = getTasks(parentId, parentType).apply {
-        this.forEach { task ->
-            task.times.clear()
-            task.times.addAll(getTimes(
-                task.id,
-                GoalTaskDeliverableTime.TimesType.TASK
-                )
-            )
-        }
-    }
-
-    @Transaction
-    suspend fun getDeliverablesWithTimes(
-        goalId: Long?
-    ) = getDeliverables(goalId).apply {
-        this.forEach { deliverable ->
-            deliverable.times.clear()
-            deliverable.times.addAll(
-                getTimes(
-                    deliverable.id,
-                    GoalTaskDeliverableTime.TimesType.DELIVERABLE
-                    )
-            )
-        }
-    }
-
     @Query("SELECT * FROM folder_table WHERE folderId = :folderId")
-    fun getFolder(folderId:Long?): LiveData<Folder>
-
-    @Query("SELECT * FROM folder_table WHERE folderId = :folderId")
-    suspend fun getFolderNow(folderId:Long?): Folder?
+    fun getFolder(folderId:Long?): Flow<Folder?>
 
     @Query("SELECT * FROM goal_table WHERE id = :goalId")
-    fun getGoal(goalId: Long?): LiveData<Goal>
-
-    @Query("SELECT * FROM goal_table WHERE id = :goalId")
-    suspend fun getGoalNow(goalId: Long?): Goal?
+    fun getGoal(goalId: Long?): Flow<Goal?>
 
     @Query("SELECT * FROM times_table WHERE times_parent =:parentId AND times_type =:type")
-    fun getTimes(parentId: Long?, type: GoalTaskDeliverableTime.TimesType): MutableList<GoalTaskDeliverableTime>
+    fun getTimes(parentId: Long?, type: GoalTaskDeliverableTime.TimesType): Flow<List<GoalTaskDeliverableTime>>
 
     @Query("SELECT * FROM folder_table WHERE folder_parent = :parent AND folder_type = :folderType ORDER BY folder_position ASC")
-    fun getFolders(parent:Long?, folderType: Folder.FolderType): LiveData<List<Folder>>
-
-    @Query("SELECT * FROM folder_table WHERE folder_parent = :parent AND folder_type = :folderType ORDER BY folder_position ASC")
-    suspend fun getFoldersNow(parent:Long?, folderType: Folder.FolderType?): List<Folder>
+    fun getFolders(parent:Long?, folderType: Folder.FolderType?): Flow<List<Folder>>
 
     @Query("SELECT * FROM folder_table WHERE folder_parent = :parent AND folder_type = :folderType ORDER BY folder_position DESC")
-    suspend fun getFoldersNowDESC(parent:Long?, folderType: Folder.FolderType?): List<Folder>
-
-    @Query("SELECT * FROM script_table WHERE script_parent = :parent ORDER BY script_position ASC")
-    fun getScripts(parent:Long?): LiveData<List<Script>>
+    fun getFoldersDESC(parent:Long?, folderType: Folder.FolderType?): Flow<List<Folder>>
 
     @Query("SELECT * FROM goal_table WHERE goal_parent = :parent ORDER BY goal_position ASC")
-    fun getGoals(parent: Long?): LiveData<List<Goal>>
-
-    @Query("SELECT * FROM goal_table WHERE goal_parent = :parent ORDER BY goal_position ASC")
-    suspend fun getGoalsNow(parent: Long?): List<Goal>
+    fun getGoals(parent: Long?): Flow<List<Goal>>
 
     @Query("SELECT * FROM goal_table WHERE goal_parent = :parent ORDER BY goal_position DESC")
-    suspend fun getGoalsNowDESC(parent: Long?): List<Goal>
+    fun getGoalsDESC(parent: Long?): Flow<List<Goal>>
 
     @Query("SELECT * FROM content_table WHERE content_script = :scriptId ORDER BY content_position ASC")
     suspend fun getContentList(scriptId:Long?): List<Content>
 
     @Query("SELECT * FROM content_table WHERE content_script = :scriptId ORDER BY content_position ASC")
     suspend fun getContentListNow(scriptId:Long?): List<Content>
-
-    @Query("SELECT * FROM app_settings_table WHERE appSettingId = 1")
-    fun getAppSettings(): LiveData<AppSettings>
 
     @Query("SELECT * FROM app_settings_table WHERE appSettingId = 1")
     suspend fun getAppSettingsNow(): AppSettings?
@@ -497,12 +439,6 @@ interface RepositoryDao {
 
     @Query("SELECT * FROM special_characters WHERE teleprompter_settings_id = :teleprompterSettingsId AND character = :character")
     suspend fun getSpecialCharacter(teleprompterSettingsId: Long?, character: String): SpecialCharacters?
-
-    @Query("SELECT * FROM script_table WHERE scriptId = :scriptId")
-    fun getScript(scriptId:Long?): LiveData<Script>
-
-    @Query("SELECT * FROM content_table WHERE id = :contentId")
-    fun getContent(contentId:Long?): LiveData<Content>
 
     @Query("SELECT * FROM special_characters WHERE teleprompter_settings_id = :teleprompterSettingsId")
     suspend fun getScriptSpecialCharacters(teleprompterSettingsId:Long?): List<SpecialCharacters>
@@ -522,50 +458,41 @@ interface RepositoryDao {
     @Query("SELECT * FROM teleprompter_settings_table")
     suspend fun getTeleprompterSettings(): List<TeleprompterSettings>
 
-    @Query("UPDATE script_table SET script_markup_language = :markupLanguageName WHERE scriptId = :scriptId")
-    suspend fun setScriptMarkupLanguage( scriptId: Long?, markupLanguageName: String?)
-
-    @Query("SELECT script_markup_language FROM script_table WHERE scriptId = :scriptId")
-    fun getScriptMarkupLanguage(scriptId: Long?): LiveData<String?>
-
-    @Query("SELECT * FROM teleprompter_settings_table WHERE id = :teleprompterSettingsId")
-    fun getScriptTeleprompterSettings(teleprompterSettingsId: Long?): LiveData<TeleprompterSettings?>
-
     @Query("SELECT * FROM teleprompter_settings_table WHERE id = :teleprompterSettingsId")
     fun getTeleprompterSettings(teleprompterSettingsId: Long?): TeleprompterSettings?
 
     @Query("SELECT * FROM script_table WHERE script_parent = :parent ORDER BY script_position ASC")
-    suspend fun getScriptsNow(parent:Long?): List<Script>
+    fun getScripts(parent:Long?): Flow<List<Script>>
 
     @Query("SELECT * FROM script_table WHERE script_parent = :parent ORDER BY script_position DESC")
-    suspend fun getScriptsNowDESC(parent:Long?): List<Script>
+    fun getScriptsDESC(parent:Long?): Flow<List<Script>>
 
     @Query("SELECT * FROM task_table WHERE task_parent = :parentId AND task_parent_type = :parentType")
-    suspend fun getTasks(parentId:Long?, parentType: Task.TaskParentType): List<Task>
+    fun getTasks(parentId:Long?, parentType: Task.TaskParentType): Flow<List<Task>>
 
     @Query("SELECT * FROM deliverable_table WHERE deliverable_parent = :goalId")
-    suspend fun getDeliverables(goalId:Long?): List<Deliverable>
+    fun getDeliverables(goalId:Long?): Flow<List<Deliverable>>
 
     @Query("SELECT * FROM marker_table WHERE marker_parent = :goalId")
-    suspend fun getMarkers(goalId:Long?): List<Marker>
+    fun getMarkers(goalId:Long?): Flow<List<Marker>>
 
     @Query("SELECT * FROM marker_table")
     suspend fun getAllMarkers(): List<Marker>
 
     @Query("SELECT * FROM task_table WHERE id = :taskId")
-    suspend fun getTask(taskId: Long?): Task?
+    fun getTask(taskId: Long?): Flow<Task?>
 
     @Query("SELECT * FROM deliverable_table WHERE id = :deliverableId")
-    suspend fun getDeliverable(deliverableId: Long?): Deliverable?
+    fun getDeliverable(deliverableId: Long?): Flow<Deliverable?>
 
     @Query("SELECT * FROM marker_table WHERE id = :markerId")
-    suspend fun getMarker(markerId: Long?): Marker?
+    fun getMarker(markerId: Long?): Flow<Marker?>
 
     @Query("SELECT * FROM times_table WHERE id = :goalTaskDeliverableTimeId")
-    suspend fun getGoalTaskDeliverableTime(goalTaskDeliverableTimeId: Long?): GoalTaskDeliverableTime?
+    fun getGoalTaskDeliverableTime(goalTaskDeliverableTimeId: Long?): Flow<GoalTaskDeliverableTime?>
 
-    @Query("SELECT * FROM deliverable_table WHERE deliverable_goal_id = :goalId")
-    suspend fun getGoalDeliverables(goalId: Long?): List<Deliverable>
+    @Query("SELECT * FROM deliverable_table WHERE deliverable_goal_id = :goalId AND deliverable_parent = :goalId")
+    fun getGoalDeliverables(goalId: Long?): Flow<List<Deliverable>>
 
     @Transaction
     suspend fun appSettings(): AppSettings {
@@ -591,7 +518,7 @@ interface RepositoryDao {
     ){
         searchOccurrences.value = 0
         searchNumScripts.value = 0
-        val scriptsList = getScriptsNow(id)
+        val scriptsList = getScripts(id).first()
         for (script in scriptsList) {
             if (script.scriptId == null) continue
             val scriptSearch = SearchViewModel.ScriptSearch(id, title, script)
@@ -628,7 +555,7 @@ interface RepositoryDao {
         if (words.size>1){
             val deferredList = arrayListOf<Deferred<ArrayList<Triple<String,MutableList<IntRange>,Content?>>>>()
             words.forEach {
-                deferredList.add(CoroutineScope(coroutineContext).async{
+                deferredList.add(CoroutineScope(currentCoroutineContext()).async{
                     val deferredArrayList = arrayListOf<Triple<String,MutableList<IntRange>,Content?>>()
                     if (title!=null){
                         val list = searchForStringInString(it,title,matchCaseCheck, wordCheck)
@@ -642,7 +569,7 @@ interface RepositoryDao {
             var isValid = true
             deferredList.forEach {
                 val list = it.await()
-                if (!isValid || (title!=null && list.size == 0)){
+                if (!isValid || (title!=null && list.isEmpty())){
                     isValid = false
                     ranges.clear()
                     deferredList.forEach { dList-> dList.cancel() }
@@ -686,7 +613,7 @@ interface RepositoryDao {
                     Content.ContentType.DOCUMENT,
                     Content.ContentType.AUDIO -> {
                         deferredList.add(Pair(
-                            CoroutineScope(coroutineContext).async{
+                            CoroutineScope(currentCoroutineContext()).async{
                                 val list: MutableList<IntRange>? = searchForStringInString(
                                     searchString, content.description.text.toString(), matchCaseCheck, wordCheck
                                 )
@@ -701,7 +628,7 @@ interface RepositoryDao {
                         content.content.text.toString().toLongOrNull()?.let {
                             deferredList.add(Pair(
                                 null,
-                                CoroutineScope(coroutineContext).async{
+                                CoroutineScope(currentCoroutineContext()).async{
                                     searchScriptForString(
                                         it,
                                         searchString,

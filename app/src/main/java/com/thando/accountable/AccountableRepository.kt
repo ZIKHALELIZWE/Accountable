@@ -14,8 +14,6 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,17 +45,20 @@ import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.OutputStream
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
@@ -69,7 +70,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val repositoryJob = Job()
     private val repositoryScope = CoroutineScope(Dispatchers.Main + repositoryJob)
     private var loadFoldersListJob: CompletableJob? = null
-    private var loadGoalsListJob: CompletableJob? = null
     private var loadScriptsListJob: CompletableJob? = null
 
     private val folder = MutableStateFlow<Folder?>(null)
@@ -80,17 +80,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
     val listShown = MutableStateFlow(getListShown(false))
 
     private val appSettings = MutableStateFlow<AppSettings?>(null)
-    private val foldersList = mutableStateListOf<Folder>()
-    private val scriptsList = mutableStateListOf<Script>()
-    private val goalsList = mutableStateListOf<Goal>()
+    private val foldersList = MutableStateFlow<Flow<List<Folder>>?>(null)
+    private val scriptsList = MutableStateFlow<Flow<List<Script>>?>(null)
+    private val goalsList = MutableStateFlow<Flow<List<Goal>>?>(null)
     var intentString: String? = null
 
     private val editFolder = MutableStateFlow<Folder?>(null)
     private val newEditFolder = MutableStateFlow<Folder?>(null)
 
-    private val goal = MutableStateFlow<Goal?>(null)
+    private val goal = MutableStateFlow<Flow<Goal?>?>(null)
     private val editGoal = MutableStateFlow<Goal?>(null)
-    private val newGoal = MutableStateFlow<Goal?>(null)
+    private var newGoal = MutableStateFlow<Flow<Goal?>?>(null)
 
     private val scriptsOrGoalsFolderType = MutableStateFlow(Folder.FolderType.SCRIPTS)
 
@@ -156,13 +156,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getListShown() : StateFlow<Folder.FolderListType>{ return listShown }
 
     fun getAppSettings(): StateFlow<AppSettings?> { return appSettings }
-    fun getFoldersList(): SnapshotStateList<Folder> { return foldersList }
-    fun getScriptsList(): SnapshotStateList<Script> { return scriptsList }
-    fun getGoalsList(): SnapshotStateList<Goal> { return goalsList }
+    fun getFoldersList(): StateFlow<Flow<List<Folder>>?> { return foldersList }
+    fun getScriptsList(): StateFlow<Flow<List<Script>>?> { return scriptsList }
+    fun getGoalsList(): StateFlow<Flow<List<Goal>>?> { return goalsList.asStateFlow() }
     fun getEditFolder(): StateFlow<Folder?>{ return editFolder }
     fun getNewEditFolder(): StateFlow<Folder?>{ return newEditFolder }
-    fun getNewGoal():StateFlow<Goal?> { return newGoal }
-    fun getGoal(): MutableStateFlow<Goal?> { return goal }
+    fun getNewGoal():StateFlow<Flow<Goal?>?> { return newGoal }
+    fun getGoal(): MutableStateFlow<Flow<Goal?>?> { return goal }
     fun getDirection(): SharedFlow<AccountableFragment?>{ return direction }
     fun getScriptsOrGoalsFolderType(): StateFlow<Folder.FolderType?> { return scriptsOrGoalsFolderType }
     fun getCurrentFragment(): SharedFlow<AccountableFragment?>{ return currentFragment }
@@ -192,9 +192,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getSearchScriptsList(): SnapshotStateList<SearchViewModel.ScriptSearch> { return searchScriptsList }
 
     fun clearFolderLists(){
-        scriptsList.clear()
-        foldersList.clear()
-        goalsList.clear()
+        scriptsList.value = null
+        foldersList.value = null
+        goalsList.value = null
     }
 
     fun loadScriptsList(
@@ -209,20 +209,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
             if (id != null) {
                 withContext(Dispatchers.Main) {
                     if (ascendingOrder) {
-                        scriptsList.clear()
-                        scriptsList.addAll(
-                            withContext(Dispatchers.IO) {
-                                dao.getScriptsNow(id)
-                            }
-                        )
+                        scriptsList.value = dao.getScripts(id)
                     }
                     else {
-                        scriptsList.clear()
-                        scriptsList.addAll(
-                            withContext(Dispatchers.IO) {
-                                dao.getScriptsNowDESC(id)
-                            }
-                        )
+                        scriptsList.value = dao.getScriptsDESC(id)
                     }
                 }
             }
@@ -237,39 +227,32 @@ class AccountableRepository(val application: Application): AutoCloseable {
         folderNotAppSettings:Boolean,
         appendedUnit: (() -> Unit)? = null
     ){
-        loadGoalsListJob?.cancel()
-        loadGoalsListJob = Job()
-        CoroutineScope(Dispatchers.IO + loadGoalsListJob!!).launch {
-            val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
-            if (id != null) {
-                withContext(Dispatchers.Main) {
-                    if (ascendingOrder) {
-                        goalsList.clear()
-                        goalsList.addAll(
-                            withContext(Dispatchers.IO) {
-                                dao.getGoalsNow(id)
-                            }
-                        )
-                    }
-                    else {
-                        goalsList.clear()
-                        goalsList.addAll(
-                            withContext(Dispatchers.IO) {
-                                dao.getGoalsNowDESC(id)
-                            }
-                        )
-                    }
-
-                    goalsList.forEach { goal ->
+        val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
+        if (id != null) {
+            if (ascendingOrder) {
+                goalsList.value = dao.getGoals(id).map { goals ->
+                    goals.forEach { goal ->
                         goal.loadGoalTimes(dao)
                         goal.loadDeliverables(dao)
+                        goal.loadTasks(dao)
+                        goal.loadMarkers(dao)
                     }
+                    goals
                 }
             }
-            withContext(Dispatchers.Main){ appendedUnit?.invoke() }
-            loadGoalsListJob?.complete()
-            loadGoalsListJob = null
+            else {
+                goalsList.value = dao.getGoalsDESC(id).map { goals ->
+                    goals.forEach { goal ->
+                        goal.loadGoalTimes(dao)
+                        goal.loadDeliverables(dao)
+                        goal.loadTasks(dao)
+                        goal.loadMarkers(dao)
+                    }
+                    goals
+                }
+            }
         }
+        appendedUnit?.invoke()
     }
 
     fun loadFoldersList(
@@ -288,22 +271,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 else Folder.FolderType.GOALS
             withContext(Dispatchers.Main) {
                 if (ascendingOrder){
-                    foldersList.clear()
-                    foldersList.addAll(
-                        withContext(Dispatchers.IO) {
-                            val list = dao.getFoldersNow(id, type)
-                            list
-                        }
-                    )
+                    foldersList.value = dao.getFolders(id, type)
                 }
                 else{
-                    foldersList.clear()
-                    foldersList.addAll(
-                        withContext(Dispatchers.IO) {
-                            val list = dao.getFoldersNowDESC(id, type)
-                            list
-                        }
-                    )
+                    foldersList.value = dao.getFoldersDESC(id, type)
                 }
                 appendedUnit?.invoke()
             }
@@ -316,7 +287,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         val folderId:Long =
             folderIdInput ?: (folder.value?.folderId ?: INITIAL_FOLDER_ID)
         folder.update {
-                if (folderId != INITIAL_FOLDER_ID) dao.getFolderNow(folderId)
+                if (folderId != INITIAL_FOLDER_ID) dao.getFolder(folderId).first()
                 else null
         }
         if (folder.value!=null){
@@ -541,7 +512,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 withContext(Dispatchers.Main) {
                     newEditFolder.update { null }
                     editFolder.value = withContext(Dispatchers.IO) {
-                        if (id != INITIAL_FOLDER_ID) dao.getFolderNow(id)
+                        if (id != INITIAL_FOLDER_ID) dao.getFolder(id).first()
                         else null
                     }
                 }
@@ -554,9 +525,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
         withContext(Dispatchers.IO) {
             id?.let {
                 dao.deleteFolder(it, application)
-                foldersList.removeIf { folder ->
-                    folder.folderId == id
-                }
             }
         }
     }
@@ -565,9 +533,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
         withContext(Dispatchers.IO){
             id?.let {
                 dao.deleteGoal(it, application)
-                goalsList.removeIf { goal ->
-                    goal.id == id
-                }
             }
         }
     }
@@ -576,9 +541,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
         withContext(Dispatchers.IO) {
             id?.let {
                 dao.deleteScript(it, application)
-                scriptsList.removeIf { script ->
-                    script.scriptId == id
-                }
             }
         }
     }
@@ -599,17 +561,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
             } else {
                 if (folder.value == null) {
                     // Update AppSettings Table
-                    newFolder.folderPosition = if (appSettings.value != null) dao.getFoldersNow(
+                    newFolder.folderPosition = if (appSettings.value != null) dao.getFolders(
                         INITIAL_FOLDER_ID,
                         scriptsOrGoalsFolderType.value
-                    ).size.toLong()
+                    ).first().size.toLong()
                     else 0.toLong()
                 } else {
                     // Update Folders Table
-                    newFolder.folderPosition = dao.getFoldersNow(
+                    newFolder.folderPosition = dao.getFolders(
                         folder.value!!.folderId,
                         folder.value!!.folderType
-                    ).size.toLong()
+                    ).first().size.toLong()
                 }
             }
             newFolder
@@ -733,7 +695,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
         repositoryScope.launch {
             withContext(Dispatchers.Main) {
                 goal.value = withContext(Dispatchers.IO) {
-                    dao.getGoalWithTimes(goalId)
+                    dao.getGoal(goalId).map { goal ->
+                        goal?.loadGoalTimes(dao)
+                        goal?.loadMarkers(dao)
+                        goal?.loadTasks(dao)
+                        goal?.loadDeliverables(dao)
+                        goal
+                    }
                 }
             }
             withContext(Dispatchers.IO) {
@@ -754,7 +722,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         withContext(Dispatchers.IO) {
             if (scriptId == INITIAL_FOLDER_ID) {
                 val parentId = folder.value?.folderId ?: INITIAL_FOLDER_ID
-                val scripts = dao.getScriptsNow(parentId)
+                val scripts = dao.getScripts(parentId).first()
                 withContext(Dispatchers.Main) {
                     script.value = Script(
                         scriptParentType = Script.ScriptParentType.FOLDER,
@@ -1717,7 +1685,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         folder:Folder
     ) {
         withContext(Dispatchers.IO) {
-            dao.getFoldersNow(folder.folderId, folder.folderType).let { folders ->
+            dao.getFolders(folder.folderId, folder.folderType).first().let { folders ->
                 folder.numFolders.update { folders.size }
             }
 
@@ -1730,13 +1698,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
         withContext(Dispatchers.IO) {
             when (folder.folderType) {
                 Folder.FolderType.SCRIPTS -> {
-                    dao.getScriptsNow(folder.folderId).let { scripts ->
+                    dao.getScripts(folder.folderId).first().let { scripts ->
                         folder.numScripts.update { scripts.size }
                     }
                 }
 
                 Folder.FolderType.GOALS -> {
-                    dao.getGoalsNow(folder.folderId).let { goals ->
+                    dao.getGoals(folder.folderId).first().let { goals ->
                         folder.numGoals.update { goals.size }
                     }
                 }
@@ -1817,17 +1785,31 @@ class AccountableRepository(val application: Application): AutoCloseable {
         withContext(Dispatchers.IO) {
                 if (id != null && id != INITIAL_FOLDER_ID){
                     // Load Existing Goal
-                    val tempEditGoal = MutableStateFlow(dao.getGoalWithTimes(id))
-                    val tempNewGoal = MutableStateFlow<Goal?>(Goal())
-                    cloneGoalTo(tempEditGoal,tempNewGoal)
+                    val tempEditGoal = MutableStateFlow<Goal?>(
+                        getGoal(id).map { goal ->
+                            goal?.loadGoalTimes(dao)
+                            goal?.loadTasks(dao)
+                            goal?.loadMarkers(dao)
+                            goal?.loadDeliverables(dao)
+                            goal
+                        }.first()
+                        ?:return@withContext)
+                    val tempNewGoal = MutableStateFlow<Goal?>(Goal(
+                        parent = tempEditGoal.value!!.parent
+                    ))
+                    cloneGoalTo(tempEditGoal.value,tempNewGoal)
                     tempNewGoal.value?.let { newGoal ->
-                        tempEditGoal.value?.let { _ ->
-                            dao.update(newGoal)
-                        }
+                        dao.update(newGoal)
                     }
                     withContext(Dispatchers.Main){
                         editGoal.value = tempEditGoal.value
-                        newGoal.value = tempNewGoal.value
+                        newGoal.value = dao.getGoal(tempNewGoal.value?.id).map { goal ->
+                            goal?.loadGoalTimes(dao)
+                            goal?.loadDeliverables(dao)
+                            goal?.loadTasks(dao)
+                            goal?.loadMarkers(dao)
+                            goal
+                        }
                     }
                 }
                 else {
@@ -1835,13 +1817,20 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     withContext(Dispatchers.Main) {
                         editGoal.value = null
                         newGoal.update { withContext(Dispatchers.IO) {
-                            val tempGoal = Goal()
-                            tempGoal.parent.value = folder.value?.folderId?:INITIAL_FOLDER_ID
-                            tempGoal.position.value = dao.getGoalsNow(
-                                tempGoal.parent.value
-                            ).size.toLong()
+                            val tempGoal = Goal(
+                                parent = folder.value?.folderId?:INITIAL_FOLDER_ID,
+                                position = dao.getGoals(
+                                    folder.value?.folderId?:INITIAL_FOLDER_ID
+                                ).first().size.toLong()
+                            )
                             tempGoal.id = dao.insert(tempGoal)
-                            tempGoal
+                            dao.getGoal(tempGoal.id).map { goal ->
+                                goal?.loadGoalTimes(dao)
+                                goal?.loadDeliverables(dao)
+                                goal?.loadTasks(dao)
+                                goal?.loadMarkers(dao)
+                                goal
+                            }
                         }}
                     }
                 }
@@ -1853,35 +1842,35 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun setNewGoalImage(imageUri: Uri?=null){
         withContext(Dispatchers.IO){
-            if (newGoal.value?.id == null) newGoal.value?.let {
-                it.id = dao.insert(it)
+            newGoal.value?.first()?.let { newGoal ->
+                deleteNewGoalImage()
+                if (newGoal.id == null) newGoal.id = dao.insert(newGoal)
+                if (imageUri != null) newGoal.saveImage(application, imageUri)
+                dao.update(newGoal)
             }
-            if (imageUri!=null) newGoal.value?.saveImage(application, imageUri)
-            newGoal.value?.let { dao.update(it) }
         }
     }
 
     suspend fun deleteNewGoalImage(){
         withContext(Dispatchers.IO) {
-            newGoal.value?.deleteFile(application)
+            newGoal.value?.first()?.let { newGoal ->
+                newGoal.deleteFile(application)
+                dao.update(newGoal)
+            }
         }
     }
 
     suspend fun addNewGoalTimeBlock(){
         withContext(Dispatchers.IO){
-            if (newGoal.value?.id == null) newGoal.value?.let {
-                it.id = dao.insert(it)
-            }
-            newGoal.value?.id?.let {
-                val newTime = GoalTaskDeliverableTime(
-                    parent = mutableLongStateOf(it),
-                    type = mutableStateOf(
-                        GoalTaskDeliverableTime.TimesType.GOAL
+            newGoal.value?.first()?.let { newGoal ->
+                if (newGoal.id == null) newGoal.id = dao.insert(newGoal)
+
+                newGoal.id?.let {
+                    val newTime = GoalTaskDeliverableTime(
+                        parent = it,
+                        type = GoalTaskDeliverableTime.TimesType.GOAL.name
                     )
-                )
-                newTime.id = dao.upsert(newTime)
-                withContext(Dispatchers.Main) {
-                    newGoal.value?.times?.add(newTime)
+                    newTime.id = dao.upsert(newTime)
                 }
             }
         }
@@ -1890,24 +1879,21 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun deleteNewGoalTimeBlock(timeBlock: GoalTaskDeliverableTime) {
         withContext(Dispatchers.IO) {
             dao.delete(timeBlock)
-            withContext(Dispatchers.Main) {
-                newGoal.value?.times?.remove(timeBlock)
-            }
         }
     }
 
     suspend fun saveNewGoal(process:suspend ()->Unit){
-        if (editGoal.value == null) {
-            editGoal.value = Goal()
-        }
-        if (editGoal.value!!.id == null){
-            editGoal.value!!.id = dao.insert(editGoal.value!!)
-        }
-        cloneGoalTo(newGoal,editGoal)
-        editGoal.value?.let { editGoal ->
-            newGoal.value?.let { newGoal ->
+        newGoal.value?.first()?.let { newGoal ->
+            if (editGoal.value == null) {
+                editGoal.value = Goal(parent = newGoal.parent)
+            }
+            if (editGoal.value!!.id == null) {
+                editGoal.value!!.id = dao.insert(editGoal.value!!)
+            }
+            cloneGoalTo(newGoal, editGoal)
+            editGoal.value?.let { editGoal ->
                 dao.update(editGoal)
-                withContext(Dispatchers.Main){
+                withContext(Dispatchers.Main) {
                     process()
                 }
             }
@@ -1915,65 +1901,74 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun cloneGoalTo(
-        from:MutableStateFlow<Goal?>,
+        from:Goal?,
         to:MutableStateFlow<Goal?>
     ) {
-        from.value?.let { from ->
+        from?.let { from ->
             to.value?.let { to ->
-                to.parent.value = from.parent.value
-                to.goalCategory.value = from.goalCategory.value
-                to.initialDateTime.value = from.initialDateTime.value
-                to.position.value = from.position.value
-                to.scrollPosition.requestScrollToItem(
-                    from.scrollPosition.firstVisibleItemIndex,
-                    from.scrollPosition.firstVisibleItemScrollOffset
-                )
-                to.size.value = from.size.value
-                to.numImages.value = from.numImages.value
-                to.numVideos.value = from.numVideos.value
-                to.numAudios.value = from.numAudios.value
-                to.numDocuments.value = from.numDocuments.value
-                to.numScripts.value = from.numScripts.value
-                to.goal.setTextAndPlaceCursorAtEnd(from.goal.text.toString())
-                to.dateOfCompletion.value = from.dateOfCompletion.value
-                to.status.value = from.status.value
-                to.colour.value = from.colour.value
-                to.location.setTextAndPlaceCursorAtEnd(from.location.text.toString())
+                to.parent = from.parent
+                to.goalCategory = from.goalCategory
+                to.initialDateTime = from.initialDateTime
+                to.position = from.position
+                to.scrollPosition = from.scrollPosition
+                to.size = from.size
+                to.numImages = from.numImages
+                to.numVideos = from.numVideos
+                to.numAudios = from.numAudios
+                to.numDocuments = from.numDocuments
+                to.numScripts = from.numScripts
+                to.goal = from.goal
+                to.dateOfCompletion = from.dateOfCompletion
+                to.endDateTime = from.endDateTime
+                to.endType = from.endType
+                to.status = from.status
+                to.colour = from.colour
+                to.location = from.location
+                to.selectedTab = from.selectedTab
+                to.tabListState = from.tabListState
+
+                if (to.id == null) to.id = saveGoal(to)
 
                 to.saveImage(
                     application,
                     from.imageResource.getUriFromStorage(application)
                 )
 
-                if (to.id == null) to.id = saveGoal(to)
-                to.times.removeIf { toTime ->
-                    // Delete the ones that are not in from (originally in to)
-                    !from.times.any { fromTime -> toTime.id == fromTime.cloneId }
-                }
-                for (time in from.times) {
-                    to.id?.let { id ->
-                        var shouldUpdate = true
-                        var newTime = to.times.find { toTime -> toTime.id == time.cloneId }
-                        if (newTime == null){
-                            newTime = GoalTaskDeliverableTime(
-                                parent = mutableLongStateOf(id),
-                                type = mutableStateOf(
-                                    GoalTaskDeliverableTime.TimesType.GOAL
-                                ))
-                            shouldUpdate = false
+                from.times.value?.first()?.let { fromTimes ->
+                    to.times.value?.first()?.forEach { toTime ->
+                        // Delete the ones that are not in from (originally in to)
+                        if (
+                            !fromTimes.any { fromTime ->
+                                toTime.id == fromTime.cloneId
+                            }
+                        ) {
+                            dao.delete(toTime)
                         }
-                        else{
-                            newTime.parent.value = id
-                            newTime.type.value = GoalTaskDeliverableTime.TimesType.GOAL
-                        }
+                    }
 
-                        newTime.timeBlockType.value = time.timeBlockType.value
-                        newTime.start.value = time.start.value
-                        newTime.duration.value = time.duration.value
-                        newTime.id = saveGoalTaskDeliverableTime(newTime)
-                        if (!shouldUpdate)  {
-                            newTime.cloneId = time.id
-                            to.times.add(newTime)
+                    for (time in fromTimes) {
+                        to.id?.let { id ->
+                            var shouldUpdate = true
+                            var newTime = to.times.value?.first()?.find { toTime -> toTime.id == time.cloneId }
+                            if (newTime == null) {
+                                newTime = GoalTaskDeliverableTime(
+                                    parent = id,
+                                    type =
+                                        GoalTaskDeliverableTime.TimesType.GOAL.name
+                                )
+                                shouldUpdate = false
+                            } else {
+                                newTime.parent = id
+                                newTime.type = GoalTaskDeliverableTime.TimesType.GOAL.name
+                            }
+
+                            newTime.timeBlockType = time.timeBlockType
+                            newTime.start = time.start
+                            newTime.duration = time.duration
+                            if (!shouldUpdate) {
+                                newTime.cloneId = time.id
+                            }
+                            newTime.id = saveGoalTaskDeliverableTime(newTime)
                         }
                     }
                 }
@@ -1983,9 +1978,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun clearNewGoal(){
         withContext(Dispatchers.IO){
-            newGoal.value?.let {
+            newGoal.value?.first()?.let {
                 it.deleteFile(application)
-                for (time in it.times) dao.delete(time)
+                it.times.value?.let { flowList -> for (time in flowList.first()) dao.delete(time) }
                 dao.delete(it)
                 newGoal.value = null
             }
@@ -2007,18 +2002,25 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun getTasks(parentId:Long, parentType: Task.TaskParentType): List<Task> {
-        return dao.getTasksWithTimes(
-            parentId,
-            parentType
-        )
+    fun getTasks(parentId:Long, parentType: Task.TaskParentType): Flow<List<Task>> {
+        return dao.getTasks(parentId, parentType).map { tasks ->
+            tasks.forEach { task ->
+                task.loadTimes(dao)
+            }
+            tasks
+        }
     }
 
-    suspend fun getDeliverables(parentId:Long): List<Deliverable> {
-        return dao.getDeliverablesWithTimes(parentId)
+    fun getDeliverablesWithTimes(parentId:Long): Flow<List<Deliverable>> {
+        return dao.getDeliverables(parentId).map { deliverables ->
+            deliverables.forEach { deliverable ->
+                deliverable.loadTimes(dao)
+            }
+            deliverables
+        }
     }
 
-    suspend fun getMarkers(parentId:Long): List<Marker> {
+    fun getMarkers(parentId:Long): Flow<List<Marker>> {
         return dao.getMarkers(parentId)
     }
 
@@ -2053,35 +2055,40 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.numScripts.value = from.numScripts.value
 
                 if (to.id == null) to.id = saveTask(to)
-                to.times.removeIf { toTime ->
-                    // Delete the ones that are not in from (originally in to)
-                    !from.times.any { fromTime -> toTime.id == fromTime.cloneId }
-                }
-                for (time in from.times) {
-                    to.id?.let { id ->
-                        var shouldUpdate = true
-                        var newTime = to.times.find { toTime -> toTime.id == time.cloneId }
-                        if (newTime == null){
-                            newTime = GoalTaskDeliverableTime(
-                                parent = mutableLongStateOf(id),
-                                type = mutableStateOf(
-                                    GoalTaskDeliverableTime.TimesType.TASK
-                                )
-                            )
-                            shouldUpdate = false
+                from.times.value?.first()?.let { fromTimes ->
+                    to.times.value?.first()?.forEach { toTime ->
+                        // Delete the ones that are not in from (originally in to)
+                        if (
+                            !fromTimes.any { fromTime ->
+                                toTime.id == fromTime.cloneId
+                            }
+                        ) {
+                            dao.delete(toTime)
                         }
-                        else{
-                            newTime.parent.value = id
-                            newTime.type.value = GoalTaskDeliverableTime.TimesType.TASK
-                        }
+                    }
 
-                        newTime.timeBlockType.value = time.timeBlockType.value
-                        newTime.start.value = time.start.value
-                        newTime.duration.value = time.duration.value
-                        newTime.id = saveGoalTaskDeliverableTime(newTime)
-                        if (!shouldUpdate)  {
-                            newTime.cloneId = time.id
-                            to.times.add(newTime)
+                    for (time in fromTimes) {
+                        to.id?.let { id ->
+                            var shouldUpdate = true
+                            var newTime = to.times.value?.first()?.find { toTime -> toTime.id == time.cloneId }
+                            if (newTime == null) {
+                                newTime = GoalTaskDeliverableTime(
+                                    parent = id,
+                                    type = GoalTaskDeliverableTime.TimesType.TASK.name
+                                )
+                                shouldUpdate = false
+                            } else {
+                                newTime.parent = id
+                                newTime.type = GoalTaskDeliverableTime.TimesType.TASK.name
+                            }
+
+                            newTime.timeBlockType = time.timeBlockType
+                            newTime.start = time.start
+                            newTime.duration = time.duration
+                            if (!shouldUpdate) {
+                                newTime.cloneId = time.id
+                            }
+                            newTime.id = saveGoalTaskDeliverableTime(newTime)
                         }
                     }
                 }
@@ -2107,55 +2114,57 @@ class AccountableRepository(val application: Application): AutoCloseable {
     ) {
         from.value?.let { from ->
             to.value?.let { to ->
-                to.parent.value = from.parent.value
-                to.position.value = from.position.value
-                to.initialDateTime.value = from.initialDateTime.value
-                to.endDateTime.value = from.endDateTime.value
-                to.endType.value = from.endType.value
-                to.scrollPosition.requestScrollToItem(
-                    from.scrollPosition.firstVisibleItemIndex,
-                    from.scrollPosition.firstVisibleItemScrollOffset
-                )
-                to.deliverable.setTextAndPlaceCursorAtEnd(from.deliverable.text.toString())
-                to.status.value = from.status.value
-                to.location.setTextAndPlaceCursorAtEnd(from.location.text.toString())
-                to.size.value = from.size.value
-                to.numImages.value = from.numImages.value
-                to.numVideos.value = from.numVideos.value
-                to.numAudios.value = from.numAudios.value
-                to.numDocuments.value = from.numDocuments.value
-                to.numScripts.value = from.numScripts.value
+                to.parent = from.parent
+                to.position = from.position
+                to.initialDateTime = from.initialDateTime
+                to.endDateTime = from.endDateTime
+                to.endType = from.endType
+                to.scrollPosition = from.scrollPosition
+                to.deliverable = from.deliverable
+                to.status = from.status
+                to.location = from.location
+                to.size = from.size
+                to.numImages = from.numImages
+                to.numVideos = from.numVideos
+                to.numAudios = from.numAudios
+                to.numDocuments = from.numDocuments
+                to.numScripts = from.numScripts
 
                 if (to.id == null) to.id = saveDeliverable(to)
-                to.times.removeIf { toTime ->
-                    // Delete the ones that are not in from (originally in to)
-                    !from.times.any { fromTime -> toTime.id == fromTime.cloneId }
-                }
-                for (time in from.times) {
-                    to.id?.let { id ->
-                        var shouldUpdate = true
-                        var newTime = to.times.find { toTime -> toTime.id == time.cloneId }
-                        if (newTime == null){
-                            newTime = GoalTaskDeliverableTime(
-                                parent = mutableLongStateOf(id),
-                                type = mutableStateOf(
-                                    GoalTaskDeliverableTime.TimesType.DELIVERABLE
-                                )
-                            )
-                            shouldUpdate = false
+                from.times.value?.first()?.let { fromTimes ->
+                    to.times.value?.first()?.forEach { toTime ->
+                        // Delete the ones that are not in from (originally in to)
+                        if (
+                            !fromTimes.any { fromTime ->
+                                toTime.id == fromTime.cloneId
+                            }
+                        ) {
+                            dao.delete(toTime)
                         }
-                        else{
-                            newTime.parent.value = id
-                            newTime.type.value = GoalTaskDeliverableTime.TimesType.DELIVERABLE
-                        }
+                    }
 
-                        newTime.timeBlockType.value = time.timeBlockType.value
-                        newTime.start.value = time.start.value
-                        newTime.duration.value = time.duration.value
-                        newTime.id = saveGoalTaskDeliverableTime(newTime)
-                        if (!shouldUpdate) {
-                            newTime.cloneId = time.id
-                            to.times.add(newTime)
+                    for (time in fromTimes) {
+                        to.id?.let { id ->
+                            var shouldUpdate = true
+                            var newTime = to.times.value?.first()?.find { toTime -> toTime.id == time.cloneId }
+                            if (newTime == null) {
+                                newTime = GoalTaskDeliverableTime(
+                                    parent = id,
+                                    type = GoalTaskDeliverableTime.TimesType.DELIVERABLE.name
+                                )
+                                shouldUpdate = false
+                            } else {
+                                newTime.parent = id
+                                newTime.type = GoalTaskDeliverableTime.TimesType.DELIVERABLE.name
+                            }
+
+                            newTime.timeBlockType = time.timeBlockType
+                            newTime.start = time.start
+                            newTime.duration = time.duration
+                            if (!shouldUpdate) {
+                                newTime.cloneId = time.id
+                            }
+                            newTime.id = saveGoalTaskDeliverableTime(newTime)
                         }
                     }
                 }
@@ -2166,8 +2175,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun getDeliverableClone(deliverable: Deliverable): Deliverable? {
         val mutableOriginal:MutableStateFlow<Deliverable?> = MutableStateFlow(deliverable)
         val mutableReturn:MutableStateFlow<Deliverable?> = MutableStateFlow(Deliverable(
-            parent = mutableStateOf(deliverable.parent.value),
-            position = mutableStateOf(deliverable.position.value)
+            parent = deliverable.parent,
+            position = deliverable.position
         ))
         cloneDeliverableTo(mutableOriginal,mutableReturn)
         return mutableReturn.value
@@ -2238,4 +2247,20 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun deleteGoalTaskDeliverableTime(goalTaskDeliverableTime: GoalTaskDeliverableTime) {
         dao.delete(goalTaskDeliverableTime)
     }
+
+    suspend fun insert(goal: Goal): Long = dao.insert(goal)
+    suspend fun update(goal: Goal) = dao.update(goal)
+    suspend fun delete(goal: Goal) = dao.delete(goal)
+    fun getGoal(goalId: Long?): Flow<Goal?> = dao.getGoal(goalId)
+    fun getGoals(parent: Long?): Flow<List<Goal>> = dao.getGoals(parent)
+    fun getGoalsDESC(parent: Long?): Flow<List<Goal>> = getGoalsDESC(parent)
+
+    suspend fun insert(deliverable: Deliverable): Long = dao.insert(deliverable)
+    suspend fun update(deliverable: Deliverable) = dao.update(deliverable)
+    suspend fun delete(deliverable: Deliverable) = dao.delete(deliverable)
+    fun getDeliverables(goalId:Long?): Flow<List<Deliverable>> = dao.getDeliverables(goalId)
+    fun getDeliverable(deliverableId: Long?): Flow<Deliverable?> = dao.getDeliverable(deliverableId)
+    fun getGoalDeliverables(goalId: Long?): Flow<List<Deliverable>> = dao.getGoalDeliverables(goalId)
+
+    suspend fun update(timeBlock: GoalTaskDeliverableTime) = dao.update(timeBlock)
 }
