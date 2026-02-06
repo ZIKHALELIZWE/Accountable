@@ -5,11 +5,13 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.util.packInts
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @Entity(tableName = "marker_table")
 data class Marker(
@@ -17,19 +19,19 @@ data class Marker(
     var id: Long? = null,
 
     @ColumnInfo(name = "marker_parent")
-    val parent: MutableState<Long>,
+    var parent: Long,
 
     @ColumnInfo (name = "marker_position")
-    val position: MutableState<Long>,
+    var position: Long,
 
     @ColumnInfo (name = "marker_date_time")
-    var dateTime: MutableState<LocalDateTime> = mutableStateOf(LocalDateTime.now()),
+    var dateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
 
     @ColumnInfo (name = "marker_edit_scroll_position")
-    val scrollPosition: LazyListState = LazyListState(0,0),
+    var scrollPosition: Long = packInts(0,0),
 
     @ColumnInfo (name = "marker_marker")
-    val marker : TextFieldState = TextFieldState(""),
+    var marker : String = "",
 ) {
     @Ignore
     val markerTextFocusRequester = FocusRequester()

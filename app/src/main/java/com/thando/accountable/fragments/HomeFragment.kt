@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
@@ -82,7 +83,7 @@ fun HomeView( viewModel : HomeViewModel, mainActivityViewModel: MainActivityView
                     navigationIcon = {
                         IconButton(onClick = {
                             scope.launch { mainActivityViewModel.toggleDrawer() }
-                        }) {
+                        }, modifier = Modifier.testTag("HomeViewNavigationIconDrawer")) {
                             Icon(
                                 Icons.Default.Menu,
                                 contentDescription = stringResource(R.string.navigation_drawer_menu)

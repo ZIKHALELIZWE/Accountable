@@ -593,7 +593,11 @@ fun ControlsSection(
                 setSpinnerView(LocalView.current)
                 val fillMaxWidth = Modifier.fillMaxWidth()
                 TextField(
-                    value = if (selectedOptionName == TeleprompterSettings().name.collectAsState().value)
+                    value = if (selectedOptionName == TeleprompterSettings(
+                            name = MutableStateFlow(
+                                stringResource(R.string.default_settings)
+                            )
+                    ).name.collectAsState().value)
                         stringResource(
                             R.string.change_name_to_save,
                             selectedOptionName
@@ -625,10 +629,18 @@ fun ControlsSection(
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.primary,
                         unfocusedContainerColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = if (selectedOptionName == TeleprompterSettings().name.collectAsState().value)
+                        focusedTextColor = if (selectedOptionName == TeleprompterSettings(
+                                name = MutableStateFlow(
+                                    stringResource(R.string.default_settings)
+                                )
+                        ).name.collectAsState().value)
                             Color.Red
                         else MaterialTheme.colorScheme.onPrimary,
-                        unfocusedTextColor = if (selectedOptionName == TeleprompterSettings().name.collectAsState().value)
+                        unfocusedTextColor = if (selectedOptionName == TeleprompterSettings(
+                                name = MutableStateFlow(
+                                    stringResource(R.string.default_settings)
+                                )
+                        ).name.collectAsState().value)
                             Color.Red
                         else MaterialTheme.colorScheme.onPrimary,
                         focusedIndicatorColor = MaterialTheme.colorScheme.surface,
@@ -650,13 +662,21 @@ fun ControlsSection(
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        text = if (selectionOptionName == TeleprompterSettings().name.collectAsState().value)
+                                        text = if (selectionOptionName == TeleprompterSettings(
+                                                name = MutableStateFlow(
+                                                    stringResource(R.string.default_settings)
+                                                )
+                                        ).name.collectAsState().value)
                                             stringResource(
                                                 R.string.change_name_to_save,
                                                 selectionOptionName
                                             )
                                         else selectionOptionName,
-                                        color = if (selectionOptionName == TeleprompterSettings().name.collectAsState().value)
+                                        color = if (selectionOptionName == TeleprompterSettings(
+                                                name = MutableStateFlow(
+                                                    stringResource(R.string.default_settings)
+                                                )
+                                        ).name.collectAsState().value)
                                                 Color.Red
                                             else MaterialTheme.colorScheme.onPrimary
                                     )

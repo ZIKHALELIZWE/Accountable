@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("androidx.navigation.safeargs")
-    id("org.jetbrains.kotlin.kapt")
     id("com.google.devtools.ksp")
     kotlin("plugin.serialization")
 }
@@ -32,8 +31,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlin {
         compilerOptions {
@@ -42,8 +41,6 @@ android {
     }
     buildFeatures {
         compose = true
-        dataBinding = true
-        viewBinding = true
     }
 
     testOptions.unitTests.isIncludeAndroidResources = true
@@ -61,6 +58,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.ui.text)
+    implementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -102,7 +100,6 @@ dependencies {
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
     testImplementation(libs.junit)
-    implementation(libs.robolectric)
     testImplementation(libs.core.testing)
     testImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -111,4 +108,5 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     implementation(kotlin("reflect"))
     implementation(libs.accompanist.systemuicontroller)
+    testImplementation(libs.robolectric)
 }

@@ -1,288 +1,370 @@
 package com.thando.accountable
 
+import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.compose.material3.DrawerValue
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.TestMonotonicFrameClock
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.thando.accountable.AccountableNavigationController.AccountableFragment
+import com.thando.accountable.database.tables.Folder
+import com.thando.accountable.fragments.viewmodels.AppSettingsViewModel
+import com.thando.accountable.fragments.viewmodels.BooksViewModel
+import com.thando.accountable.fragments.viewmodels.HelpViewModel
+import com.thando.accountable.fragments.viewmodels.HomeViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
+import org.robolectric.shadows.ShadowLog
+import java.io.PrintStream
+import kotlin.reflect.KFunction2
+import kotlin.reflect.KFunction3
 
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34]) // Force Robolectric to use API 34
 @LooperMode(LooperMode.Mode.LEGACY)
-class MainActivityTest {/*
-
-    private lateinit var activity: MainActivity
-    private lateinit var binding: ActivityMainBinding
-    private lateinit var viewModel: MainActivityViewModel
-    private lateinit var repository: AccountableRepository
-
+class MainActivityTest {
     @get:Rule
     val instantTaskExecutorRule = InstantTaskExecutorRule()
+    @get:Rule
+    val composeTestRule = createComposeRule()
 
-    @Test
-    fun nav_home_fragment_navigation(){
-        val testedFragment = AccountableFragment.HomeFragment
-        testInvalidFragments(
-            testedFragment,
-            listOf(
-                R.id.goalFragment,
-                R.id.booksFragment,
-                R.id.appSettingsFragment,
-                R.id.helpFragment
-            )
-        )
-
-        var rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        rep.scriptsOrGoalsFolderId = INITIAL_FOLDER_ID
-        rep.scriptsOrGoalsFolderType = Folder.FolderType.GOALS
-        compareNavigationArguments(rep,testedFragment,R.id.goalFragment)
-
-        rep.scriptsOrGoalsFolderId = INITIAL_FOLDER_ID
-        rep.scriptsOrGoalsFolderType = Folder.FolderType.SCRIPTS
-        compareNavigationArguments(rep,testedFragment,R.id.booksFragment)
-
-        rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        compareNavigationArguments(rep,testedFragment,R.id.appSettingsFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.helpFragment)
+    @Before
+    fun setup() {
+        ShadowLog.stream = FilteredPrintStream(System.out)
     }
 
-    @Test
-    fun nav_app_settings_fragment_navigation(){
-        val testedFragment = AccountableFragment.AppSettingsFragment
-        testInvalidFragments(
-            testedFragment,
-            listOf(
-                R.id.goalFragment,
-                R.id.booksFragment,
-                R.id.homeFragment,
-                R.id.helpFragment
-            )
-        )
+    @After
+    fun cleanup() {
 
-        var rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        rep.scriptsOrGoalsFolderId = INITIAL_FOLDER_ID
-        rep.scriptsOrGoalsFolderType = Folder.FolderType.GOALS
-        compareNavigationArguments(rep,testedFragment,R.id.goalFragment)
-
-        rep.scriptsOrGoalsFolderId = INITIAL_FOLDER_ID
-        rep.scriptsOrGoalsFolderType = Folder.FolderType.SCRIPTS
-        compareNavigationArguments(rep,testedFragment,R.id.booksFragment)
-
-        rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        compareNavigationArguments(rep,testedFragment,R.id.homeFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.helpFragment)
     }
 
-    @Test
-    fun nav_help_fragment_navigation(){
-        val testedFragment = AccountableFragment.HelpFragment
-        testInvalidFragments(
-            testedFragment,
-            listOf(
-                R.id.goalFragment,
-                R.id.booksFragment,
-                R.id.homeFragment,
-                R.id.appSettingsFragment
-            )
-        )
-
-        var rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        rep.scriptsOrGoalsFolderId = INITIAL_FOLDER_ID
-        rep.scriptsOrGoalsFolderType = Folder.FolderType.GOALS
-        compareNavigationArguments(rep,testedFragment,R.id.goalFragment)
-
-        rep.scriptsOrGoalsFolderId = INITIAL_FOLDER_ID
-        rep.scriptsOrGoalsFolderType = Folder.FolderType.SCRIPTS
-        compareNavigationArguments(rep,testedFragment,R.id.booksFragment)
-
-        rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        compareNavigationArguments(rep,testedFragment,R.id.homeFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.appSettingsFragment)
-    }
-
-    @Test
-    fun nav_goals_fragment_navigation(){
-        val testedFragment = AccountableFragment.GoalFragment
-        testInvalidFragments(testedFragment,listOf(
-            R.id.homeFragment,
-            R.id.booksFragment,
-            R.id.appSettingsFragment,
-            R.id.helpFragment,
-            R.id.editGoalFragment,
-            R.id.editFolderFragment,
-            R.id.taskFragment
-        ))
-
-        var rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        rep.scriptsOrGoalsFolderId = INITIAL_FOLDER_ID
-        rep.scriptsOrGoalsFolderType = Folder.FolderType.SCRIPTS
-        compareNavigationArguments(rep,testedFragment,R.id.booksFragment)
-
-        rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        compareNavigationArguments(rep,testedFragment,R.id.homeFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.appSettingsFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.helpFragment)
-
-        rep = AccountableRepository.NavigationArguments(true)
-        compareNavigationArguments(rep,testedFragment,R.id.editGoalFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.editFolderFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.taskFragment)
-    }
-
-    @Test
-    fun nav_books_fragment_navigation(){
-        val testedFragment = AccountableFragment.BooksFragment
-        testInvalidFragments(testedFragment,listOf(
-            R.id.homeFragment,
-            R.id.goalFragment,
-            R.id.appSettingsFragment,
-            R.id.helpFragment,
-            R.id.editFolderFragment,
-            R.id.scriptFragment
-        ))
-
-        var rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        rep.scriptsOrGoalsFolderId = INITIAL_FOLDER_ID
-        rep.scriptsOrGoalsFolderType = Folder.FolderType.GOALS
-        compareNavigationArguments(rep,testedFragment,R.id.goalFragment)
-
-        rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        compareNavigationArguments(rep,testedFragment,R.id.homeFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.appSettingsFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.helpFragment)
-
-        rep = AccountableRepository.NavigationArguments(true)
-        compareNavigationArguments(rep,testedFragment,R.id.editFolderFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.scriptFragment)
-    }
-
-    @Test
-    fun nav_edit_folder_fragment_navigation(){
-        val testedFragment = AccountableFragment.EditFolderFragment
-        testInvalidFragments(testedFragment,listOf(
-            R.id.booksFragment,
-            R.id.goalFragment
-        ))
-
-        val rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        compareNavigationArguments(rep,testedFragment,R.id.goalFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.booksFragment)
-    }
-
-    @Test
-    fun nav_edit_goal_fragment_navigation(){
-        val testedFragment = AccountableFragment.EditGoalFragment
-        testInvalidFragments(testedFragment,listOf(
-            R.id.goalFragment
-        ))
-
-        val rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        compareNavigationArguments(rep,testedFragment,R.id.goalFragment)
-    }
-
-    @Test
-    fun nav_task_fragment_navigation(){
-        val testedFragment = AccountableFragment.TaskFragment
-        testInvalidFragments(testedFragment,listOf(
-            R.id.goalFragment
-        ))
-
-        val rep = AccountableRepository.NavigationArguments(true)
-        rep.isDrawerFragment = true
-        compareNavigationArguments(rep,testedFragment,R.id.goalFragment)
-    }
-
-    @Test
-    fun nav_markup_language_fragment_navigation(){
-        val testedFragment = AccountableFragment.MarkupLanguageFragment
-        testInvalidFragments(testedFragment,listOf(
-            R.id.scriptFragment
-        ))
-
-        val rep = AccountableRepository.NavigationArguments(true)
-        compareNavigationArguments(rep,testedFragment,R.id.scriptFragment)
-    }
-
-    @Test
-    fun nav_teleprompter_fragment_navigation(){
-        val testedFragment = AccountableFragment.TeleprompterFragment
-        testInvalidFragments(testedFragment,listOf(
-            R.id.scriptFragment
-        ))
-
-        val rep = AccountableRepository.NavigationArguments(true)
-        compareNavigationArguments(rep,testedFragment,R.id.scriptFragment)
-    }
-
-    @Test
-    fun nav_script_fragment_navigation(){
-        val testedFragment = AccountableFragment.ScriptFragment
-        testInvalidFragments(testedFragment,listOf(
-            R.id.booksFragment,
-            R.id.markupLanguageFragment,
-            R.id.teleprompterFragment
-        ))
-
-        val rep = AccountableRepository.NavigationArguments(true)
-        compareNavigationArguments(rep,testedFragment,R.id.markupLanguageFragment)
-        compareNavigationArguments(rep,testedFragment,R.id.teleprompterFragment)
-        rep.isDrawerFragment = true
-        compareNavigationArguments(rep,testedFragment,R.id.booksFragment)
-    }
-
-    private fun testInvalidFragments(testedFragment: AccountableFragment, validFragments: List<Int>){
-        val invalidFragments = getInvalidFragments(validFragments)
-        invalidFragments.forEach { testFalseNavigation(testedFragment,it) }
-    }
-
-    private fun getInvalidFragments(validFragments:List<Int>):List<Int>{
-        val invalidFragments = arrayListOf<Int>()
-        AccountableFragment.entries.forEach {
-            val id = AccountableNavigationController.getFragmentId(it)
-            if(!validFragments.contains(id)) invalidFragments.add(id)
+    class FilteredPrintStream(private val delegate: PrintStream) : PrintStream(delegate) {
+        override fun println(x: String?) {
+            if (x != null) {
+                if (x.contains("FATAL EXCEPTION")) {
+                    delegate.println(x)
+                }
+            }
         }
-        return invalidFragments
     }
 
-    private fun testFalseNavigation(from: AccountableFragment, to:Int){
-        compareNavigationArguments(
-            AccountableRepository.NavigationArguments(),
-            from,
-            to,
-            true
+    @OptIn(ExperimentalTestApi::class, ExperimentalCoroutinesApi::class)
+    fun TestScope.runSuspend(function: suspend TestScope.()->Unit) {
+        val scheduler = TestCoroutineScheduler()
+        // Create our test frame clock
+        val frameClock = TestMonotonicFrameClock( MainScope().plus(scheduler))
+        //CoroutineScope(Dispatchers.Main + frameClock).launch {
+        MainScope().plus(frameClock).launch {
+            function()
+        }
+    }
+
+    @Test
+    fun coreClassesNotNull() = runTest {
+        val activity = Robolectric.buildActivity(MainActivity::class.java)
+            .create().start().resume().get()
+        assertNotNull(activity)
+        assertNotNull(activity.viewModel)
+        assertNotNull(activity.viewModel.repository)
+    }
+
+    @Test
+    fun currentFragmentIsHomeFragment() = runTest {
+        val activity = Robolectric.buildActivity(MainActivity::class.java)
+            .create()  // Creates the activity
+            .start()   // Starts the activity
+            .resume()  // Resumes the activity to make it interactive
+            .get()     // Gets the activity instance
+
+        assertNotNull(activity.viewModel.currentFragment.value)
+        assertEquals(
+            AccountableFragment.HomeFragment,
+            activity.viewModel.currentFragment.value
+        )
+        assertEquals(
+            AccountableFragment.HomeFragment,
+            activity.viewModel.currentFragment.value
         )
     }
 
-    private fun compareNavigationArguments(expectedArgs:AccountableRepository.NavigationArguments, from: AccountableFragment, to:Int, isNull:Boolean=false){
-        val dir = AccountableNavigationController.getFragmentDirections(from,to)
-        val expectedFragment: AccountableFragment? = if (isNull) null else AccountableNavigationController.getFragmentFromId(to)
-        assertEquals(expectedFragment,dir.first)
-        assertEquals(expectedArgs.isValidDir,dir.second.isValidDir)
-        assertEquals(expectedArgs.isDrawerFragment,dir.second.isDrawerFragment)
-        assertEquals(expectedArgs.scriptsOrGoalsFolderId,dir.second.scriptsOrGoalsFolderId)
-        assertEquals(expectedArgs.scriptsOrGoalsFolderType,dir.second.scriptsOrGoalsFolderType)
+    @Test
+    fun directionIsNull() = runTest {
+        val activity = Robolectric.buildActivity(MainActivity::class.java)
+            .create()  // Creates the activity
+            .start()   // Starts the activity
+            .resume()  // Resumes the activity to make it interactive
+            .get()     // Gets the activity instance
+        assertNull(activity.viewModel.direction.value)
     }
 
+    @Test
+    fun `Main Activity Initialized`() = runTest {
+        val activity = Robolectric.buildActivity(MainActivity::class.java)
+            .setup().get()
+
+        assertNotNull(activity.viewModel.appSettings.value)
+        assertNotNull(activity.viewModel.direction)
+        assertNotNull(activity.viewModel.accountableNavigationController)
+        composeTestRule.onNodeWithTag("NavigationDrawerItemHomeFragment").assertExists()
+        if (AccountableNavigationController.isDrawerFragment(
+                activity.viewModel.currentFragment.value!!
+            )
+        ) composeTestRule.onNodeWithTag("NavigationDrawerItemHomeFragment").assertIsSelected()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `Switch Fragments`() = runTest {
+        val activity = Robolectric.buildActivity(MainActivity::class.java)
+            .setup().get()
+
+        assertNull(activity.viewModel.direction.value)
+        assertNotNull(activity.viewModel.currentFragment.value)
+        assertEquals(
+            AccountableFragment.HomeFragment,
+            activity.viewModel.currentFragment.value
+        )
+
+        val destinations = listOf(
+            AccountableFragment.BooksFragment,
+            AccountableFragment.AppSettingsFragment,
+            AccountableFragment.HelpFragment,
+            AccountableFragment.AppSettingsFragment,
+            AccountableFragment.BooksFragment,
+            AccountableFragment.HomeFragment
+        )
+        destinations.forEach {
+            switchToNavigationDrawer(activity, it)
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class, ExperimentalCoroutinesApi::class)
+    private fun switchToNavigationDrawer(
+        activity: MainActivity,
+        fragment: AccountableFragment
+    ) {
+        assertTrue(activity.viewModel.drawerEnabled.value)
+        assertFalse(activity.viewModel.drawerState.value == DrawerValue.Open)
+        composeTestRule.onNodeWithTag("MainActivityModalNavigationDrawerContent").assertIsNotDisplayed()
+
+        activity.viewModel.toggleDrawer()
+
+        assertTrue(activity.viewModel.drawerState.value == DrawerValue.Open)
+        composeTestRule.onNodeWithTag("MainActivityModalNavigationDrawerContent").assertIsDisplayed()
+
+        // Switch to fragment
+        when (fragment) {
+            AccountableFragment.HomeFragment -> {
+                composeTestRule.onNodeWithTag("NavigationDrawerItemHomeFragment")
+                    .assertExists()
+                    .assertHasClickAction()
+                activity.viewModel.changeFragment(AccountableFragment.HomeFragment)
+                composeTestRule.waitForIdle()
+                assertEquals(
+                    HomeViewModel::class.java.name,
+                    activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+                )
+            }
+            AccountableFragment.BooksFragment -> {
+                composeTestRule.onNodeWithTag("NavigationDrawerItemBooksFragment").assertExists()
+                activity.viewModel.changeFragment(AccountableFragment.BooksFragment)
+                composeTestRule.waitForIdle()
+                assertEquals(
+                    BooksViewModel::class.java.name,
+                    activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+                )
+            }
+            AccountableFragment.AppSettingsFragment -> {
+                composeTestRule.onNodeWithTag("NavigationDrawerItemAppSettingsFragment").assertExists()
+                activity.viewModel.changeFragment(AccountableFragment.AppSettingsFragment)
+                composeTestRule.waitForIdle()
+                assertEquals(
+                    AppSettingsViewModel::class.java.name,
+                    activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+                )
+            }
+            AccountableFragment.HelpFragment -> {
+                composeTestRule.onNodeWithTag("NavigationDrawerItemHelpFragment").assertExists()
+                activity.viewModel.changeFragment(AccountableFragment.HelpFragment)
+                composeTestRule.waitForIdle()
+                assertEquals(
+                    HelpViewModel::class.java.name,
+                    activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+                )
+            }
+            else -> {}
+        }
+        currentFragmentIs(activity, fragment)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun currentFragmentIs(
+        activity: MainActivity,
+        fragment: AccountableFragment
+    ) {
+        assertEquals(
+            fragment,
+            activity.viewModel.currentFragment.value
+        )
+        assertNotNull(
+            activity.viewModel.accountableNavigationController.navController?.currentDestination?.route
+        )
+        assertEquals(
+            fragment.name,
+            activity.viewModel.accountableNavigationController.navController?.currentDestination?.route
+        )
+    }
+
+    @Test
+    fun `Folders And Scripts Books Test`() = runTest {
+        val activity = Robolectric.buildActivity(MainActivity::class.java)
+            .setup().get()
+
+        switchToNavigationDrawer(activity, AccountableFragment.BooksFragment)
+
+        val fragmentViewModel = activity.viewModel.accountableNavigationController.fragmentViewModel
+        assertNotNull(fragmentViewModel)
+
+        assertEquals(fragmentViewModel.value?.javaClass?.name, BooksViewModel::class.java.name)
+        val booksViewModel = fragmentViewModel.value as BooksViewModel
+
+        assertNull(booksViewModel.folder.value)
+        assertNotNull(booksViewModel.folderType.value)
+        assertEquals(Folder.FolderType.SCRIPTS, booksViewModel.folderType.value)
+        assertNull(booksViewModel.intentString)
+        assertNotNull(booksViewModel.appSettings.value)
+
+        assertNotNull(booksViewModel.foldersList.value)
+        assertEquals(false,booksViewModel.showScripts.value?.value)
+        booksViewModel.switchFolderScript()
+        composeTestRule.waitForIdle()
+        assertNotNull(booksViewModel.scriptsList.value)
+        assertEquals(true, booksViewModel.showScripts.value?.value)
+        booksViewModel.switchFolderScript()
+        composeTestRule.waitForIdle()
+        assertNull(booksViewModel.goalsList.value)
+        /*areEqual(-1L,
+            repository.getScriptsOrGoalsFolderId().value,
+            "Repository Folder ID")
+        areEqual(Folder.FolderType.SCRIPTS,
+            repository.getScriptsOrGoalsFolderType().value,
+            "Repository Folder Type")
+
+        notNull(foldersAndScriptsFragment.binding.viewModel,"Binding View Model Set")
+        notNull(foldersAndScriptsFragment.binding.folderAdapter,"Binding Folder Adapter Set")
+        notNull(foldersAndScriptsFragment.binding.scriptAdapter,"Binding Script Adapter Set")
+        notNull(foldersAndScriptsFragment.binding.goalAdapter,"Binding Goal Adapter Set")
+        areEqual(
+            foldersAndScriptsFragment.binding.collapsingToolbar.title.toString(),
+            activity.getString(R.string.books),
+            "Collapsing Toolbar Title Set To Books"
+        )
+        notNull(
+            foldersAndScriptsFragment.binding.topImageView.drawable,
+            "Top Image Drawable Is Not Null"
+        )
+        var currentSelection = foldersAndScriptsFragment.viewModel.showScripts.value?.value
+        var currentImage = foldersAndScriptsFragment.binding.switchFolderScriptButton.drawable
+        var currentAdapter = foldersAndScriptsFragment.binding.foldersAndScriptsList.adapter
+
+        // Switch to script
+        foldersAndScriptsFragment.binding.switchFolderScriptButton.performClick()
+        foldersAndScriptsFragment.binding.executePendingBindings()
+        notEqual(currentSelection,foldersAndScriptsFragment.viewModel.showScripts.value?.value,
+            "Switch Button Changed Selection")
+        notEqual(currentImage, foldersAndScriptsFragment.binding.switchFolderScriptButton.drawable,
+            "Switch Button Changed Image")
+        notEqual(currentAdapter, foldersAndScriptsFragment.binding.foldersAndScriptsList.adapter,
+            "Switch Button Changed Adapter")
+
+        currentSelection = foldersAndScriptsFragment.viewModel.showScripts.value?.value
+        currentImage = foldersAndScriptsFragment.binding.switchFolderScriptButton.drawable
+        currentAdapter = foldersAndScriptsFragment.binding.foldersAndScriptsList.adapter
+
+        // Switch back to folder
+        foldersAndScriptsFragment.binding.switchFolderScriptButton.performClick()
+        foldersAndScriptsFragment.binding.executePendingBindings()
+        notEqual(currentSelection,foldersAndScriptsFragment.viewModel.showScripts.value?.value,
+            "Switch Button Changed Selection")
+        notEqual(currentImage, foldersAndScriptsFragment.binding.switchFolderScriptButton.drawable,
+            "Switch Button Changed Image")
+        notEqual(currentAdapter, foldersAndScriptsFragment.binding.foldersAndScriptsList.adapter,
+            "Switch Button Changed Adapter")
+
+        // Switch to Edit Folder Fragment
+        foldersAndScriptsFragment.binding.addFolderScriptButton.performClick()
+        val editFolderFragment = activity.navController.currentFragmentClass as EditFolderFragment
+
+        notNull(editFolderFragment,"Edit Folder Fragment Retrieval")
+
+        notNull(editFolderFragment.binding,"Folders And Scripts Fragment Binding")
+        areEqual(-1L,repository.getScriptsOrGoalsFolderId().value,
+            "Correct Id Sent To Edit Folder")
+        areEqual(Folder.FolderType.SCRIPTS,repository.getScriptsOrGoalsFolderType().value,
+            "Correct Type Sent To Edit Folder")
+        isNull(editFolderFragment.viewModel.editFolder.value,
+            "Edit Folder Opened From Root")
+        areEqual(Folder.FolderType.SCRIPTS,
+            editFolderFragment.viewModel.folderType.value,
+            "Edit Folder ViewModel Folder Type")
+        activity.onBackPressedDispatcher.onBackPressed()
+
+        foldersAndScriptsFragment = activity.navController.currentFragmentClass as BooksFragment
+
+        notNull(foldersAndScriptsFragment,"Folders And Scripts Fragment Retrieval")
+        notNull(foldersAndScriptsFragment.binding,"Folders And Scripts Fragment Binding")
+        areEqual(-1L,
+            foldersAndScriptsFragment.viewModel.currentFolderId.value,
+            "FoldersASF ViewModel Current Folder ID")
+        areEqual(Folder.FolderType.SCRIPTS,
+            foldersAndScriptsFragment.viewModel.folderType.value,
+            "FoldersASF ViewModel Folder Type")
+        areEqual(-1L,
+            repository.getScriptsOrGoalsFolderId().value,
+            "Repository Folder ID")
+        areEqual(Folder.FolderType.SCRIPTS,
+            repository.getScriptsOrGoalsFolderType().value,
+            "Repository Folder Type")
+
+        notNull(foldersAndScriptsFragment.binding.viewModel,"Binding View Model Set")
+        notNull(foldersAndScriptsFragment.binding.folderAdapter,"Binding Folder Adapter Set")
+        notNull(foldersAndScriptsFragment.binding.scriptAdapter,"Binding Script Adapter Set")
+        notNull(foldersAndScriptsFragment.binding.goalAdapter,"Binding Goal Adapter Set")*/
+    }
+/*
     @Test
     fun testOrder(){
         activity = Robolectric.buildActivity(MainActivity::class.java)
             .create()  // Creates the activity
             .start()   // Starts the activity
             .resume()  // Resumes the activity to make it interactive
-            .get()     // Gets the activity instance
-        binding = activity.binding
+            .get()
         viewModel = activity.viewModel
-        repository = activity.viewModel.repository
 
         var passed = 0
         var failed = 0
@@ -296,7 +378,7 @@ class MainActivityTest {/*
         val reset = "\u001B[0m"
         println("All Tests: $green$passed$reset of $blue${passed+failed}$reset Passed")
     }
-
+*/
     private enum class MActivityTest {
         CoreClassesNotNull,
         CurrentFragmentIsHomeFragment,
@@ -411,31 +493,35 @@ class MainActivityTest {/*
             }
         }
     }
-
+/*
     private fun getTest(test: MActivityTest):MTest = when(test) {
         MActivityTest.CoreClassesNotNull -> MTest(
             "Core Classes Not Null",false
         ) { notNull, _, _, _ ->
-            notNull(binding,"binding")
-            notNull(viewModel,"viewModel")
-            notNull(repository,"repository")
+            notNull(activity,"activity")
+            notNull(activity.viewModel,"viewModel")
+            notNull(activity.viewModel.repository,"repository")
         }
 
         MActivityTest.CurrentFragmentIsHomeFragment -> MTest(
             "Current Fragment Is Home Fragment", false
         ) { notNull, _, areEqual, _ ->
-            notNull(viewModel.currentFragment.value,"viewModel.currentFragment.value")
-            areEqual(
-                AccountableFragment.HomeFragment,
-                viewModel.currentFragment.value,
-                "Current Fragment"
-            )
+            runSuspend {
+                notNull(activity.viewModel.currentFragment.value, "viewModel.currentFragment.value")
+                areEqual(
+                    AccountableFragment.HomeFragment,
+                    activity.viewModel.currentFragment.value,
+                    "Current Fragment"
+                )
+            }
         }
 
         MActivityTest.DirectionIsNull -> MTest(
             "Direction Is Null", false
         ){ _, isNull, _, _ ->
-            isNull(viewModel.direction.value,"ViewModel Direction Is Null")
+            runSuspend {
+                isNull(activity.viewModel.direction.first(), "ViewModel Direction Is Null")
+            }
         }
         MActivityTest.MainActivityInitialized -> MTest(
             "Main Activity Initialized", false
@@ -463,7 +549,7 @@ class MainActivityTest {/*
                 "Current Fragment"
             )
             val destinations = listOf(
-                AccountableFragment.GoalFragment,
+                AccountableFragment.GoalsFragment,
                 AccountableFragment.BooksFragment,
                 AccountableFragment.AppSettingsFragment,
                 AccountableFragment.HelpFragment,
@@ -1128,7 +1214,7 @@ class MainActivityTest {/*
             "Comparing Current Fragment"
         )
     }
-
+*/
     object Log {
         private const val RED = "\u001B[31m"
         private const val GREEN = "\u001B[32m"
@@ -1150,7 +1236,7 @@ class MainActivityTest {/*
             return 0
         }
     }
-
+/*
     private fun getUriFromDrawable(drawableId: Int): Uri {
         // Get the drawable resource
         val drawable = ResourcesCompat.getDrawable(activity.applicationContext.resources,drawableId, null)
@@ -1179,4 +1265,5 @@ class MainActivityTest {/*
         // Get the URI using FileProvider
         return Uri.fromFile(file)
     }
-}*/}
+    */
+}

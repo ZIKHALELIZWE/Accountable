@@ -12,6 +12,8 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
@@ -24,7 +26,7 @@ class MainActivityViewModel(
     val direction = repository.getDirection()
     val appSettings = repository.getAppSettings()
     val currentFragment = repository.getCurrentFragment()
-    val drawerState = mutableStateOf(DrawerState(DrawerValue.Closed))
+    val drawerState = mutableStateOf(DrawerValue.Closed)
     val drawerEnabled = mutableStateOf(true)
     var galleryLauncherReturnProcess: ((Uri?)->Unit)? = null
     var galleryLauncherMultipleReturnProcess: ((List<@JvmSuppressWildcards Uri>)->Unit)? = null
@@ -51,7 +53,9 @@ class MainActivityViewModel(
         isIntentActivity
     )
 
-
+    suspend fun directionChanged() {
+        repository.directionChanged()
+    }
     fun clearGalleryLaunchers(){
         setGalleryLauncherReturn()
         setGalleryLauncherMultipleReturn()
@@ -157,17 +161,18 @@ class MainActivityViewModel(
         drawerEnabled.value = false
     }
 
-    suspend fun toggleDrawer(open: Boolean? = null):Boolean{
+    fun toggleDrawer(open: Boolean? = null):Boolean{
         if (drawerEnabled.value) {
-            val drawerOpened = drawerState.value.isOpen
+            val drawerOpened = drawerState.value == DrawerValue.Open
             open?.let { open ->
-                if (open) drawerState.value.open()
+                if (open) drawerState.value = DrawerValue.Open
                 else{
-                    drawerState.value.close()
+                    drawerState.value = DrawerValue.Closed
                     return drawerOpened
                 }
             } ?: run {
-                drawerState.value.apply { if (isClosed) open() else close() }
+                if (drawerState.value == DrawerValue.Open) drawerState.value = DrawerValue.Closed
+                else drawerState.value = DrawerValue.Open
             }
         }
         return false

@@ -3,6 +3,7 @@ package com.thando.accountable
 import android.app.Activity
 import android.app.Application
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
@@ -75,7 +76,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val folder = MutableStateFlow<Folder?>(null)
     val showScripts = MutableStateFlow<MutableStateFlow<Boolean>?>(null)
     val folderOrder = MutableStateFlow<MutableStateFlow<Boolean>?>(null)
-    val listLoaded = MutableStateFlow( false)
+    val listLoaded = MutableStateFlow(false)
     val scrollStateParent = MutableStateFlow<LazyListState?>(null)
     val listShown = MutableStateFlow(getListShown(false))
 
@@ -94,8 +95,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     private val scriptsOrGoalsFolderType = MutableStateFlow(Folder.FolderType.SCRIPTS)
 
-    private val direction = MutableSharedFlow<AccountableFragment?>()
-    private val currentFragment = MutableStateFlow<AccountableFragment?>(null)
+    private val direction = MutableStateFlow<AccountableFragment?>(null)
+    private val currentFragment: MutableStateFlow<AccountableFragment?> = MutableStateFlow(null)
 
     private val script = MutableStateFlow<Script?>(null)
     private val scriptContentList = mutableStateListOf<Content>()
@@ -103,12 +104,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val isEditingScript = MutableStateFlow(false)
 
     private val markupLanguagesList = mutableStateListOf<MarkupLanguage>()
-    private val defaultMarkupLanguage = MutableStateFlow(MarkupLanguage())
+    private val defaultMarkupLanguage = MutableStateFlow(MarkupLanguage(
+        name = MutableStateFlow(application.getString(R.string.new_markup_language))
+    ))
     private val markupLanguageSelectedIndex = MutableStateFlow(-1)
 
     private val scriptTeleprompterSetting = MutableStateFlow<TeleprompterSettings?>(null)
     private val teleprompterSettingsList = mutableStateListOf<TeleprompterSettings>()
-    private val defaultTeleprompterSetting = MutableStateFlow(TeleprompterSettings())
+    private val defaultTeleprompterSetting = MutableStateFlow(TeleprompterSettings(
+        name = MutableStateFlow(
+            application.getString(R.string.default_settings)
+        )
+    ))
     private val teleprompterSettingsSelectedIndex = MutableStateFlow(-1)
 
     private val searchScrollPosition: LazyListState = LazyListState()
@@ -119,7 +126,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
     private val searchOccurrences: MutableStateFlow<Int> = MutableStateFlow(0)
     private val searchNumScripts: MutableStateFlow<Int> = MutableStateFlow(0)
     private val searchMenuOpen: MutableState<Boolean> = mutableStateOf(true)
-    private val searchScriptsList: SnapshotStateList<SearchViewModel.ScriptSearch> = mutableStateListOf()
+    private val searchScriptsList: SnapshotStateList<SearchViewModel.ScriptSearch> =
+        mutableStateListOf()
     private var isFromSearchFolder: Boolean = false
 
 
@@ -140,68 +148,187 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     init {
-        accountablePlayer.init(application)
-        repositoryScope.launch { loadAppSettings() }
+     // todo for some reason it won't run tests when this is active   accountablePlayer.init(application)
+        repositoryScope.launch {
+            appSettings.update { dao.appSettings() }
+
+            val loadInitialFolder: suspend (inputFolderType: Folder.FolderType) -> Unit = { type ->
+                scriptsOrGoalsFolderType.update { type }
+                loadFolder(INITIAL_FOLDER_ID)
+            }
+
+            if (appSettings.value?.initialFragment == AccountableFragment.BooksFragment) {
+                loadInitialFolder(Folder.FolderType.SCRIPTS)
+            } else if (appSettings.value?.initialFragment == AccountableFragment.GoalsFragment) {
+                loadInitialFolder(Folder.FolderType.GOALS)
+            }
+            currentFragment.value = appSettings.value?.initialFragment
+        }
     }
 
     override fun close() {
         accountablePlayer.onDestroy()
     }
 
-    fun getFolder(): StateFlow<Folder?>{ return folder }
-    fun getShowScripts(): StateFlow<MutableStateFlow<Boolean>?>{ return showScripts}
-    fun getFolderOrder(): StateFlow<MutableStateFlow<Boolean>?>{ return folderOrder }
-    fun getListLoaded(): StateFlow<Boolean>{ return listLoaded }
-    fun getScrollStateParent(): StateFlow<LazyListState?>{ return scrollStateParent }
-    fun getListShown() : StateFlow<Folder.FolderListType>{ return listShown }
+    fun getFolder(): StateFlow<Folder?> {
+        return folder
+    }
 
-    fun getAppSettings(): StateFlow<AppSettings?> { return appSettings }
-    fun getFoldersList(): StateFlow<Flow<List<Folder>>?> { return foldersList }
-    fun getScriptsList(): StateFlow<Flow<List<Script>>?> { return scriptsList }
-    fun getGoalsList(): StateFlow<Flow<List<Goal>>?> { return goalsList.asStateFlow() }
-    fun getEditFolder(): StateFlow<Folder?>{ return editFolder }
-    fun getNewEditFolder(): StateFlow<Folder?>{ return newEditFolder }
-    fun getNewGoal():StateFlow<Flow<Goal?>?> { return newGoal }
-    fun getGoal(): MutableStateFlow<Flow<Goal?>?> { return goal }
-    fun getDirection(): SharedFlow<AccountableFragment?>{ return direction }
-    fun getScriptsOrGoalsFolderType(): StateFlow<Folder.FolderType?> { return scriptsOrGoalsFolderType }
-    fun getCurrentFragment(): SharedFlow<AccountableFragment?>{ return currentFragment }
+    fun getShowScripts(): StateFlow<MutableStateFlow<Boolean>?> {
+        return showScripts
+    }
 
-    fun getScript(): StateFlow<Script?>{ return script }
-    fun getScriptContentList(): SnapshotStateList<Content>{ return scriptContentList }
-    fun getScriptMarkupLanguage(): StateFlow<MarkupLanguage?>{ return scriptMarkupLanguage }
-    fun getIsEditingScript(): MutableStateFlow<Boolean>{ return isEditingScript }
+    fun getFolderOrder(): StateFlow<MutableStateFlow<Boolean>?> {
+        return folderOrder
+    }
 
-    fun getMarkupLanguagesList(): SnapshotStateList<MarkupLanguage> { return markupLanguagesList }
-    fun getDefaultMarkupLanguage(): StateFlow<MarkupLanguage> { return defaultMarkupLanguage }
-    fun getMarkupLanguageSelectedIndex(): StateFlow<Int> { return markupLanguageSelectedIndex }
+    fun getListLoaded(): StateFlow<Boolean> {
+        return listLoaded
+    }
 
-    fun getScriptTeleprompterSetting(): StateFlow<TeleprompterSettings?> { return scriptTeleprompterSetting }
-    fun getTeleprompterSettingsList(): SnapshotStateList<TeleprompterSettings> { return teleprompterSettingsList }
-    fun getDefaultTeleprompterSettings(): StateFlow<TeleprompterSettings> { return defaultTeleprompterSetting }
-    fun getTeleprompterSettingsSelectedIndex(): StateFlow<Int> { return teleprompterSettingsSelectedIndex }
+    fun getScrollStateParent(): StateFlow<LazyListState?> {
+        return scrollStateParent
+    }
 
-    fun getSearchScrollPosition(): LazyListState { return searchScrollPosition }
-    fun getSearchString(): TextFieldState { return searchString }
-    fun getMatchCaseCheck(): MutableState<Boolean> { return matchCaseCheck }
-    fun getWordCheck(): MutableState<Boolean> { return wordCheck }
-    fun getSearchJob(): StateFlow<Job?> { return searchJob }
-    fun getSearchOccurrences(): StateFlow<Int> { return searchOccurrences }
-    fun getSearchNumScripts(): StateFlow<Int> { return searchNumScripts }
-    fun getSearchMenuOpen(): MutableState<Boolean> { return searchMenuOpen }
-    fun getSearchScriptsList(): SnapshotStateList<SearchViewModel.ScriptSearch> { return searchScriptsList }
+    fun getListShown(): StateFlow<Folder.FolderListType> {
+        return listShown
+    }
 
-    fun clearFolderLists(){
+    fun getAppSettings(): StateFlow<AppSettings?> {
+        return appSettings
+    }
+
+    fun getFoldersList(): StateFlow<Flow<List<Folder>>?> {
+        return foldersList
+    }
+
+    fun getScriptsList(): StateFlow<Flow<List<Script>>?> {
+        return scriptsList
+    }
+
+    fun getGoalsList(): StateFlow<Flow<List<Goal>>?> {
+        return goalsList.asStateFlow()
+    }
+
+    fun getEditFolder(): StateFlow<Folder?> {
+        return editFolder
+    }
+
+    fun getNewEditFolder(): StateFlow<Folder?> {
+        return newEditFolder
+    }
+
+    fun getNewGoal(): StateFlow<Flow<Goal?>?> {
+        return newGoal
+    }
+
+    fun getGoal(): MutableStateFlow<Flow<Goal?>?> {
+        return goal
+    }
+
+    fun getDirection(): MutableStateFlow<AccountableFragment?> {
+        return direction
+    }
+
+    fun getScriptsOrGoalsFolderType(): StateFlow<Folder.FolderType?> {
+        return scriptsOrGoalsFolderType
+    }
+
+    fun getCurrentFragment(): StateFlow<AccountableFragment?> {
+        return currentFragment
+    }
+
+    fun getScript(): StateFlow<Script?> {
+        return script
+    }
+
+    fun getScriptContentList(): SnapshotStateList<Content> {
+        return scriptContentList
+    }
+
+    fun getScriptMarkupLanguage(): StateFlow<MarkupLanguage?> {
+        return scriptMarkupLanguage
+    }
+
+    fun getIsEditingScript(): MutableStateFlow<Boolean> {
+        return isEditingScript
+    }
+
+    fun getMarkupLanguagesList(): SnapshotStateList<MarkupLanguage> {
+        return markupLanguagesList
+    }
+
+    fun getDefaultMarkupLanguage(): StateFlow<MarkupLanguage> {
+        return defaultMarkupLanguage
+    }
+
+    fun getMarkupLanguageSelectedIndex(): StateFlow<Int> {
+        return markupLanguageSelectedIndex
+    }
+
+    fun getScriptTeleprompterSetting(): StateFlow<TeleprompterSettings?> {
+        return scriptTeleprompterSetting
+    }
+
+    fun getTeleprompterSettingsList(): SnapshotStateList<TeleprompterSettings> {
+        return teleprompterSettingsList
+    }
+
+    fun getDefaultTeleprompterSettings(): StateFlow<TeleprompterSettings> {
+        return defaultTeleprompterSetting
+    }
+
+    fun getTeleprompterSettingsSelectedIndex(): StateFlow<Int> {
+        return teleprompterSettingsSelectedIndex
+    }
+
+    fun getSearchScrollPosition(): LazyListState {
+        return searchScrollPosition
+    }
+
+    fun getSearchString(): TextFieldState {
+        return searchString
+    }
+
+    fun getMatchCaseCheck(): MutableState<Boolean> {
+        return matchCaseCheck
+    }
+
+    fun getWordCheck(): MutableState<Boolean> {
+        return wordCheck
+    }
+
+    fun getSearchJob(): StateFlow<Job?> {
+        return searchJob
+    }
+
+    fun getSearchOccurrences(): StateFlow<Int> {
+        return searchOccurrences
+    }
+
+    fun getSearchNumScripts(): StateFlow<Int> {
+        return searchNumScripts
+    }
+
+    fun getSearchMenuOpen(): MutableState<Boolean> {
+        return searchMenuOpen
+    }
+
+    fun getSearchScriptsList(): SnapshotStateList<SearchViewModel.ScriptSearch> {
+        return searchScriptsList
+    }
+
+    fun clearFolderLists() {
         scriptsList.value = null
         foldersList.value = null
         goalsList.value = null
     }
 
     fun loadScriptsList(
-        ascendingOrder:Boolean,
-        folderNotAppSettings:Boolean,
+        ascendingOrder: Boolean,
+        folderNotAppSettings: Boolean,
         appendedUnit: (() -> Unit)? = null
-    ){
+    ) {
         loadScriptsListJob?.cancel()
         loadScriptsListJob = Job()
         CoroutineScope(Dispatchers.IO + loadScriptsListJob!!).launch {
@@ -210,57 +337,39 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 withContext(Dispatchers.Main) {
                     if (ascendingOrder) {
                         scriptsList.value = dao.getScripts(id)
-                    }
-                    else {
+                    } else {
                         scriptsList.value = dao.getScriptsDESC(id)
                     }
                 }
             }
-            withContext(Dispatchers.Main){ appendedUnit?.invoke() }
+            withContext(Dispatchers.Main) { appendedUnit?.invoke() }
             loadScriptsListJob?.complete()
             loadScriptsListJob = null
         }
     }
 
     fun loadGoalsList(
-        ascendingOrder:Boolean,
-        folderNotAppSettings:Boolean,
+        ascendingOrder: Boolean,
+        folderNotAppSettings: Boolean,
         appendedUnit: (() -> Unit)? = null
-    ){
+    ) {
         val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
         if (id != null) {
             if (ascendingOrder) {
-                goalsList.value = dao.getGoals(id).map { goals ->
-                    goals.forEach { goal ->
-                        goal.loadGoalTimes(dao)
-                        goal.loadDeliverables(dao)
-                        goal.loadTasks(dao)
-                        goal.loadMarkers(dao)
-                    }
-                    goals
-                }
-            }
-            else {
-                goalsList.value = dao.getGoalsDESC(id).map { goals ->
-                    goals.forEach { goal ->
-                        goal.loadGoalTimes(dao)
-                        goal.loadDeliverables(dao)
-                        goal.loadTasks(dao)
-                        goal.loadMarkers(dao)
-                    }
-                    goals
-                }
+                goalsList.value = getGoals(id)
+            } else {
+                goalsList.value = getGoalsDESC(id)
             }
         }
         appendedUnit?.invoke()
     }
 
     fun loadFoldersList(
-        ascendingOrder:Boolean,
-        folderNotAppSettings:Boolean,
-        folderTypeScriptsNotGoals:Boolean,
+        ascendingOrder: Boolean,
+        folderNotAppSettings: Boolean,
+        folderTypeScriptsNotGoals: Boolean,
         appendedUnit: (() -> Unit)? = null
-    ){
+    ) {
         loadFoldersListJob?.cancel()
         loadFoldersListJob = Job()
         CoroutineScope(Dispatchers.IO + loadFoldersListJob!!).launch {
@@ -270,10 +379,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     Folder.FolderType.SCRIPTS
                 else Folder.FolderType.GOALS
             withContext(Dispatchers.Main) {
-                if (ascendingOrder){
+                if (ascendingOrder) {
                     foldersList.value = dao.getFolders(id, type)
-                }
-                else{
+                } else {
                     foldersList.value = dao.getFoldersDESC(id, type)
                 }
                 appendedUnit?.invoke()
@@ -283,18 +391,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun loadFolder(folderIdInput: Long?=null){
-        val folderId:Long =
+    suspend fun loadFolder(folderIdInput: Long? = null) {
+        val folderId: Long =
             folderIdInput ?: (folder.value?.folderId ?: INITIAL_FOLDER_ID)
         folder.update {
-                if (folderId != INITIAL_FOLDER_ID) dao.getFolder(folderId).first()
-                else null
+            if (folderId != INITIAL_FOLDER_ID) dao.getFolder(folderId).first()
+            else null
         }
-        if (folder.value!=null){
+        if (folder.value != null) {
             showScripts.update { folder.value!!.folderShowScripts }
             scrollStateParent.update { folder.value!!.folderScrollPosition }
-        }
-        else{
+        } else {
             if (scriptsOrGoalsFolderType.value == Folder.FolderType.SCRIPTS) showScripts.update { appSettings.value?.showScripts }
             else if (scriptsOrGoalsFolderType.value == Folder.FolderType.GOALS) showScripts.update { appSettings.value?.showGoals }
             scrollStateParent.update { appSettings.value?.scrollPosition }
@@ -302,20 +409,21 @@ class AccountableRepository(val application: Application): AutoCloseable {
         loadFolderData()
     }
 
-    fun folderIsScripts(): Boolean { return scriptsOrGoalsFolderType.value == Folder.FolderType.SCRIPTS }
-
-    private fun getListShown(showScripts:Boolean): Folder.FolderListType{
-        return if (showScripts){
-            if (folderIsScripts()) Folder.FolderListType.SCRIPTS
-            else Folder.FolderListType.GOALS
-        }
-        else Folder.FolderListType.FOLDERS
+    fun folderIsScripts(): Boolean {
+        return scriptsOrGoalsFolderType.value == Folder.FolderType.SCRIPTS
     }
 
-    fun loadFolderData(){
+    private fun getListShown(showScripts: Boolean): Folder.FolderListType {
+        return if (showScripts) {
+            if (folderIsScripts()) Folder.FolderListType.SCRIPTS
+            else Folder.FolderListType.GOALS
+        } else Folder.FolderListType.FOLDERS
+    }
+
+    fun loadFolderData() {
         clearFolderLists()
         showScripts.value?.let { showScripts -> listShown.update { getListShown(showScripts.value) } }
-        if (folder.value !=null) {
+        if (folder.value != null) {
             if (folder.value?.folderShowScripts?.value == true) folderOrder.update {
                 folder.value?.folderScriptsOrder
             }
@@ -323,9 +431,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 folder.value?.folderFoldersOrder
             }
             folderOrder.value?.value?.let { loadContent(it) }
-        }
-        else if ( appSettings.value != null){
-            if (scriptsOrGoalsFolderType.value == Folder.FolderType.SCRIPTS){
+        } else if (appSettings.value != null) {
+            if (scriptsOrGoalsFolderType.value == Folder.FolderType.SCRIPTS) {
                 if (appSettings.value!!.showScripts.value)
                     folderOrder.update {
                         appSettings.value!!.scriptsOrder
@@ -334,8 +441,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     appSettings.value!!.foldersOrder
                 }
                 folderOrder.value?.value?.let { loadContent(it) }
-            }
-            else if(scriptsOrGoalsFolderType.value == Folder.FolderType.GOALS){
+            } else if (scriptsOrGoalsFolderType.value == Folder.FolderType.GOALS) {
                 if (appSettings.value!!.showGoals.value)
                     folderOrder.update {
                         appSettings.value!!.goalScriptsOrder
@@ -348,25 +454,23 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun loadContent(ascendingOrder: Boolean){
+    fun loadContent(ascendingOrder: Boolean) {
         listLoaded.update { false }
         val folderNotAppSettings = folder.value != null
         val folderTypeScriptsNotGoals = scriptsOrGoalsFolderType.value == Folder.FolderType.SCRIPTS
-        if (showScripts.value?.value == true){
+        if (showScripts.value?.value == true) {
             if (folderTypeScriptsNotGoals) {
                 loadScriptsList(
                     ascendingOrder = ascendingOrder,
                     folderNotAppSettings = folderNotAppSettings
                 )
-            }
-            else {
+            } else {
                 loadGoalsList(
                     ascendingOrder = ascendingOrder,
                     folderNotAppSettings = folderNotAppSettings
                 )
             }
-        }
-        else{
+        } else {
             loadFoldersList(
                 ascendingOrder = ascendingOrder,
                 folderNotAppSettings = folderNotAppSettings,
@@ -375,38 +479,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    private suspend fun loadAppSettings() {
-        withContext(Dispatchers.IO) {
-            appSettings.update { dao.appSettings() }
-
-            val loadInitialFolder: suspend (inputFolderType:Folder.FolderType) -> Unit = { type ->
-                scriptsOrGoalsFolderType.update { type }
-                loadFolder(INITIAL_FOLDER_ID)
-            }
-            when (currentFragment.value) {
-                null -> {
-                    if (appSettings.value?.initialFragment == AccountableFragment.BooksFragment) {
-                        loadInitialFolder(Folder.FolderType.SCRIPTS)
-                    } else if (appSettings.value?.initialFragment == AccountableFragment.GoalsFragment) {
-                        loadInitialFolder(Folder.FolderType.GOALS)
-                    }
-                    currentFragment.update { appSettings.value?.initialFragment }
-                }
-
-                AccountableFragment.BooksFragment -> {
-                    loadInitialFolder(Folder.FolderType.SCRIPTS)
-                }
-
-                AccountableFragment.GoalsFragment -> {
-                    loadInitialFolder(Folder.FolderType.GOALS)
-                }
-
-                else -> {}
-            }
-        }
-    }
-
-    fun updateAppSettings(){
+    fun updateAppSettings() {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 appSettings.value?.let { dao.update(it) }
@@ -414,7 +487,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun saveCustomAppSettingsImage(imageUri: Uri?){
+    fun saveCustomAppSettingsImage(imageUri: Uri?) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 appSettings.value?.saveImage(application, imageUri)
@@ -424,7 +497,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun restoreDefaultCustomAppSettingsImage(){
+    fun restoreDefaultCustomAppSettingsImage() {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 appSettings.value?.restoreDefaultFile(application)
@@ -433,7 +506,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun updateScriptsOrGoalsFolderScrollPosition(index: Int, offset: Int,appendedUnit:(()->Unit)?){
+    fun updateScriptsOrGoalsFolderScrollPosition(
+        index: Int,
+        offset: Int,
+        appendedUnit: (() -> Unit)?
+    ) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 if (folder.value == null) {
@@ -445,14 +522,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     folder.value?.folderScrollPosition?.requestScrollToItem(index, offset)
                     appSettings.value?.let { dao.update(it) }
                 }
-                withContext(Dispatchers.Main){
+                withContext(Dispatchers.Main) {
                     appendedUnit?.invoke()
                 }
             }
         }
     }
 
-    fun updateFolderShowScripts(appendedUnit : (suspend ()->Unit)?){
+    fun updateFolderShowScripts(appendedUnit: (suspend () -> Unit)?) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 if (folder.value == null) {
@@ -470,7 +547,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     // Navigation Code
-    fun changeFragment(newFragment: AccountableFragment){
+    fun changeFragment(newFragment: AccountableFragment) {
         currentFragment.value?.let { currentFragmentInScope ->
             val (validatedFragment, navArgs) = AccountableNavigationController.getFragmentDirections(
                 currentFragmentInScope,
@@ -500,13 +577,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    data class NavigationArguments(var isValidDir:Boolean = false){
-        var isDrawerFragment = false
-        var scriptsOrGoalsFolderId:Long? = null
-        var scriptsOrGoalsFolderType:Folder.FolderType? = null
+    suspend fun directionChanged() {
+        direction.emit(null)
     }
 
-    fun loadEditFolder(id:Long?){
+    data class NavigationArguments(var isValidDir: Boolean = false) {
+        var isDrawerFragment = false
+        var scriptsOrGoalsFolderId: Long? = null
+        var scriptsOrGoalsFolderType: Folder.FolderType? = null
+    }
+
+    fun loadEditFolder(id: Long?) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 withContext(Dispatchers.Main) {
@@ -521,7 +602,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun deleteFolder(id:Long?){
+    suspend fun deleteFolder(id: Long?) {
         withContext(Dispatchers.IO) {
             id?.let {
                 dao.deleteFolder(it, application)
@@ -529,15 +610,15 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun deleteGoal(id:Long?){
-        withContext(Dispatchers.IO){
+    suspend fun deleteGoal(id: Long?) {
+        withContext(Dispatchers.IO) {
             id?.let {
                 dao.deleteGoal(it, application)
             }
         }
     }
 
-    suspend fun deleteScript(id:Long?){
+    suspend fun deleteScript(id: Long?) {
         withContext(Dispatchers.IO) {
             id?.let {
                 dao.deleteScript(it, application)
@@ -545,13 +626,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun setNewEditFolder(editFolder:Folder?){
-        if (newEditFolder.value!=null) return
-        newEditFolder.value = withContext(Dispatchers.IO){
+    suspend fun setNewEditFolder(editFolder: Folder?) {
+        if (newEditFolder.value != null) return
+        newEditFolder.value = withContext(Dispatchers.IO) {
             clearNewEditFolder(runAsync = false, resetEditFolder = false)
             val newFolder = Folder(
                 folderType = scriptsOrGoalsFolderType.value,
-                folderParent = folder.value?.folderId?: INITIAL_FOLDER_ID
+                folderParent = folder.value?.folderId ?: INITIAL_FOLDER_ID
             )
 
             newFolder.folderId = dao.insert(newFolder)
@@ -578,7 +659,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    private suspend fun copyFolder(from:Folder,to:Folder){
+    private suspend fun copyFolder(from: Folder, to: Folder) {
         if (to.folderId == from.folderId) return
         to.folderName.setTextAndPlaceCursorAtEnd(from.folderName.text.toString())
         to.folderPosition = from.folderPosition
@@ -588,14 +669,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
         dao.update(to)
     }
 
-    suspend fun setNewEditFolderImage(imageUri: Uri?=null){
-        withContext(Dispatchers.IO){
-            if (imageUri!=null) newEditFolder.value?.saveImage(application, imageUri)
+    suspend fun setNewEditFolderImage(imageUri: Uri? = null) {
+        withContext(Dispatchers.IO) {
+            if (imageUri != null) newEditFolder.value?.saveImage(application, imageUri)
             dao.update(newEditFolder.value!!)
         }
     }
 
-    suspend fun clearNewEditFolder(runAsync:Boolean = true, resetEditFolder:Boolean = true){
+    suspend fun clearNewEditFolder(runAsync: Boolean = true, resetEditFolder: Boolean = true) {
         val unit = suspend {
             if (newEditFolder.value != null) {
                 newEditFolder.value!!.imageResource.deleteFile(application)
@@ -604,19 +685,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
             if (resetEditFolder) editFolder.value = null
             null
         }
-        if (runAsync)  newEditFolder.value = withContext(Dispatchers.IO){
+        if (runAsync) newEditFolder.value = withContext(Dispatchers.IO) {
             unit()
         }
-        else{
+        else {
             newEditFolder.value = unit()
         }
     }
 
-    suspend fun saveNewEditFolderToNewFolder(){
-        if (editFolder.value==null){
+    suspend fun saveNewEditFolderToNewFolder() {
+        if (editFolder.value == null) {
             newEditFolder.value?.let { dao.update(it) }
-        }
-        else{
+        } else {
             newEditFolder.value?.let {
                 copyFolder(it, editFolder.value!!)
                 it.deleteFile(application)
@@ -630,13 +710,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
         loadFolder()
     }
 
-    suspend fun deleteNewEditFolderImage(){
+    suspend fun deleteNewEditFolderImage() {
         withContext(Dispatchers.IO) {
             newEditFolder.value?.deleteFile(application)
         }
     }
 
-    fun appendIntentStringToScript(scriptId:Long, activity: Activity?){
+    fun appendIntentStringToScript(scriptId: Long, activity: Activity?) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 if (scriptId != INITIAL_FOLDER_ID) {
@@ -644,7 +724,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         isEditingScript.value = false
                         script.value = withContext(Dispatchers.IO) {
                             val tempScript = dao.getScriptNow(scriptId)
-                            withContext(Dispatchers.Main){
+                            withContext(Dispatchers.Main) {
                                 scriptMarkupLanguage.value = withContext(Dispatchers.IO) {
                                     tempScript!!.scriptMarkupLanguage.let { dao.getMarkupLanguage(it) }
                                 }
@@ -652,7 +732,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             tempScript
                         }
                         scriptContentList.clear()
-                        scriptContentList.addAll( withContext(Dispatchers.IO) {
+                        scriptContentList.addAll(withContext(Dispatchers.IO) {
                             dao.getContentList(scriptId)
                         })
                     }
@@ -664,7 +744,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         Toast.LENGTH_LONG
                     ).show()
                 } else if (!intentString.isNullOrEmpty()) {
-                    if (scriptContentList.lastIndex == -1 || scriptContentList.last().type != ContentType.TEXT){
+                    if (scriptContentList.lastIndex == -1 || scriptContentList.last().type != ContentType.TEXT) {
                         // Make a new TextProcessor and add the content's content
                         if (script.value != null && script.value!!.scriptId != null) {
                             scriptContentList.add(
@@ -684,24 +764,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     }
                 }
                 intentString = null
-                withContext(Dispatchers.Main){
+                withContext(Dispatchers.Main) {
                     activity?.finishAndRemoveTask()
                 }
             }
         }
     }
 
-    fun loadAndOpenGoal(goalId: Long){
+    fun loadAndOpenGoal(goalId: Long) {
         repositoryScope.launch {
             withContext(Dispatchers.Main) {
                 goal.value = withContext(Dispatchers.IO) {
-                    dao.getGoal(goalId).map { goal ->
-                        goal?.loadGoalTimes(dao)
-                        goal?.loadMarkers(dao)
-                        goal?.loadTasks(dao)
-                        goal?.loadDeliverables(dao)
-                        goal
-                    }
+                    getGoal(goalId)
                 }
             }
             withContext(Dispatchers.IO) {
@@ -718,7 +792,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun loadAndOpenScript(scriptId: Long){
+    suspend fun loadAndOpenScript(scriptId: Long) {
         withContext(Dispatchers.IO) {
             if (scriptId == INITIAL_FOLDER_ID) {
                 val parentId = folder.value?.folderId ?: INITIAL_FOLDER_ID
@@ -731,7 +805,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     )
                     scriptMarkupLanguage.value = null
                     isEditingScript.value = true
-                    script.value!!.scriptId = withContext(Dispatchers.IO) { dao.insert(script.value!!) }
+                    script.value!!.scriptId =
+                        withContext(Dispatchers.IO) { dao.insert(script.value!!) }
                     scriptContentList.clear()
                     appendTextFieldIfNeeded()
                 }
@@ -740,7 +815,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     isEditingScript.value = false
                     script.value = withContext(Dispatchers.IO) {
                         val tempScript = dao.getScriptNow(scriptId)
-                        withContext(Dispatchers.Main){
+                        withContext(Dispatchers.Main) {
                             scriptMarkupLanguage.value = withContext(Dispatchers.IO) {
                                 tempScript!!.scriptMarkupLanguage.let { dao.getMarkupLanguage(it) }
                             }
@@ -766,7 +841,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    private fun appendTextFieldIfNeeded(){
+    private fun appendTextFieldIfNeeded() {
         repositoryScope.launch {
             if (scriptContentList.lastIndex == -1 || scriptContentList.last().type != ContentType.TEXT) {
                 // Make a new TextProcessor and add the content's content
@@ -783,7 +858,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun deleteScriptImage(){
+    fun deleteScriptImage() {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 script.value?.deleteFile(application)
@@ -792,8 +867,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun saveScriptImage(uri: Uri?){
-        if (uri!=null){
+    fun saveScriptImage(uri: Uri?) {
+        if (uri != null) {
             repositoryScope.launch {
                 withContext(Dispatchers.IO) {
                     if (script.value?.scriptId == null) script.value?.let {
@@ -806,7 +881,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun saveScript(loadFolder:Boolean = false, appendedUnit: (() -> Unit)? = null){
+    fun saveScript(loadFolder: Boolean = false, appendedUnit: (() -> Unit)? = null) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 if (script.value?.scriptId == null) script.value?.let {
@@ -869,14 +944,20 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    private suspend fun saveContent(content: Content, position:Long):Long{
+    private suspend fun saveContent(content: Content, position: Long): Long {
         content.position = position
-        if (content.id==null) content.id = dao.insert(content)
+        if (content.id == null) content.id = dao.insert(content)
         else dao.update(content)
-        return position+1
+        return position + 1
     }
 
-    fun addContent(multipleContentList:List<Uri>?, contentType: ContentType, contentPosition: ContentPosition, item: Content, cursorPosition:Int?){
+    fun addContent(
+        multipleContentList: List<Uri>?,
+        contentType: ContentType,
+        contentPosition: ContentPosition,
+        item: Content,
+        cursorPosition: Int?
+    ) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 val inputIndex = when (contentPosition) {
@@ -894,7 +975,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             val bottomString =
                                 text.substring(cursorPosition, text.length)
 
-                            item.content.edit { replace(0,length,topString) }
+                            item.content.edit { replace(0, length, topString) }
                             val newContent = Content(
                                 type = ContentType.TEXT,
                                 script = script.value!!.scriptId!!,
@@ -945,7 +1026,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun deleteContent(content: Content){
+    fun deleteContent(content: Content) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 if (accountablePlayer.contains(content)) accountablePlayer.close(content)
@@ -959,7 +1040,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun printScriptEntry(){
+    fun printScriptEntry() {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 script.value?.scriptTitle?.let { title ->
@@ -1002,7 +1083,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun appendFileToScript(uri: Uri){
+    fun appendFileToScript(uri: Uri) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 script.value?.let {
@@ -1027,10 +1108,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return documentsDir + File.separator + folderName
     }
 
-    fun makeAccountableBackup(data: Intent?,
-                              pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-                              pushNotificationUnit: AtomicReference<(() -> Unit)?>
-    ){
+    fun makeAccountableBackup(
+        data: Intent?,
+        pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
+        pushNotificationUnit: AtomicReference<(() -> Unit)?>
+    ) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 data?.data?.let { uri ->
@@ -1056,20 +1138,27 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     var saveFile = docFile.findFile(fileName)
                     saveFile?.delete()
                     saveFile = docFile.createDirectory(fileName)
-                    saveFile?.createFile("application/x-sqlite3", dbFile.name+".db")?.let { outputFile ->
-                        application.contentResolver.openOutputStream(outputFile.uri ).use { output ->
-                            application.contentResolver.openInputStream(dbFile.toUri()).use { input ->
-                                if (output != null) {
-                                    input?.copyTo(output)
+                    saveFile?.createFile("application/x-sqlite3", dbFile.name + ".db")
+                        ?.let { outputFile ->
+                            application.contentResolver.openOutputStream(outputFile.uri)
+                                .use { output ->
+                                    application.contentResolver.openInputStream(dbFile.toUri())
+                                        .use { input ->
+                                            if (output != null) {
+                                                input?.copyTo(output)
+                                            }
+                                        }
                                 }
-                            }
                         }
-                    }
 
-                    val imageFile = DocumentFile.fromFile(File(application.filesDir.toString()+ File.separator + AppResources.ImageResource.DESTINATION_FOLDER))
-                    val videoFile = DocumentFile.fromFile(File(application.filesDir.toString()+ File.separator + AppResources.VideoResource.DESTINATION_FOLDER))
-                    val audioFile = DocumentFile.fromFile(File(application.filesDir.toString()+ File.separator + AppResources.AudioResource.DESTINATION_FOLDER))
-                    val documentFile = DocumentFile.fromFile(File(application.filesDir.toString()+ File.separator + AppResources.DocumentResource.DESTINATION_FOLDER))
+                    val imageFile =
+                        DocumentFile.fromFile(File(application.filesDir.toString() + File.separator + AppResources.ImageResource.DESTINATION_FOLDER))
+                    val videoFile =
+                        DocumentFile.fromFile(File(application.filesDir.toString() + File.separator + AppResources.VideoResource.DESTINATION_FOLDER))
+                    val audioFile =
+                        DocumentFile.fromFile(File(application.filesDir.toString() + File.separator + AppResources.AudioResource.DESTINATION_FOLDER))
+                    val documentFile =
+                        DocumentFile.fromFile(File(application.filesDir.toString() + File.separator + AppResources.DocumentResource.DESTINATION_FOLDER))
                     val itemsSaved = AtomicInteger(0)
                     val totalItems = imageFile.listFiles().size.plus(
                         videoFile.listFiles().size.plus(
@@ -1086,10 +1175,38 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     ) { notification ->
                         repositoryScope.launch {
                             withContext(Dispatchers.IO) {
-                                copyAppMediaToExternalFolder(AppResources.ImageResource.DESTINATION_FOLDER, imageFile, saveFile, notification, itemsSaved, totalItems)
-                                copyAppMediaToExternalFolder(AppResources.VideoResource.DESTINATION_FOLDER, videoFile, saveFile, notification, itemsSaved, totalItems)
-                                copyAppMediaToExternalFolder(AppResources.AudioResource.DESTINATION_FOLDER, audioFile, saveFile, notification, itemsSaved, totalItems)
-                                copyAppMediaToExternalFolder(AppResources.DocumentResource.DESTINATION_FOLDER, documentFile, saveFile, notification, itemsSaved, totalItems)
+                                copyAppMediaToExternalFolder(
+                                    AppResources.ImageResource.DESTINATION_FOLDER,
+                                    imageFile,
+                                    saveFile,
+                                    notification,
+                                    itemsSaved,
+                                    totalItems
+                                )
+                                copyAppMediaToExternalFolder(
+                                    AppResources.VideoResource.DESTINATION_FOLDER,
+                                    videoFile,
+                                    saveFile,
+                                    notification,
+                                    itemsSaved,
+                                    totalItems
+                                )
+                                copyAppMediaToExternalFolder(
+                                    AppResources.AudioResource.DESTINATION_FOLDER,
+                                    audioFile,
+                                    saveFile,
+                                    notification,
+                                    itemsSaved,
+                                    totalItems
+                                )
+                                copyAppMediaToExternalFolder(
+                                    AppResources.DocumentResource.DESTINATION_FOLDER,
+                                    documentFile,
+                                    saveFile,
+                                    notification,
+                                    itemsSaved,
+                                    totalItems
+                                )
                             }
                         }
                     }
@@ -1098,10 +1215,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun restoreAccountableDataFromBackup(data: Intent?,
-                                         pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-                                         pushNotificationUnit: AtomicReference<(() -> Unit)?>
-    ){
+    fun restoreAccountableDataFromBackup(
+        data: Intent?,
+        pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
+        pushNotificationUnit: AtomicReference<(() -> Unit)?>
+    ) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 data?.data?.let { uri ->
@@ -1128,7 +1246,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     application.contentResolver.openOutputStream(dbFile.toUri()).use { output ->
                         inputDbFile?.uri?.let { inputFile ->
                             application.contentResolver.openInputStream(inputFile).use { input ->
-                                if (output != null){
+                                if (output != null) {
                                     input?.copyTo(output)
                                 }
                             }
@@ -1139,14 +1257,15 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     val imageFile = docFile.findFile(AppResources.ImageResource.DESTINATION_FOLDER)
                     val videoFile = docFile.findFile(AppResources.VideoResource.DESTINATION_FOLDER)
                     val audioFile = docFile.findFile(AppResources.AudioResource.DESTINATION_FOLDER)
-                    val documentFile = docFile.findFile(AppResources.DocumentResource.DESTINATION_FOLDER)
+                    val documentFile =
+                        docFile.findFile(AppResources.DocumentResource.DESTINATION_FOLDER)
                     val itemsSaved = AtomicInteger(0)
                     val totalItems = (
                             imageFile?.listFiles()?.size?.plus(
                                 videoFile?.listFiles()?.size?.plus(
                                     audioFile?.listFiles()?.size?.plus(
                                         documentFile?.listFiles()?.size!!
-                                    )?: 0
+                                    ) ?: 0
                                 ) ?: 0
                             ) ?: 0)
                     AccountableNotification.createProgressNotification(
@@ -1157,10 +1276,38 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     ) { notification ->
                         repositoryScope.launch {
                             withContext(Dispatchers.IO) {
-                                copyAppMediaToExternalFolder(AppResources.ImageResource.DESTINATION_FOLDER, imageFile, saveFile, notification, itemsSaved, totalItems)
-                                copyAppMediaToExternalFolder(AppResources.VideoResource.DESTINATION_FOLDER, videoFile, saveFile, notification, itemsSaved, totalItems)
-                                copyAppMediaToExternalFolder(AppResources.AudioResource.DESTINATION_FOLDER, audioFile, saveFile, notification, itemsSaved, totalItems)
-                                copyAppMediaToExternalFolder(AppResources.DocumentResource.DESTINATION_FOLDER, documentFile, saveFile, notification, itemsSaved, totalItems)
+                                copyAppMediaToExternalFolder(
+                                    AppResources.ImageResource.DESTINATION_FOLDER,
+                                    imageFile,
+                                    saveFile,
+                                    notification,
+                                    itemsSaved,
+                                    totalItems
+                                )
+                                copyAppMediaToExternalFolder(
+                                    AppResources.VideoResource.DESTINATION_FOLDER,
+                                    videoFile,
+                                    saveFile,
+                                    notification,
+                                    itemsSaved,
+                                    totalItems
+                                )
+                                copyAppMediaToExternalFolder(
+                                    AppResources.AudioResource.DESTINATION_FOLDER,
+                                    audioFile,
+                                    saveFile,
+                                    notification,
+                                    itemsSaved,
+                                    totalItems
+                                )
+                                copyAppMediaToExternalFolder(
+                                    AppResources.DocumentResource.DESTINATION_FOLDER,
+                                    documentFile,
+                                    saveFile,
+                                    notification,
+                                    itemsSaved,
+                                    totalItems
+                                )
                                 dao = AccountableDatabase.getInstance(application).repositoryDao
                             }
                         }
@@ -1170,13 +1317,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    private suspend fun copyAppMediaToExternalFolder(inputFolder:String,
-                                                     inputDocumentFile: DocumentFile?,
-                                                     outputDocumentFile: DocumentFile?,
-                                                     notification: AccountableNotification,
-                                                     progress: AtomicInteger,
-                                                     total: Int
-    ){
+    private suspend fun copyAppMediaToExternalFolder(
+        inputFolder: String,
+        inputDocumentFile: DocumentFile?,
+        outputDocumentFile: DocumentFile?,
+        notification: AccountableNotification,
+        progress: AtomicInteger,
+        total: Int
+    ) {
         outputDocumentFile?.findFile(inputFolder)?.delete()
         outputDocumentFile?.createDirectory(inputFolder).let { imageDocFile ->
             inputDocumentFile?.listFiles()?.forEach { inputImage ->
@@ -1184,14 +1332,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     inputImage.name.let { name ->
                         if (name != null) {
                             imageDocFile?.createFile("", name)?.let { outputFile ->
-                                application.contentResolver.openOutputStream(outputFile.uri).use { output ->
-                                    if (output != null) {
-                                        input?.copyTo(output)
-                                        withContext(Dispatchers.Main) {
-                                            notification.updateNotification(progress.incrementAndGet(),total)
+                                application.contentResolver.openOutputStream(outputFile.uri)
+                                    .use { output ->
+                                        if (output != null) {
+                                            input?.copyTo(output)
+                                            withContext(Dispatchers.Main) {
+                                                notification.updateNotification(
+                                                    progress.incrementAndGet(),
+                                                    total
+                                                )
+                                            }
                                         }
                                     }
-                                }
                             }
                         }
                     }
@@ -1201,13 +1353,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     private fun getDateTimeFromMillis(): String {
-        val simpleDateFormat = SimpleDateFormat("dd-MM-yyyy-hh:mm", Locale.getDefault()).format(Date())
+        val simpleDateFormat =
+            SimpleDateFormat("dd-MM-yyyy-hh:mm", Locale.getDefault()).format(Date())
         return simpleDateFormat.format(System.currentTimeMillis())
     }
 
-    fun setAppSettingsTextSize(textSize:Int){
+    fun setAppSettingsTextSize(textSize: Int) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO){
+            withContext(Dispatchers.IO) {
                 if (appSettings.value != null) {
                     appSettings.value!!.textSize.update { textSize }
                     dao.update(appSettings.value!!)
@@ -1216,19 +1369,19 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun getMarkupLanguages(){
+    suspend fun getMarkupLanguages() {
         markupLanguagesList.clear()
-        markupLanguagesList.addAll( withContext(Dispatchers.IO){
+        markupLanguagesList.addAll(withContext(Dispatchers.IO) {
             val arrayList = dao.getMarkupLanguages().toMutableList()
-            if (script.value != null && script.value!!.scriptMarkupLanguage != null){
+            if (script.value != null && script.value!!.scriptMarkupLanguage != null) {
                 var exist = false
                 for (markupLanguage in arrayList) {
-                    if (markupLanguage.name.value == script.value!!.scriptMarkupLanguage){
+                    if (markupLanguage.name.value == script.value!!.scriptMarkupLanguage) {
                         exist = true
                         break
                     }
                 }
-                if (!exist){
+                if (!exist) {
                     script.value!!.scriptMarkupLanguage = null
                     dao.update(script.value!!)
                 }
@@ -1236,7 +1389,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
             var exist = false
             for (markupLanguage in arrayList) {
-                if (markupLanguage.name.value == defaultMarkupLanguage.value.name.value){
+                if (markupLanguage.name.value == defaultMarkupLanguage.value.name.value) {
                     exist = true
                     break
                 }
@@ -1252,13 +1405,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
     ) {
         withContext(Dispatchers.IO) {
             dao.delete(markupLanguage)
-            withContext(Dispatchers.Main){
+            withContext(Dispatchers.Main) {
                 appendedUnit?.invoke()
             }
         }
     }
 
-    suspend fun saveMarkupLanguage(similarList: List<String>, appendedUnit: (() -> Unit)?){
+    suspend fun saveMarkupLanguage(similarList: List<String>, appendedUnit: (() -> Unit)?) {
         withContext(Dispatchers.IO) {
             // skip the save if there are conflicting identifiers
             var isValid = false
@@ -1272,7 +1425,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun setMarkupLanguageToScript(set:Boolean, appendedUnit: (suspend () -> Unit)? = null){
+    fun setMarkupLanguageToScript(set: Boolean, appendedUnit: (suspend () -> Unit)? = null) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 script.value?.let { script ->
@@ -1281,8 +1434,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             script.scriptMarkupLanguage = it
                             dao.update(script)
                         }
-                    }
-                    else{
+                    } else {
                         script.scriptMarkupLanguage = null
                         dao.update(script)
                     }
@@ -1292,60 +1444,69 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun deleteDefaultMarkupLanguage(appendedUnit: (suspend () -> Unit)? = null){
-        deleteMarkupLanguage(defaultMarkupLanguage.value,appendedUnit)
+    suspend fun deleteDefaultMarkupLanguage(appendedUnit: (suspend () -> Unit)? = null) {
+        deleteMarkupLanguage(defaultMarkupLanguage.value, appendedUnit)
     }
 
-    fun setRepositoryMarkupLanguage(markupLanguage: MarkupLanguage?){
+    fun setRepositoryMarkupLanguage(markupLanguage: MarkupLanguage?) {
         scriptMarkupLanguage.value = markupLanguage
     }
 
-    fun spansNotSimilarAndNameUnique(similarList: List<String>, process:(isValid:Boolean, similarList:List<String>, nameUniqueErrorMessage:String)->Unit){
+    fun spansNotSimilarAndNameUnique(
+        similarList: List<String>,
+        process: (isValid: Boolean, similarList: List<String>, nameUniqueErrorMessage: String) -> Unit
+    ) {
         val index = markupLanguageSelectedIndex.value
-        if (index == -1 || index>=markupLanguagesList.size) return
+        if (index == -1 || index >= markupLanguagesList.size) return
         val indexName = markupLanguagesList[index].name.value
         var nameUniqueErrorMessage = ""
-        if (indexName.isEmpty() || indexName == MainActivity.ResourceProvider.getString(R.string.new_markup_language)) {
-            nameUniqueErrorMessage = MainActivity.ResourceProvider.getString(R.string.name_is_not_allowed, indexName)
-        }
-        else {
+        if (indexName.isEmpty() || indexName == application.getString(R.string.new_markup_language)) {
+            nameUniqueErrorMessage =
+                application.getString(R.string.name_is_not_allowed, indexName)
+        } else {
             for ((i, mLanguage) in markupLanguagesList.withIndex()) {
                 if (i != index && mLanguage.name.value == indexName) {
-                    nameUniqueErrorMessage = MainActivity.ResourceProvider.getString(
+                    nameUniqueErrorMessage = application.getString(
                         R.string.name_is_not_unique,
                         indexName
                     )
                 }
             }
         }
-        process(similarList.isEmpty() && nameUniqueErrorMessage.isEmpty(),similarList,nameUniqueErrorMessage)
+        process(
+            similarList.isEmpty() && nameUniqueErrorMessage.isEmpty(),
+            similarList,
+            nameUniqueErrorMessage
+        )
     }
 
-    suspend fun resetDefaultMarkupLanguage(appendedUnit: (suspend () -> Unit)? = null){
-        defaultMarkupLanguage.update { MarkupLanguage() }
+    suspend fun resetDefaultMarkupLanguage(appendedUnit: (suspend () -> Unit)? = null) {
+        defaultMarkupLanguage.update { MarkupLanguage(
+            name = MutableStateFlow(application.getString(R.string.new_markup_language))
+        ) }
         markupLanguagesList.clear()
         markupLanguageSelectedIndex.value = -1
         scriptMarkupLanguage.value = null
         appendedUnit?.invoke()
     }
 
-    fun setMarkupLanguageSelectedIndex(selection:Int){
+    fun setMarkupLanguageSelectedIndex(selection: Int) {
         markupLanguageSelectedIndex.value = selection
     }
 
-    suspend fun loadTeleprompterSettingsList(){
+    suspend fun loadTeleprompterSettingsList() {
         teleprompterSettingsList.clear()
-        teleprompterSettingsList.addAll(withContext(Dispatchers.IO){
+        teleprompterSettingsList.addAll(withContext(Dispatchers.IO) {
             val arrayList = ArrayList<TeleprompterSettings>(dao.getTeleprompterSettings())
-            if (script.value != null && script.value!!.scriptTeleprompterSettings == null){
+            if (script.value != null && script.value!!.scriptTeleprompterSettings == null) {
                 var exist = false
                 for (teleprompterSetting in arrayList) {
-                    if (teleprompterSetting.id == script.value!!.scriptTeleprompterSettings){
+                    if (teleprompterSetting.id == script.value!!.scriptTeleprompterSettings) {
                         exist = true
                         break
                     }
                 }
-                if (!exist){
+                if (!exist) {
                     script.value!!.scriptTeleprompterSettings = null
                     dao.update(script.value!!)
                 }
@@ -1353,7 +1514,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
             var exist = false
             for (teleprompterSetting in arrayList) {
-                if (teleprompterSetting.id == defaultTeleprompterSetting.value.id){
+                if (teleprompterSetting.id == defaultTeleprompterSetting.value.id) {
                     exist = true
                     break
                 }
@@ -1363,34 +1524,38 @@ class AccountableRepository(val application: Application): AutoCloseable {
         })
     }
 
-    suspend fun setRepositoryTeleprompterSetting(teleprompterSettings: TeleprompterSettings?){
+    suspend fun setRepositoryTeleprompterSetting(teleprompterSettings: TeleprompterSettings?) {
         scriptTeleprompterSetting.value = teleprompterSettings
         loadTeleprompterSpecialCharacters(teleprompterSettings)
     }
 
-    suspend fun resetDefaultTeleprompterSetting(appendedUnit: (suspend () -> Unit)? = null){
-        defaultTeleprompterSetting.value = TeleprompterSettings()
+    suspend fun resetDefaultTeleprompterSetting(appendedUnit: (suspend () -> Unit)? = null) {
+        defaultTeleprompterSetting.value = TeleprompterSettings(
+            name = MutableStateFlow(
+                application.getString(R.string.default_settings)
+            )
+        )
         teleprompterSettingsList.clear()
         teleprompterSettingsSelectedIndex.value = -1
         appendedUnit?.invoke()
     }
 
-    fun setTeleprompterSettingsSelectedIndex(selection:Int){
+    fun setTeleprompterSettingsSelectedIndex(selection: Int) {
         teleprompterSettingsSelectedIndex.value = selection
     }
 
-    suspend fun saveTeleprompterSettings(appendedUnit: (suspend (settingsId:Long?) -> Unit)? = null){
+    suspend fun saveTeleprompterSettings(appendedUnit: (suspend (settingsId: Long?) -> Unit)? = null) {
         scriptTeleprompterSetting.value?.let { teleprompterSettings ->
             val newId = dao.upsert(teleprompterSettings)
             teleprompterSettings.id = newId
             saveSpecialCharactersToDatabase(newId)
             appendedUnit?.invoke(newId)
-        }?:run {
+        } ?: run {
             appendedUnit?.invoke(null)
         }
     }
 
-    private suspend fun saveSpecialCharactersToDatabase(newId:Long){
+    private suspend fun saveSpecialCharactersToDatabase(newId: Long) {
         scriptTeleprompterSetting.value?.specialCharactersList?.forEach {
             if (it.canUpdateList()) {
                 it.teleprompterSettingsId = newId
@@ -1399,15 +1564,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun setTeleprompterSettingToScript(set:Boolean, appendedUnit: (suspend () -> Unit)? = null){
+    suspend fun setTeleprompterSettingToScript(
+        set: Boolean,
+        appendedUnit: (suspend () -> Unit)? = null
+    ) {
         script.value?.let { script ->
             if (set) {
                 scriptTeleprompterSetting.value?.id.let {
                     script.scriptTeleprompterSettings = it
                     dao.update(script)
                 }
-            }
-            else{
+            } else {
                 scriptTeleprompterSetting.value = null
                 script.scriptTeleprompterSettings = null
                 dao.update(script)
@@ -1419,8 +1586,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun deleteTeleprompterSetting(
         teleprompterSettings: TeleprompterSettings,
         deleteSpecialCharacters: Boolean = true,
-        operationsAfterDelete: suspend ()->Unit
-    ){
+        operationsAfterDelete: suspend () -> Unit
+    ) {
         withContext(Dispatchers.IO) {
             if (deleteSpecialCharacters) dao.deleteSpecialCharacters(
                 teleprompterSettings.id
@@ -1433,7 +1600,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun loadTeleprompterSpecialCharacters(teleprompterSettings: TeleprompterSettings?){
+    suspend fun loadTeleprompterSpecialCharacters(teleprompterSettings: TeleprompterSettings?) {
         teleprompterSettings?.let { teleprompterSettings ->
             teleprompterSettings.specialCharactersList.clear()
             teleprompterSettings.specialCharactersList.addAll(
@@ -1446,8 +1613,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun deleteTeleprompterSettingSpecialCharacter(teleprompterSettings: TeleprompterSettings,
-                                                  operationsAfterDelete: () -> Unit){
+    fun deleteTeleprompterSettingSpecialCharacter(
+        teleprompterSettings: TeleprompterSettings,
+        operationsAfterDelete: () -> Unit
+    ) {
         repositoryScope.launch {
             withContext(Dispatchers.IO) {
                 dao.deleteSpecialCharacters(teleprompterSettings.id)
@@ -1458,7 +1627,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun addSpecialCharacter(){
+    fun addSpecialCharacter() {
         scriptTeleprompterSetting.value?.let { scriptTeleprompterSetting ->
             repositoryScope.launch {
                 withContext(Dispatchers.IO) {
@@ -1476,17 +1645,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun deleteSpecialCharacter(specialCharacter: SpecialCharacters){
+    fun deleteSpecialCharacter(specialCharacter: SpecialCharacters) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO){
+            withContext(Dispatchers.IO) {
                 scriptTeleprompterSetting.value?.specialCharactersList?.removeIf { it == specialCharacter }
                 dao.delete(specialCharacter)
             }
         }
     }
 
-    fun setSearchScrollPosition(index:Int=0,offset:Int=0){
-        searchScrollPosition.requestScrollToItem(index,offset)
+    fun setSearchScrollPosition(index: Int = 0, offset: Int = 0) {
+        searchScrollPosition.requestScrollToItem(index, offset)
     }
 
     suspend fun getContentListNow(scriptId: Long?): List<Content> {
@@ -1494,7 +1663,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     inner class GoalContentPreview(
-        val id:Long
+        val id: Long
     ) {
         private var numAudios: MutableStateFlow<Int> = MutableStateFlow(0)
         private var numImages: MutableStateFlow<Int> = MutableStateFlow(0)
@@ -1504,7 +1673,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         private var description: MutableStateFlow<String> = MutableStateFlow("")
         private var displayImage: MutableStateFlow<Uri?> = MutableStateFlow(null)
 
-        fun init(finished:(()->Unit)?=null): Job {
+        fun init(finished: (() -> Unit)? = null): Job {
             return repositoryScope.launch {
                 /*withContext(Dispatchers.IO) {
                     val contentList: List<Content> = getContentListNow(id)
@@ -1578,17 +1747,37 @@ class AccountableRepository(val application: Application): AutoCloseable {
             }
         }
 
-        fun getNumAudios(): StateFlow<Int> { return numAudios }
-        fun getNumImages(): StateFlow<Int> { return numImages }
-        fun getNumVideos(): StateFlow<Int> { return numVideos }
-        fun getNumScripts(): StateFlow<Int> { return numScripts }
-        fun getNumDocuments(): StateFlow<Int> { return numDocuments }
-        fun getDescription(): StateFlow<String> { return description }
-        fun getDisplayImage(): StateFlow<Uri?> { return displayImage }
+        fun getNumAudios(): StateFlow<Int> {
+            return numAudios
+        }
+
+        fun getNumImages(): StateFlow<Int> {
+            return numImages
+        }
+
+        fun getNumVideos(): StateFlow<Int> {
+            return numVideos
+        }
+
+        fun getNumScripts(): StateFlow<Int> {
+            return numScripts
+        }
+
+        fun getNumDocuments(): StateFlow<Int> {
+            return numDocuments
+        }
+
+        fun getDescription(): StateFlow<String> {
+            return description
+        }
+
+        fun getDisplayImage(): StateFlow<Uri?> {
+            return displayImage
+        }
     }
 
     inner class ContentPreview(
-        val id:Long
+        val id: Long
     ) {
         private var numAudios: MutableStateFlow<Int> = MutableStateFlow(0)
         private var numImages: MutableStateFlow<Int> = MutableStateFlow(0)
@@ -1598,7 +1787,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         private var description: MutableStateFlow<String> = MutableStateFlow("")
         private var displayImage: MutableStateFlow<Uri?> = MutableStateFlow(null)
 
-        fun init(finished:(()->Unit)?=null): Job {
+        fun init(finished: (() -> Unit)? = null): Job {
             return repositoryScope.launch {
                 withContext(Dispatchers.IO) {
                     val contentList: List<Content> = getContentListNow(id)
@@ -1672,17 +1861,37 @@ class AccountableRepository(val application: Application): AutoCloseable {
             }
         }
 
-        fun getNumAudios(): StateFlow<Int> { return numAudios }
-        fun getNumImages(): StateFlow<Int> { return numImages }
-        fun getNumVideos(): StateFlow<Int> { return numVideos }
-        fun getNumScripts(): StateFlow<Int> { return numScripts }
-        fun getNumDocuments(): StateFlow<Int> { return numDocuments }
-        fun getDescription(): StateFlow<String> { return description }
-        fun getDisplayImage(): StateFlow<Uri?> { return displayImage }
+        fun getNumAudios(): StateFlow<Int> {
+            return numAudios
+        }
+
+        fun getNumImages(): StateFlow<Int> {
+            return numImages
+        }
+
+        fun getNumVideos(): StateFlow<Int> {
+            return numVideos
+        }
+
+        fun getNumScripts(): StateFlow<Int> {
+            return numScripts
+        }
+
+        fun getNumDocuments(): StateFlow<Int> {
+            return numDocuments
+        }
+
+        fun getDescription(): StateFlow<String> {
+            return description
+        }
+
+        fun getDisplayImage(): StateFlow<Uri?> {
+            return displayImage
+        }
     }
 
     suspend fun getFolderFolderNum(
-        folder:Folder
+        folder: Folder
     ) {
         withContext(Dispatchers.IO) {
             dao.getFolders(folder.folderId, folder.folderType).first().let { folders ->
@@ -1693,8 +1902,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun getFolderScriptGoalNum(
-        folder:Folder
-    ){
+        folder: Folder
+    ) {
         withContext(Dispatchers.IO) {
             when (folder.folderType) {
                 Folder.FolderType.SCRIPTS -> {
@@ -1704,7 +1913,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 }
 
                 Folder.FolderType.GOALS -> {
-                    dao.getGoals(folder.folderId).first().let { goals ->
+                    getGoals(folder.folderId).first().let { goals ->
                         folder.numGoals.update { goals.size }
                     }
                 }
@@ -1713,8 +1922,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     fun searchFragmentSearch(
-        searchComplete:(()->Unit)?=null
-    ){
+        context: Context,
+        searchComplete: (() -> Unit)? = null
+    ) {
         searchJob.value?.cancel()
         searchScriptsList.clear()
         searchJob.value = repositoryScope.launch {
@@ -1723,16 +1933,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 searchJob.value = null
                 return@launch
             }
-            withContext(Dispatchers.IO){
-                val title:String
+            withContext(Dispatchers.IO) {
+                val title: String
                 val id: Long = if (folder.value != null) {
                     title = folder.value!!.folderName.text.toString()
-                    folder.value!!.folderId?:return@withContext
+                    folder.value!!.folderId ?: return@withContext
                 } else {
                     title = application.getString(R.string.books)
-                    appSettings.value?.appSettingId?:return@withContext
+                    appSettings.value?.appSettingId ?: return@withContext
                 }
                 dao.searchFolderScripts(
+                    context,
                     id,
                     title,
                     searchString.text.toString().trim(),
@@ -1741,7 +1952,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     searchScriptsList,
                     searchOccurrences,
                     searchNumScripts
-                ){
+                ) {
                     searchJob.value = null
                     searchComplete?.invoke()
                 }
@@ -1749,20 +1960,20 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun setIsFromSearchFolderToTrue(appendedUnit: (suspend () -> Unit)?=null){
+    suspend fun setIsFromSearchFolderToTrue(appendedUnit: (suspend () -> Unit)? = null) {
         isFromSearchFolder = true
         appendedUnit?.invoke()
     }
 
-    fun isFromSearchFragment():Boolean{
+    fun isFromSearchFragment(): Boolean {
         val result = isFromSearchFolder
         isFromSearchFolder = false
         return result
     }
 
-    fun resetSearchData(appendedUnit: (() -> Unit)?=null){
+    fun resetSearchData(appendedUnit: (() -> Unit)? = null) {
         searchMenuOpen.value = true
-        searchScrollPosition.requestScrollToItem(0,0)
+        searchScrollPosition.requestScrollToItem(0, 0)
         searchString.clearText()
         matchCaseCheck.value = false
         wordCheck.value = false
@@ -1781,67 +1992,59 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun loadEditGoal(id: Long? = null){
+    suspend fun loadEditGoal(id: Long? = null) {
         withContext(Dispatchers.IO) {
-                if (id != null && id != INITIAL_FOLDER_ID){
-                    // Load Existing Goal
-                    val tempEditGoal = MutableStateFlow<Goal?>(
-                        getGoal(id).map { goal ->
-                            goal?.loadGoalTimes(dao)
-                            goal?.loadTasks(dao)
-                            goal?.loadMarkers(dao)
-                            goal?.loadDeliverables(dao)
-                            goal
-                        }.first()
-                        ?:return@withContext)
-                    val tempNewGoal = MutableStateFlow<Goal?>(Goal(
+            if (id != null && id != INITIAL_FOLDER_ID) {
+                // Load Existing Goal
+                val tempEditGoal = MutableStateFlow<Goal?>(
+                    getGoal(id).map { goal ->
+                        goal?.loadGoalTimes(dao)
+                        goal?.loadTasks(dao)
+                        goal?.loadMarkers(dao)
+                        goal?.loadDeliverables(dao)
+                        goal
+                    }.first()
+                        ?: return@withContext
+                )
+                val tempNewGoal = MutableStateFlow<Goal?>(
+                    Goal(
                         parent = tempEditGoal.value!!.parent
-                    ))
-                    cloneGoalTo(tempEditGoal.value,tempNewGoal)
-                    tempNewGoal.value?.let { newGoal ->
-                        dao.update(newGoal)
-                    }
-                    withContext(Dispatchers.Main){
-                        editGoal.value = tempEditGoal.value
-                        newGoal.value = dao.getGoal(tempNewGoal.value?.id).map { goal ->
-                            goal?.loadGoalTimes(dao)
-                            goal?.loadDeliverables(dao)
-                            goal?.loadTasks(dao)
-                            goal?.loadMarkers(dao)
-                            goal
-                        }
-                    }
+                    )
+                )
+                cloneGoalTo(tempEditGoal.value, tempNewGoal)
+                tempNewGoal.value?.let { newGoal ->
+                    dao.update(newGoal)
                 }
-                else {
-                    // Make New Goal
-                    withContext(Dispatchers.Main) {
-                        editGoal.value = null
-                        newGoal.update { withContext(Dispatchers.IO) {
+                withContext(Dispatchers.Main) {
+                    editGoal.value = tempEditGoal.value
+                    newGoal.value = getGoal(tempNewGoal.value?.id)
+                }
+            } else {
+                // Make New Goal
+                withContext(Dispatchers.Main) {
+                    editGoal.value = null
+                    newGoal.update {
+                        withContext(Dispatchers.IO) {
                             val tempGoal = Goal(
-                                parent = folder.value?.folderId?:INITIAL_FOLDER_ID,
-                                position = dao.getGoals(
-                                    folder.value?.folderId?:INITIAL_FOLDER_ID
+                                parent = folder.value?.folderId ?: INITIAL_FOLDER_ID,
+                                position = getGoals(
+                                    folder.value?.folderId ?: INITIAL_FOLDER_ID
                                 ).first().size.toLong()
                             )
                             tempGoal.id = dao.insert(tempGoal)
-                            dao.getGoal(tempGoal.id).map { goal ->
-                                goal?.loadGoalTimes(dao)
-                                goal?.loadDeliverables(dao)
-                                goal?.loadTasks(dao)
-                                goal?.loadMarkers(dao)
-                                goal
-                            }
-                        }}
+                            getGoal(tempGoal.id)
+                        }
                     }
                 }
+            }
         }
-        withContext(Dispatchers.IO){
+        withContext(Dispatchers.IO) {
             changeFragment(AccountableFragment.EditGoalFragment)
         }
     }
 
-    suspend fun setNewGoalImage(imageUri: Uri?=null){
-        withContext(Dispatchers.IO){
+    suspend fun setNewGoalImage(imageUri: Uri? = null) {
+        withContext(Dispatchers.IO) {
             newGoal.value?.first()?.let { newGoal ->
                 deleteNewGoalImage()
                 if (newGoal.id == null) newGoal.id = dao.insert(newGoal)
@@ -1851,7 +2054,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun deleteNewGoalImage(){
+    suspend fun deleteNewGoalImage() {
         withContext(Dispatchers.IO) {
             newGoal.value?.first()?.let { newGoal ->
                 newGoal.deleteFile(application)
@@ -1860,8 +2063,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun addNewGoalTimeBlock(){
-        withContext(Dispatchers.IO){
+    suspend fun addNewGoalTimeBlock() {
+        withContext(Dispatchers.IO) {
             newGoal.value?.first()?.let { newGoal ->
                 if (newGoal.id == null) newGoal.id = dao.insert(newGoal)
 
@@ -1882,7 +2085,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun saveNewGoal(process:suspend ()->Unit){
+    suspend fun saveNewGoal(process: suspend () -> Unit) {
         newGoal.value?.first()?.let { newGoal ->
             if (editGoal.value == null) {
                 editGoal.value = Goal(parent = newGoal.parent)
@@ -1901,8 +2104,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun cloneGoalTo(
-        from:Goal?,
-        to:MutableStateFlow<Goal?>
+        from: Goal?,
+        to: MutableStateFlow<Goal?>
     ) {
         from?.let { from ->
             to.value?.let { to ->
@@ -1934,41 +2137,55 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     from.imageResource.getUriFromStorage(application)
                 )
 
-                from.times.value?.first()?.let { fromTimes ->
-                    to.times.value?.first()?.forEach { toTime ->
+                cloneTimesTo(
+                    to.id,
+                    from.times,
+                    to.times,
+                    GoalTaskDeliverableTime.TimesType.GOAL
+                )
+
+                from.goalDeliverables.value?.first()?.let { fromDeliverables ->
+                    to.goalDeliverables.value?.first()?.forEach { toDeliverable ->
                         // Delete the ones that are not in from (originally in to)
                         if (
-                            !fromTimes.any { fromTime ->
-                                toTime.id == fromTime.cloneId
+                            !fromDeliverables.any { fromDeliverable ->
+                                toDeliverable.id == fromDeliverable.cloneId
                             }
                         ) {
-                            dao.delete(toTime)
+                            dao.delete(toDeliverable)
                         }
                     }
 
-                    for (time in fromTimes) {
+                    for (deliverable in fromDeliverables) {
                         to.id?.let { id ->
                             var shouldUpdate = true
-                            var newTime = to.times.value?.first()?.find { toTime -> toTime.id == time.cloneId }
-                            if (newTime == null) {
-                                newTime = GoalTaskDeliverableTime(
+                            var newDeliverable = to.goalDeliverables.value?.first()
+                                ?.find { toDeliverable -> toDeliverable.id == deliverable.cloneId }
+                            if (newDeliverable == null) {
+                                newDeliverable = Deliverable(
                                     parent = id,
-                                    type =
-                                        GoalTaskDeliverableTime.TimesType.GOAL.name
+                                    position = deliverable.position
                                 )
+                                newDeliverable.id = saveDeliverable(newDeliverable)
                                 shouldUpdate = false
                             } else {
-                                newTime.parent = id
-                                newTime.type = GoalTaskDeliverableTime.TimesType.GOAL.name
+                                newDeliverable.parent = id
+                                newDeliverable.position = deliverable.position
                             }
 
-                            newTime.timeBlockType = time.timeBlockType
-                            newTime.start = time.start
-                            newTime.duration = time.duration
-                            if (!shouldUpdate) {
-                                newTime.cloneId = time.id
+                            val fromMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(deliverable.id))
+                            val toMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(newDeliverable.id))
+                            cloneDeliverableTo(
+                                fromMutable,
+                                toMutable
+                            )
+
+                            toMutable.value?.first()?.let { newDeliverable ->
+                                if (!shouldUpdate) {
+                                    newDeliverable.cloneId = deliverable.id
+                                }
+                                newDeliverable.id = saveDeliverable(newDeliverable)
                             }
-                            newTime.id = saveGoalTaskDeliverableTime(newTime)
                         }
                     }
                 }
@@ -1976,8 +2193,54 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun clearNewGoal(){
-        withContext(Dispatchers.IO){
+    suspend fun cloneTimesTo(
+        toId: Long?,
+        fromTimes : MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>,
+        toTimes : MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>,
+        timesType : GoalTaskDeliverableTime.TimesType
+    ) {
+        fromTimes.value?.first()?.let { fromTimes ->
+            toTimes.value?.first()?.forEach { toTime ->
+                // Delete the ones that are not in from (originally in to)
+                if (
+                    !fromTimes.any { fromTime ->
+                        toTime.id == fromTime.cloneId
+                    }
+                ) {
+                    dao.delete(toTime)
+                }
+            }
+
+            for (time in fromTimes) {
+                toId?.let { id ->
+                    var shouldUpdate = true
+                    var newTime = toTimes.value?.first()
+                        ?.find { toTime -> toTime.id == time.cloneId }
+                    if (newTime == null) {
+                        newTime = GoalTaskDeliverableTime(
+                            parent = id,
+                            type = timesType.name
+                        )
+                        shouldUpdate = false
+                    } else {
+                        newTime.parent = id
+                        newTime.type = timesType.name
+                    }
+
+                    newTime.timeBlockType = time.timeBlockType
+                    newTime.start = time.start
+                    newTime.duration = time.duration
+                    if (!shouldUpdate) {
+                        newTime.cloneId = time.id
+                    }
+                    newTime.id = saveGoalTaskDeliverableTime(newTime)
+                }
+            }
+        }
+    }
+
+    suspend fun clearNewGoal() {
+        withContext(Dispatchers.IO) {
             newGoal.value?.first()?.let {
                 it.deleteFile(application)
                 it.times.value?.let { flowList -> for (time in flowList.first()) dao.delete(time) }
@@ -1988,7 +2251,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun goBackToGoalsFromEditGoal(){
+    suspend fun goBackToGoalsFromEditGoal() {
         withContext(Dispatchers.IO) {
             loadFolder()
             changeFragment(AccountableFragment.GoalsFragment)
@@ -2002,118 +2265,71 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun getTasks(parentId:Long, parentType: Task.TaskParentType): Flow<List<Task>> {
-        return dao.getTasks(parentId, parentType).map { tasks ->
-            tasks.forEach { task ->
-                task.loadTimes(dao)
-            }
-            tasks
-        }
-    }
-
-    fun getDeliverablesWithTimes(parentId:Long): Flow<List<Deliverable>> {
-        return dao.getDeliverables(parentId).map { deliverables ->
-            deliverables.forEach { deliverable ->
-                deliverable.loadTimes(dao)
-            }
-            deliverables
-        }
-    }
-
-    fun getMarkers(parentId:Long): Flow<List<Marker>> {
-        return dao.getMarkers(parentId)
-    }
-
     suspend fun cloneTaskTo(
-        from:MutableStateFlow<Task?>,
-        to:MutableStateFlow<Task?>
+        from: MutableStateFlow<Flow<Task?>?>,
+        to: MutableStateFlow<Flow<Task?>?>
     ) {
-        to.value?.let { to ->
-            from.value?.let { from ->
-                to.parent.value = from.parent.value
-                to.parentType.value = from.parentType.value
-                to.position.value = from.position.value
-                to.initialDateTime.value = from.initialDateTime.value
-                to.endDateTime.value = from.endDateTime.value
-                to.endType.value = from.endType.value
-                to.scrollPosition.requestScrollToItem(
-                    from.scrollPosition.firstVisibleItemIndex,
-                    from.scrollPosition.firstVisibleItemScrollOffset
-                )
-                to.task.setTextAndPlaceCursorAtEnd(from.task.text.toString())
-                to.type.value = from.type.value
-                to.quantity.value = from.quantity.value
-                to.time.value = from.time.value
-                to.status.value = from.status.value
-                to.colour.value = from.colour.value
-                to.location.setTextAndPlaceCursorAtEnd(from.location.text.toString())
-                to.size.value = from.size.value
-                to.numImages.value = from.numImages.value
-                to.numVideos.value = from.numVideos.value
-                to.numAudios.value = from.numAudios.value
-                to.numDocuments.value = from.numDocuments.value
-                to.numScripts.value = from.numScripts.value
+        to.value?.first()?.let { to ->
+            from.value?.first()?.let { from ->
+                to.parent = from.parent
+                to.parentType = from.parentType
+                to.position = from.position
+                to.initialDateTime = from.initialDateTime
+                to.endDateTime = from.endDateTime
+                to.endType = from.endType
+                to.scrollPosition = from.scrollPosition
+                to.task = from.task
+                to.type = from.type
+                to.quantity = from.quantity
+                to.time = from.time
+                to.status = from.status
+                to.colour = from.colour
+                to.location = from.location
+                to.size = from.size
+                to.numImages = from.numImages
+                to.numVideos = from.numVideos
+                to.numAudios = from.numAudios
+                to.numDocuments = from.numDocuments
+                to.numScripts = from.numScripts
 
                 if (to.id == null) to.id = saveTask(to)
-                from.times.value?.first()?.let { fromTimes ->
-                    to.times.value?.first()?.forEach { toTime ->
-                        // Delete the ones that are not in from (originally in to)
-                        if (
-                            !fromTimes.any { fromTime ->
-                                toTime.id == fromTime.cloneId
-                            }
-                        ) {
-                            dao.delete(toTime)
-                        }
-                    }
-
-                    for (time in fromTimes) {
-                        to.id?.let { id ->
-                            var shouldUpdate = true
-                            var newTime = to.times.value?.first()?.find { toTime -> toTime.id == time.cloneId }
-                            if (newTime == null) {
-                                newTime = GoalTaskDeliverableTime(
-                                    parent = id,
-                                    type = GoalTaskDeliverableTime.TimesType.TASK.name
-                                )
-                                shouldUpdate = false
-                            } else {
-                                newTime.parent = id
-                                newTime.type = GoalTaskDeliverableTime.TimesType.TASK.name
-                            }
-
-                            newTime.timeBlockType = time.timeBlockType
-                            newTime.start = time.start
-                            newTime.duration = time.duration
-                            if (!shouldUpdate) {
-                                newTime.cloneId = time.id
-                            }
-                            newTime.id = saveGoalTaskDeliverableTime(newTime)
-                        }
-                    }
-                }
+                cloneTimesTo(
+                    to.id,
+                    from.times,
+                    to.times,
+                    GoalTaskDeliverableTime.TimesType.TASK
+                )
             }
         }
     }
 
-    suspend fun getTaskClone(task: Task): Task? {
-        val mutableOriginal:MutableStateFlow<Task?> = MutableStateFlow(task)
-        val mutableReturn:MutableStateFlow<Task?> = MutableStateFlow(Task(
-            parent = mutableLongStateOf(task.parent.value),
-            parentType = mutableStateOf(task.parentType.value),
-            position = mutableLongStateOf(task.position.value),
-            type = mutableStateOf(task.type.value)
-        ))
-        cloneTaskTo(mutableOriginal,mutableReturn)
-        return mutableReturn.value
+    suspend fun getTaskClone(taskFlow: Flow<Task?>): Flow<Task?>? {
+        taskFlow.first()?.let { task ->
+            val mutableOriginal: MutableStateFlow<Flow<Task?>?> = MutableStateFlow(taskFlow)
+            val mutableReturn: MutableStateFlow<Flow<Task?>?> = MutableStateFlow(
+                getTask(
+                    insert(
+                        Task(
+                            parent = task.parent,
+                            parentType = task.parentType,
+                            position = task.position,
+                            type = task.type
+                        )
+                    )
+                )
+            )
+            cloneTaskTo(mutableOriginal, mutableReturn)
+            return mutableReturn.value
+        }
+        return null
     }
 
     suspend fun cloneDeliverableTo(
-        from:MutableStateFlow<Deliverable?>,
-        to:MutableStateFlow<Deliverable?>
+        from: MutableStateFlow<Flow<Deliverable?>?>,
+        to: MutableStateFlow<Flow<Deliverable?>?>
     ) {
-        from.value?.let { from ->
-            to.value?.let { to ->
+        from.value?.first()?.let { from ->
+            to.value?.first()?.let { to ->
                 to.parent = from.parent
                 to.position = from.position
                 to.initialDateTime = from.initialDateTime
@@ -2131,85 +2347,74 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.numScripts = from.numScripts
 
                 if (to.id == null) to.id = saveDeliverable(to)
-                from.times.value?.first()?.let { fromTimes ->
-                    to.times.value?.first()?.forEach { toTime ->
-                        // Delete the ones that are not in from (originally in to)
-                        if (
-                            !fromTimes.any { fromTime ->
-                                toTime.id == fromTime.cloneId
-                            }
-                        ) {
-                            dao.delete(toTime)
-                        }
-                    }
+                to.goalId = if (from.goalId!=null) to.id else null
 
-                    for (time in fromTimes) {
-                        to.id?.let { id ->
-                            var shouldUpdate = true
-                            var newTime = to.times.value?.first()?.find { toTime -> toTime.id == time.cloneId }
-                            if (newTime == null) {
-                                newTime = GoalTaskDeliverableTime(
-                                    parent = id,
-                                    type = GoalTaskDeliverableTime.TimesType.DELIVERABLE.name
-                                )
-                                shouldUpdate = false
-                            } else {
-                                newTime.parent = id
-                                newTime.type = GoalTaskDeliverableTime.TimesType.DELIVERABLE.name
-                            }
+                cloneTimesTo(
+                    to.id,
+                    from.times,
+                    to.times,
+                    GoalTaskDeliverableTime.TimesType.DELIVERABLE
+                )
 
-                            newTime.timeBlockType = time.timeBlockType
-                            newTime.start = time.start
-                            newTime.duration = time.duration
-                            if (!shouldUpdate) {
-                                newTime.cloneId = time.id
-                            }
-                            newTime.id = saveGoalTaskDeliverableTime(newTime)
-                        }
-                    }
-                }
+                saveDeliverable(to)
             }
         }
     }
 
-    suspend fun getDeliverableClone(deliverable: Deliverable): Deliverable? {
-        val mutableOriginal:MutableStateFlow<Deliverable?> = MutableStateFlow(deliverable)
-        val mutableReturn:MutableStateFlow<Deliverable?> = MutableStateFlow(Deliverable(
-            parent = deliverable.parent,
-            position = deliverable.position
-        ))
-        cloneDeliverableTo(mutableOriginal,mutableReturn)
-        return mutableReturn.value
+    suspend fun getDeliverableClone(deliverableFlow: Flow<Deliverable?>): Flow<Deliverable?>? {
+        deliverableFlow.first()?.let { deliverable ->
+            val mutableOriginal: MutableStateFlow<Flow<Deliverable?>?> =
+                MutableStateFlow(deliverableFlow)
+            val mutableReturn: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(
+                getDeliverable(
+                    insert(
+                        Deliverable(
+                            parent = deliverable.parent,
+                            position = deliverable.position
+                        )
+                    )
+                )
+            )
+            cloneDeliverableTo(mutableOriginal, mutableReturn)
+            return mutableReturn.value
+        }
+        return null
     }
 
     suspend fun cloneMarkerTo(
-        from:MutableStateFlow<Marker?>,
-        to:MutableStateFlow<Marker?>
+        from: MutableStateFlow<Flow<Marker?>?>,
+        to: MutableStateFlow<Flow<Marker?>?>
     ) {
-        from.value?.let { from ->
-            to.value?.let { to ->
-                to.parent.value = from.parent.value
-                to.position.value = from.position.value
-                to.dateTime.value = from.dateTime.value
-                to.scrollPosition.requestScrollToItem(
-                    from.scrollPosition.firstVisibleItemIndex,
-                    from.scrollPosition.firstVisibleItemScrollOffset
-                )
-                to.marker.setTextAndPlaceCursorAtEnd(from.marker.text.toString())
+        from.value?.first()?.let { from ->
+            to.value?.first()?.let { to ->
+                to.parent = from.parent
+                to.position = from.position
+                to.dateTime = from.dateTime
+                to.scrollPosition = from.scrollPosition
+                to.marker = from.marker
 
                 if (to.id == null) to.id = saveMarker(to)
             }
         }
     }
 
-    suspend fun getMarkerClone(marker: Marker): Marker? {
-        val mutableOriginal:MutableStateFlow<Marker?> = MutableStateFlow(marker)
-        val mutableReturn:MutableStateFlow<Marker?> = MutableStateFlow(Marker(
-            parent = mutableStateOf(marker.parent.value),
-            position = mutableStateOf(marker.position.value)
-        ))
-        cloneMarkerTo(mutableOriginal,mutableReturn)
-        return mutableReturn.value
+    suspend fun getMarkerClone(markerFlow: Flow<Marker?>): Flow<Marker?>? {
+        markerFlow.first()?.let { marker ->
+            val mutableOriginal: MutableStateFlow<Flow<Marker?>?> = MutableStateFlow(markerFlow)
+            val mutableReturn: MutableStateFlow<Flow<Marker?>?> = MutableStateFlow(
+                getMarker(
+                    insert(
+                        Marker(
+                            parent = marker.parent,
+                            position = marker.position
+                        )
+                    )
+                )
+            )
+            cloneMarkerTo(mutableOriginal, mutableReturn)
+            return mutableReturn.value
+        }
+        return null
     }
 
     suspend fun saveGoal(goal: Goal): Long {
@@ -2232,6 +2437,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return dao.upsert(goalTaskDeliverableTime)
     }
 
+    suspend fun insert(goal: Goal): Long = dao.insert(goal)
+    suspend fun insert(task: Task): Long = dao.insert(task)
+    suspend fun insert(marker: Marker): Long = dao.insert(marker)
+    suspend fun insert(deliverable: Deliverable): Long = dao.insert(deliverable)
+    suspend fun update(goal: Goal) = dao.update(goal)
+    suspend fun update(task: Task) = dao.update(task)
+    suspend fun update(marker: Marker) = dao.update(marker)
+    suspend fun update(timeBlock: GoalTaskDeliverableTime) = dao.update(timeBlock)
+    suspend fun update(deliverable: Deliverable) = dao.update(deliverable)
+
+    suspend fun delete(deliverable: Deliverable) = dao.delete(deliverable)
+
     suspend fun deleteTask(task: Task) {
         dao.delete(task)
     }
@@ -2247,20 +2464,71 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun deleteGoalTaskDeliverableTime(goalTaskDeliverableTime: GoalTaskDeliverableTime) {
         dao.delete(goalTaskDeliverableTime)
     }
+    fun getGoal(goalId: Long?): Flow<Goal?> = dao.getGoal(goalId).map { goal ->
+        goal?.loadGoalTimes(dao)
+        goal?.loadTasks(dao)
+        goal?.loadMarkers(dao)
+        goal?.loadDeliverables(dao)
+        goal
+    }
 
-    suspend fun insert(goal: Goal): Long = dao.insert(goal)
-    suspend fun update(goal: Goal) = dao.update(goal)
-    suspend fun delete(goal: Goal) = dao.delete(goal)
-    fun getGoal(goalId: Long?): Flow<Goal?> = dao.getGoal(goalId)
-    fun getGoals(parent: Long?): Flow<List<Goal>> = dao.getGoals(parent)
-    fun getGoalsDESC(parent: Long?): Flow<List<Goal>> = getGoalsDESC(parent)
+    fun getTask(taskId: Long?): Flow<Task?> = dao.getTask(taskId).map { task ->
+        task?.loadTimes(dao)
+        task
+    }
 
-    suspend fun insert(deliverable: Deliverable): Long = dao.insert(deliverable)
-    suspend fun update(deliverable: Deliverable) = dao.update(deliverable)
-    suspend fun delete(deliverable: Deliverable) = dao.delete(deliverable)
-    fun getDeliverables(goalId:Long?): Flow<List<Deliverable>> = dao.getDeliverables(goalId)
-    fun getDeliverable(deliverableId: Long?): Flow<Deliverable?> = dao.getDeliverable(deliverableId)
-    fun getGoalDeliverables(goalId: Long?): Flow<List<Deliverable>> = dao.getGoalDeliverables(goalId)
+    fun getMarker(markerId: Long?): Flow<Marker?> = dao.getMarker(markerId)
+    fun getGoals(parent: Long?): Flow<List<Goal>> = dao.getGoals(parent).map { goals ->
+        goals.forEach { goal ->
+            goal.loadGoalTimes(dao)
+            goal.loadTasks(dao)
+            goal.loadMarkers(dao)
+            goal.loadDeliverables(dao)
+        }
+        goals
+    }
 
-    suspend fun update(timeBlock: GoalTaskDeliverableTime) = dao.update(timeBlock)
+    fun getGoalsDESC(parent: Long?): Flow<List<Goal>> = dao.getGoalsDESC(parent).map { goals ->
+        goals.forEach { goal ->
+            goal.loadGoalTimes(dao)
+            goal.loadTasks(dao)
+            goal.loadMarkers(dao)
+            goal.loadDeliverables(dao)
+        }
+        goals
+    }
+
+    fun getDeliverable(deliverableId: Long?): Flow<Deliverable?> =
+        dao.getDeliverable(deliverableId).map { deliverable ->
+            deliverable?.loadTimes(dao)
+            deliverable
+        }
+
+    fun getGoalDeliverables(goalId: Long?): Flow<List<Deliverable>> =
+        dao.getGoalDeliverables(goalId).map { deliverables ->
+            deliverables.forEach { deliverable -> deliverable.loadTimes(dao) }
+            deliverables
+        }
+
+    fun getTasks(parentId: Long, parentType: Task.TaskParentType): Flow<List<Task>> {
+        return dao.getTasks(parentId, parentType).map { tasks ->
+            tasks.forEach { task ->
+                task.loadTimes(dao)
+            }
+            tasks
+        }
+    }
+
+    fun getDeliverablesWithTimes(parentId: Long): Flow<List<Deliverable>> {
+        return dao.getDeliverables(parentId).map { deliverables ->
+            deliverables.forEach { deliverable ->
+                deliverable.loadTimes(dao)
+            }
+            deliverables
+        }
+    }
+
+    fun getMarkers(parentId: Long): Flow<List<Marker>> {
+        return dao.getMarkers(parentId)
+    }
 }

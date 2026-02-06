@@ -144,15 +144,18 @@ interface RepositoryDao {
     @Transaction
     suspend fun deleteGoal(goalId: Long?, context: Context){
         val goal = getGoal(goalId).first()?:return
-        /* todo this is where you delete whatever is inside goal
-
-        val contentList = getContentListNow(script.scriptId)
-        contentList?.forEach {
-            deleteContent(it,context)
-        }*/
         goal.deleteFile(context)
+        val deliverables = getDeliverables(goalId).first()
+        deliverables.forEach { deliverable -> deleteDeliverable(deliverable) }
+        val tasks = getTasks(goalId, Task.TaskParentType.GOAL).first()
+        tasks.forEach { task -> deleteTask(task) }
+        val markers = getMarkers(goalId).first()
+        markers.forEach { marker -> deleteMarker(marker) }
+        val times = getTimes(goalId, GoalTaskDeliverableTime.TimesType.GOAL).first()
+        times.forEach { time -> delete(time) }
+
         // Fix goal Positions
-        /*val goals = getGoalsNow(goal.parent)
+        val goals = getGoals(goal.parent).first()
         var passedGoal = false
         goals.forEach {
             if (!passedGoal){
@@ -161,8 +164,49 @@ interface RepositoryDao {
                 it.position -= 1
                 update(it)
             }
-        }*/
+        }
         delete(goal)
+    }
+
+    @Transaction
+    suspend fun deleteDeliverable(deliverable: Deliverable){
+        val times = getTimes(deliverable.id, GoalTaskDeliverableTime.TimesType.GOAL).first()
+        times.forEach { time -> delete(time) }
+        delete(deliverable)
+    }
+
+    @Transaction
+    suspend fun deleteTask(task: Task) {
+        val times = getTimes(task.id, GoalTaskDeliverableTime.TimesType.TASK).first()
+        times.forEach { time -> delete(time) }
+        // Fix task Positions
+        val tasks = getTasks(task.parent, Task.TaskParentType.GOAL).first()
+        var passedTask = false
+        tasks.forEach {
+            if (!passedTask){
+                if (it.id == task.id) passedTask = true
+            } else{
+                it.position -= 1
+                update(it)
+            }
+        }
+        delete(task)
+    }
+
+    @Transaction
+    suspend fun deleteMarker(marker: Marker) {
+        // Fix marker Positions
+        val markers = getMarkers(marker.parent).first()
+        var passedMarker = false
+        markers.forEach {
+            if (!passedMarker){
+                if (it.id == marker.id) passedMarker = true
+            } else{
+                it.position -= 1
+                update(it)
+            }
+        }
+        delete(marker)
     }
 
     @Transaction
@@ -429,7 +473,7 @@ interface RepositoryDao {
     suspend fun getContentListNow(scriptId:Long?): List<Content>
 
     @Query("SELECT * FROM app_settings_table WHERE appSettingId = 1")
-    suspend fun getAppSettingsNow(): AppSettings?
+    fun getAppSettings(): Flow<AppSettings?>
 
     @Query("SELECT * FROM script_table WHERE scriptId = :scriptId")
     suspend fun getScriptNow(scriptId:Long?): Script?
@@ -442,9 +486,6 @@ interface RepositoryDao {
 
     @Query("SELECT * FROM special_characters WHERE teleprompter_settings_id = :teleprompterSettingsId")
     suspend fun getScriptSpecialCharacters(teleprompterSettingsId:Long?): List<SpecialCharacters>
-
-    @Query("DELETE FROM content_table WHERE id = :contentId")
-    fun deleteContent(contentId: Long?)
 
     @Query("SELECT * FROM markup_language_table WHERE name = :markupLanguageName")
     suspend fun getMarkupLanguage(markupLanguageName:String?): MarkupLanguage?
@@ -476,9 +517,6 @@ interface RepositoryDao {
     @Query("SELECT * FROM marker_table WHERE marker_parent = :goalId")
     fun getMarkers(goalId:Long?): Flow<List<Marker>>
 
-    @Query("SELECT * FROM marker_table")
-    suspend fun getAllMarkers(): List<Marker>
-
     @Query("SELECT * FROM task_table WHERE id = :taskId")
     fun getTask(taskId: Long?): Flow<Task?>
 
@@ -496,16 +534,17 @@ interface RepositoryDao {
 
     @Transaction
     suspend fun appSettings(): AppSettings {
-        var appSettings = getAppSettingsNow()
+        var appSettings = getAppSettings().first()
         if (appSettings==null){
             insert(AppSettings())
-            appSettings = getAppSettingsNow()
+            appSettings = getAppSettings().first()
         }
         return appSettings!!
     }
 
     @Transaction
     suspend fun searchFolderScripts(
+        context: Context,
         id:Long,
         title:String,
         searchString:String,
@@ -532,7 +571,7 @@ interface RepositoryDao {
             var hasContent = false
             if (list.isNotEmpty()) {
                 list.forEach { withContext(Dispatchers.Main) { searchOccurrences.value += it.second.size } }
-                scriptSearch.addRanges(list)
+                scriptSearch.addRanges(context,list)
                 hasContent = true
             }
             if (hasContent) {

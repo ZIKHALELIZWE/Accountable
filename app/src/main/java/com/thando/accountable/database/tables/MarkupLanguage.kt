@@ -83,7 +83,7 @@ import kotlin.reflect.KFunction4
 @Entity(tableName = "markup_language_table")
 data class MarkupLanguage(
     @PrimaryKey
-    var name: MutableStateFlow<String> = MutableStateFlow(MainActivity.ResourceProvider.getString(R.string.new_markup_language)),
+    var name: MutableStateFlow<String>,
 
     @ColumnInfo(name = "opening")
     var opening: TextFieldState = TextFieldState(""),

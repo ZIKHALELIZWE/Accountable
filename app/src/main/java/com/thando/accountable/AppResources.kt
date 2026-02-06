@@ -6,13 +6,10 @@ import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
 import android.graphics.drawable.Drawable
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.widget.Toast
 import androidx.annotation.AnyRes
-import androidx.annotation.StringRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TimePickerState
 import androidx.compose.runtime.Composable
@@ -22,7 +19,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.drawable.toBitmap
-import androidx.databinding.ObservableField
 import com.thando.accountable.database.tables.AppSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,7 +27,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
@@ -43,7 +38,6 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.Period
 import java.util.Calendar
-import kotlin.coroutines.CoroutineContext
 
 
 sealed class AppResources {

@@ -1,7 +1,5 @@
 package com.thando.accountable.database.tables
 
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.util.packInts
 import androidx.room.ColumnInfo
@@ -47,7 +45,7 @@ data class Deliverable (
     var location: String = "",
 
     @ColumnInfo (name = "deliverable_goal_id")
-    val goalId: Long? = null,
+    var goalId: Long? = null,
 
     @ColumnInfo (name = "deliverable_size")
     var size: Float = 0F,
@@ -79,6 +77,9 @@ data class Deliverable (
 
     @Ignore
     val locationFocusRequester = FocusRequester()
+
+    @Ignore
+    var cloneId: Long? = null
 
     fun loadTimes(dao: RepositoryDao) {
         times.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.DELIVERABLE)

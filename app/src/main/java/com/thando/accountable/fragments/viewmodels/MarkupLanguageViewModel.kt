@@ -49,7 +49,7 @@ class MarkupLanguageViewModel(
     val openingClosingExampleSpannedString = SpannedString("")
 
     private var changeNameFunction: ()->Unit = {}
-    private val _deleteButtonText = MutableStateFlow(MainActivity.ResourceProvider.getString(R.string.restore_default_settings))
+    private val _deleteButtonText = MutableStateFlow(repository.application.getString(R.string.restore_default_settings))
     val deleteButtonText: StateFlow<String> get() = _deleteButtonText
     private var deleteButtonFunction: ()->Unit = {}
     private val _showNameNotUniqueSnackBar = MutableSharedFlow<String>()

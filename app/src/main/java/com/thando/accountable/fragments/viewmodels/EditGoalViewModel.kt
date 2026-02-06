@@ -10,10 +10,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableRepository
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
+import com.thando.accountable.database.tables.Marker
+import com.thando.accountable.database.tables.Task
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.addDeliverableCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.addTimeBlockCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.deleteClickedDeliverable
@@ -26,6 +29,7 @@ import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.saveC
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showBottomSheetCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showInputError
 import com.thando.accountable.ui.cards.ColourPickerDialog
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import java.time.LocalDateTime
@@ -42,10 +46,10 @@ class EditGoalViewModel(
     val locationFocusRequester = FocusRequester()
     val colourFocusRequester = FocusRequester()
     val colourPickerDialog = ColourPickerDialog()
-    val deliverable: MutableStateFlow<Deliverable?> = MutableStateFlow(null)
-    val originalDeliverable = MutableStateFlow<Deliverable?>(null)
+    val deliverable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(null)
+    val originalDeliverable = MutableStateFlow<Flow<Deliverable?>?>(null)
     val triedToSaveBottomSheet = MutableStateFlow(false)
-    val bottomSheetType = mutableStateOf<Goal.GoalTab?>(null)
+    val bottomSheetType = MutableStateFlow<Goal.GoalTab?>(null)
 
     private fun showError(
         message: Int,
@@ -134,6 +138,18 @@ class EditGoalViewModel(
         repository.update(timeBlock)
     }
 
+    suspend fun updateDeliverable(deliverable: Deliverable) {
+        repository.update(deliverable)
+    }
+
+    suspend fun updateTask(task: Task) {
+        repository.update(task)
+    }
+
+    suspend fun updateMarker(marker: Marker) {
+        repository.update(marker)
+    }
+
     suspend fun closeGoal(){
         if (bottomSheetType.value != null){
             dismissBottomSheet()
@@ -144,7 +160,13 @@ class EditGoalViewModel(
         }
     }
 
-    suspend fun editDeliverable(originalDeliverableInput: Deliverable){
+    suspend fun editDeliverable(originalDeliverableInput: Deliverable) {
+        originalDeliverableInput.id?.let { id ->
+            editDeliverable(repository.getDeliverable(id))
+        }
+    }
+
+    suspend fun editDeliverable(originalDeliverableInput: Flow<Deliverable?>){
         editClickedDeliverable(
             originalDeliverableInput = originalDeliverableInput,
             repository = repository,

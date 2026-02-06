@@ -59,7 +59,6 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -98,23 +97,18 @@ import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
-import com.thando.accountable.database.tables.Task
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.temporal.TemporalAdjusters
-import kotlin.collections.forEach
 import kotlin.enums.EnumEntries
 import kotlin.random.Random
 
@@ -176,7 +170,6 @@ fun EditGoalView(
     }
 
     AccountableTheme {
-        val bottomSheetType by remember { viewModel.bottomSheetType }
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
@@ -232,7 +225,7 @@ fun EditGoalView(
                     mainActivityViewModel
                 )
                 TaskDeliverableMarkerBottomSheet(
-                    bottomSheetType = bottomSheetType,
+                    bottomSheetTypeState = viewModel.bottomSheetType,
                     dismissBottomSheet = viewModel::dismissBottomSheet,
                     triedToSaveInput = viewModel.triedToSave,
                     colourPickerDialog = viewModel.colourPickerDialog,
@@ -243,15 +236,18 @@ fun EditGoalView(
                     addTimeBlock = viewModel::addTimeBlock,
                     deleteTimeBlock = viewModel::deleteTimeBlock,
                     updateTimeBlock = viewModel::updateTimeBlock,
+                    updateDeliverable = viewModel::updateDeliverable,
                     deleteTaskClicked = null,
                     originalTask = null,
                     task = null,
+                    updateTask = viewModel::updateTask,
                     deleteDeliverableClicked = viewModel::deleteDeliverableClicked,
                     originalDeliverable = viewModel.originalDeliverable,
                     deliverable = viewModel.deliverable,
                     deleteMarkerClicked = null,
                     originalMarker = null,
-                    marker = null
+                    marker = null,
+                    updateMarker = viewModel::updateMarker
                 )
             }
         }
@@ -267,11 +263,6 @@ fun EditGoalFragmentView(
 ){
     val newGoalStateFlow by viewModel.newGoal.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(newGoalStateFlow) {
-        MainActivity.log("New Goal State Flow: $newGoalStateFlow")
-    }
 
     newGoalStateFlow?.let { newGoalFlow ->
         val newGoal by newGoalFlow.collectAsStateWithLifecycle(null)
@@ -306,7 +297,7 @@ fun EditGoalFragmentView(
             val goalFocusRequester = remember { viewModel.goalFocusRequester }
             val locationFocusRequester = remember { viewModel.locationFocusRequester }
             val colourFocusRequester = remember { viewModel.colourFocusRequester }
-            val bottomSheetType by remember { viewModel.bottomSheetType }
+            val bottomSheetType by viewModel.bottomSheetType.collectAsStateWithLifecycle()
 
             LaunchedEffect(goal.text) {
                 viewModel.updateGoalString(goal.text.toString())
@@ -431,7 +422,6 @@ fun EditGoalFragmentView(
                         }
                         Button(
                             onClick = {
-                                MainActivity.log("Button Colour: ${newGoal.colour}")
                                 viewModel.pickColour(
                                     Color(newGoal.colour)
                                 )
@@ -601,8 +591,16 @@ fun EditGoalFragmentView(
                                 onClick = { scope.launch { viewModel.selectDeliverable() } },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(8.dp).weight(1f)
-                            ) { Text(stringResource(R.string.select_deliverable)) }
+                                    .padding(8.dp).weight(1f),
+                                enabled = goalDeliverables.isNotEmpty() && selectedGoalDeliverables.size < goalDeliverables.size
+                            ) { Text(
+                                stringResource(R.string.select_deliverable) +
+                                    if (goalDeliverables.size - selectedGoalDeliverables.size!=0) {
+                                        " (${goalDeliverables.size - selectedGoalDeliverables.size})"
+                                    } else {
+                                        ""
+                                    }
+                            ) }
                         }
                     }
                     items(

@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -38,15 +39,16 @@ import com.thando.accountable.fragments.viewmodels.ScriptViewModel
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import com.thando.accountable.fragments.viewmodels.TaskViewModel
 import com.thando.accountable.fragments.viewmodels.TeleprompterViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class AccountableNavigationController(
     private val mainActivityViewModel: MainActivityViewModel,
     private val isIntentActivity: Boolean = false
 ) {
-
     enum class AccountableFragment {
         HomeFragment,
         GoalsFragment,
@@ -213,29 +215,32 @@ class AccountableNavigationController(
         }
     }
 
+    var navController:NavHostController? = null
+    var fragmentViewModel: MutableStateFlow<ViewModel?> = MutableStateFlow(null)
     @Composable
     fun GetAccountableActivity(
         modifier: Modifier = Modifier
     ){
-        val navController = rememberNavController()
+        navController = rememberNavController()
         val scope = rememberCoroutineScope()
         var startDestination by remember { mutableStateOf<AccountableFragment?>(null) }
 
         LaunchedEffect(Unit) {
             mainActivityViewModel.direction.collect { direction ->
-                if (direction != null){
+                if (direction != null && navController!=null){
                     scope.launch { mainActivityViewModel.toggleDrawer(false) }
                     mainActivityViewModel.clearGalleryLaunchers()
-                    (0 until navController.currentBackStack.value.size).forEach { _ ->
-                        navController.popBackStack()
+                    (0 until navController!!.currentBackStack.value.size).forEach { _ ->
+                        navController!!.popBackStack()
                     }
                     if (
                         isDrawerFragment(direction)
                     ) mainActivityViewModel.enableDrawer()
                     else mainActivityViewModel.disableDrawer()
-                    navController.navigate(
+                    navController!!.navigate(
                         direction.name
                     ){ launchSingleTop = true }
+                    mainActivityViewModel.directionChanged()
                 }
             }
         }
@@ -255,8 +260,10 @@ class AccountableNavigationController(
 
                     scope.launch { mainActivityViewModel.toggleDrawer(false) }
                     mainActivityViewModel.clearGalleryLaunchers()
-                    (0 until navController.currentBackStack.value.size).forEach { _ ->
-                        navController.popBackStack()
+                    navController?.let { navController ->
+                        (0 until navController.currentBackStack.value.size).forEach { _ ->
+                            navController.popBackStack()
+                        }
                     }
                     if (
                         isDrawerFragment(currentFragment)
@@ -267,69 +274,83 @@ class AccountableNavigationController(
         }
 
         startDestination?.let { startDestination ->
-            NavHost(
-                modifier = modifier,
-                navController = navController,
-                startDestination = startDestination.name
-            ) {
-                composable(AccountableFragment.HomeFragment.name) {
-                    val viewModel = viewModel<HomeViewModel>(factory = HomeViewModel.Factory)
-                    HomeView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.GoalsFragment.name) {
-                    val viewModel = viewModel<BooksViewModel>(
-                        factory = BooksViewModel.Factory
-                    )
-                    BooksView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.BooksFragment.name) {
-                    val viewModel = viewModel<BooksViewModel>(
-                        factory = BooksViewModel.Factory
-                    )
-                    BooksView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.AppSettingsFragment.name) {
-                    val viewModel =
-                        viewModel<AppSettingsViewModel>(factory = AppSettingsViewModel.Factory)
-                    AppSettingsView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.HelpFragment.name) {
-                    val viewModel = viewModel<HelpViewModel>(factory = HelpViewModel.Factory)
-                    HelpView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.EditFolderFragment.name) {
-                    val viewModel =
-                        viewModel<EditFolderViewModel>(factory = EditFolderViewModel.Factory)
-                    EditFolderView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.EditGoalFragment.name) {
-                    val viewModel =
-                        viewModel<EditGoalViewModel>(factory = EditGoalViewModel.Factory)
-                    EditGoalView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.TaskFragment.name) {
-                    val viewModel = viewModel<TaskViewModel>(factory = TaskViewModel.Factory)
-                    TaskView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.MarkupLanguageFragment.name) {
-                    val viewModel =
-                        viewModel<MarkupLanguageViewModel>(factory = MarkupLanguageViewModel.Factory)
-                    MarkupLanguageView(viewModel)
-                }
-                composable(AccountableFragment.ScriptFragment.name) {
-                    val viewModel =
-                        viewModel<ScriptViewModel>(factory = ScriptViewModel.Factory)
-                    ScriptView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.TeleprompterFragment.name) {
-                    val viewModel =
-                        viewModel<TeleprompterViewModel>(factory = TeleprompterViewModel.Factory)
-                    TeleprompterView(viewModel, mainActivityViewModel)
-                }
-                composable(AccountableFragment.SearchFragment.name) {
-                    val viewModel =
-                        viewModel<SearchViewModel>(factory = SearchViewModel.Factory)
-                    SearchView(viewModel, mainActivityViewModel).searchView()
+            navController?.let { navController ->
+                NavHost(
+                    modifier = modifier,
+                    navController = navController,
+                    startDestination = startDestination.name
+                ) {
+                    composable(AccountableFragment.HomeFragment.name) {
+                        val viewModel = viewModel<HomeViewModel>(factory = HomeViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        HomeView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.GoalsFragment.name) {
+                        val viewModel = viewModel<BooksViewModel>(
+                            factory = BooksViewModel.Factory
+                        )
+                        fragmentViewModel.update { viewModel }
+                        BooksView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.BooksFragment.name) {
+                        val viewModel = viewModel<BooksViewModel>(
+                            factory = BooksViewModel.Factory
+                        )
+                        fragmentViewModel.update { viewModel }
+                        BooksView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.AppSettingsFragment.name) {
+                        val viewModel =
+                            viewModel<AppSettingsViewModel>(factory = AppSettingsViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        AppSettingsView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.HelpFragment.name) {
+                        val viewModel = viewModel<HelpViewModel>(factory = HelpViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        HelpView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.EditFolderFragment.name) {
+                        val viewModel =
+                            viewModel<EditFolderViewModel>(factory = EditFolderViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        EditFolderView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.EditGoalFragment.name) {
+                        val viewModel =
+                            viewModel<EditGoalViewModel>(factory = EditGoalViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        EditGoalView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.TaskFragment.name) {
+                        val viewModel = viewModel<TaskViewModel>(factory = TaskViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        TaskView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.MarkupLanguageFragment.name) {
+                        val viewModel =
+                            viewModel<MarkupLanguageViewModel>(factory = MarkupLanguageViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        MarkupLanguageView(viewModel)
+                    }
+                    composable(AccountableFragment.ScriptFragment.name) {
+                        val viewModel =
+                            viewModel<ScriptViewModel>(factory = ScriptViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        ScriptView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.TeleprompterFragment.name) {
+                        val viewModel =
+                            viewModel<TeleprompterViewModel>(factory = TeleprompterViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        TeleprompterView(viewModel, mainActivityViewModel)
+                    }
+                    composable(AccountableFragment.SearchFragment.name) {
+                        val viewModel =
+                            viewModel<SearchViewModel>(factory = SearchViewModel.Factory)
+                        fragmentViewModel.update { viewModel }
+                        SearchView(viewModel, mainActivityViewModel).searchView()
+                    }
                 }
             }
         }

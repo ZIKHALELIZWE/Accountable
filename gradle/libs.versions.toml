@@ -2,6 +2,7 @@
 accompanistSystemuicontroller = "0.36.0"
 agp = "8.13.2"
 androidxNavigationSafeargsGradlePlugin = "2.9.6"
+fragmentTesting = "1.8.9"
 kotlin = "2.2.21"
 coreKtx = "1.17.0"
 junit = "4.13.2"
@@ -24,6 +25,7 @@ kotlinxSerializationJson = "1.8.1"
 cardview = "1.0.0"
 recyclerview = "1.4.0"
 fragment = "1.8.9"
+robolectric = "4.16.1"
 roomCommon = "2.8.3"
 roomCommonJvm = "2.8.3"
 roomCompiler = "2.8.3"
@@ -38,12 +40,14 @@ constraintlayout = "2.2.1"
 coreTestingVersion = "2.2.0"
 foundation = "1.10.0"
 uiText = "1.10.0"
+uiTestJunit4 = "1.10.2"
 
 [libraries]
 accompanist-systemuicontroller = { module = "com.google.accompanist:accompanist-systemuicontroller", version.ref = "accompanistSystemuicontroller" }
 androidx-androidx-navigation-safeargs-gradle-plugin = { module = "androidx.navigation.safeargs:androidx.navigation.safeargs.gradle.plugin", version.ref = "androidxNavigationSafeargsGradlePlugin" }
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-fragment-testing = { module = "androidx.fragment:fragment-testing", version.ref = "fragmentTesting" }
 androidx-media3-exoplayer-v160 = { module = "androidx.media3:media3-exoplayer", version.ref = "media3Exoplayer" }
 androidx-media3-session-v160 = { module = "androidx.media3:media3-session", version.ref = "media3Session" }
 androidx-media3-ui-compose = { module = "androidx.media3:media3-ui-compose", version.ref = "media3UiCompose" }
@@ -84,10 +88,11 @@ androidx-preference = { group = "androidx.preference", name = "preference", vers
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junitJupiter" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
-robolectric = { module = "org.robolectric:robolectric", version = "4.14.1" }
 core-testing = { module = "androidx.arch.core:core-testing", version.ref = "coreTestingVersion" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 androidx-compose-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version.ref = "uiTestJunit4" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

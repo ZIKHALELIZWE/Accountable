@@ -112,6 +112,7 @@ import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.cards.ColourPickerDialog
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -175,8 +176,6 @@ fun TaskView(
         goal?.let { goal ->
             val goalUri by goal.getUri(context).collectAsStateWithLifecycle(null)
             val goalColour by remember { mutableIntStateOf( goal.colour) }
-            val selectedTab by remember { mutableStateOf(GoalTab.valueOf(goal.selectedTab)) }
-            val bottomSheetType by remember { viewModel.bottomSheetType }
 
             var image by remember { mutableStateOf<ImageBitmap?>(null) }
             LaunchedEffect(goalUri) {
@@ -232,7 +231,7 @@ fun TaskView(
                             actions = {
                                 TextButton(
                                     onClick = {
-                                        when (selectedTab) {
+                                        when (GoalTab.valueOf(goal.selectedTab)) {
                                             GoalTab.TASKS -> scope.launch {
                                                 viewModel.addTask()
                                             }
@@ -246,7 +245,7 @@ fun TaskView(
                                     },
                                 ) {
                                     Text(
-                                        text = when (selectedTab){
+                                        text = when (GoalTab.valueOf(goal.selectedTab)){
                                             GoalTab.TASKS -> stringResource(R.string.add_task)
                                             GoalTab.DELIVERABLES -> stringResource(R.string.add_deliverable)
                                             GoalTab.MARKERS -> stringResource(R.string.add_marker)
@@ -265,7 +264,7 @@ fun TaskView(
                     modifier = Modifier.padding(innerPadding)
                 )
                 TaskDeliverableMarkerBottomSheet(
-                    bottomSheetType = bottomSheetType,
+                    bottomSheetTypeState = viewModel.bottomSheetType,
                     dismissBottomSheet = viewModel::dismissBottomSheet,
                     triedToSaveInput = viewModel.triedToSave,
                     colourPickerDialog = viewModel.colourPickerDialog,
@@ -276,6 +275,7 @@ fun TaskView(
                     addTimeBlock = viewModel::addTimeBlock,
                     deleteTimeBlock = viewModel::deleteTimeBlock,
                     updateTimeBlock = viewModel::updateTimeBlock,
+                    updateDeliverable = viewModel::updateDeliverable,
                     deleteTaskClicked = viewModel::deleteTaskClicked,
                     originalTask = viewModel.originalTask,
                     task = viewModel.task,
@@ -284,7 +284,9 @@ fun TaskView(
                     deliverable = viewModel.deliverable,
                     deleteMarkerClicked = viewModel::deleteMarkerClicked,
                     originalMarker = viewModel.originalMarker,
-                    marker = viewModel.marker
+                    marker = viewModel.marker,
+                    updateTask = viewModel::updateTask,
+                    updateMarker = viewModel::updateMarker
                 )
             }
         }
@@ -294,7 +296,7 @@ fun TaskView(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskDeliverableMarkerBottomSheet(
-    bottomSheetType: GoalTab?,
+    bottomSheetTypeState: MutableStateFlow<GoalTab?>,
     dismissBottomSheet: suspend () -> Unit,
     triedToSaveInput: MutableStateFlow<Boolean>,
     colourPickerDialog: ColourPickerDialog,
@@ -302,20 +304,24 @@ fun TaskDeliverableMarkerBottomSheet(
     showErrorMessage: MutableState<Boolean>,
     errorMessage: MutableIntState,
     pickColour: (Color?) -> Unit,
+    updateTask: suspend (Task) -> Unit,
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
+    updateDeliverable: suspend (Deliverable) -> Unit,
     deleteTaskClicked: (suspend () -> Unit)?=null,
-    originalTask: MutableStateFlow<Task?>?=null,
-    task: MutableStateFlow<Task?>?=null,
+    originalTask: MutableStateFlow<Flow<Task?>?>?=null,
+    task: MutableStateFlow<Flow<Task?>?>?=null,
     deleteDeliverableClicked: (suspend () -> Unit)?=null,
-    originalDeliverable: MutableStateFlow<Deliverable?>?=null,
-    deliverable: MutableStateFlow<Deliverable?>?=null,
+    originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+    deliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
     deleteMarkerClicked: (suspend () -> Unit)?=null,
-    originalMarker: MutableStateFlow<Marker?>?=null,
-    marker: MutableStateFlow<Marker?>?=null
+    originalMarker: MutableStateFlow<Flow<Marker?>?>?=null,
+    marker: MutableStateFlow<Flow<Marker?>?>?=null,
+    updateMarker: suspend (Marker) -> Unit
 ){
     val scope = rememberCoroutineScope()
+    val bottomSheetType by bottomSheetTypeState.collectAsStateWithLifecycle()
     bottomSheetType?.let { bottomSheetType ->
         val sheetState = rememberModalBottomSheetState()
         ModalBottomSheet(
@@ -329,7 +335,7 @@ fun TaskDeliverableMarkerBottomSheet(
                     if (originalTask != null && task != null && deleteTaskClicked != null)
                     AddTaskView(
                         originalTask = originalTask,
-                        task = task,
+                        taskStateFlow = task,
                         triedToSaveInput = triedToSaveInput,
                         colourPickerDialog = colourPickerDialog,
                         processBottomSheetAdd = processBottomSheetAdd,
@@ -339,14 +345,15 @@ fun TaskDeliverableMarkerBottomSheet(
                         addTimeBlock = addTimeBlock,
                         deleteTimeBlock = deleteTimeBlock,
                         updateTimeBlock = updateTimeBlock,
-                        deleteTaskClicked = deleteTaskClicked
+                        deleteTaskClicked = deleteTaskClicked,
+                        updateTask = updateTask
                     )
                 }
                 GoalTab.DELIVERABLES -> {
                     if (originalDeliverable != null && deliverable != null && deleteDeliverableClicked != null)
                     AddDeliverableView(
-                        originalDeliverable = originalDeliverable,
-                        deliverable = deliverable,
+                        originalDeliverableStateFlow = originalDeliverable,
+                        deliverableStateFlow = deliverable,
                         triedToSaveInput = triedToSaveInput,
                         processBottomSheetAdd = processBottomSheetAdd,
                         showErrorMessage = showErrorMessage,
@@ -354,7 +361,8 @@ fun TaskDeliverableMarkerBottomSheet(
                         addTimeBlock = addTimeBlock,
                         deleteTimeBlock = deleteTimeBlock,
                         deleteDeliverableClicked = deleteDeliverableClicked,
-                        updateTimeBlock = updateTimeBlock
+                        updateTimeBlock = updateTimeBlock,
+                        updateDeliverable = updateDeliverable
                     )
                 }
                 GoalTab.MARKERS -> {
@@ -366,7 +374,8 @@ fun TaskDeliverableMarkerBottomSheet(
                             processBottomSheetAdd = processBottomSheetAdd,
                             showErrorMessage = showErrorMessage,
                             errorMessage = errorMessage,
-                            deleteMarkerClicked = deleteMarkerClicked
+                            deleteMarkerClicked = deleteMarkerClicked,
+                            updateMarker = updateMarker
                         )
                 }
             }
@@ -380,12 +389,12 @@ fun TasksFragmentView(
     goal: Goal,
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
     val tabListState = remember { LazyListState(
         unpackInt1(goal.tabListState),
         unpackInt2(goal.tabListState)
     ) }
     val goalTitle = remember { TextFieldState(goal.goal) }
-    var selectedTab by remember { mutableStateOf(GoalTab.valueOf(goal.selectedTab)) }
     val tabs = listOf(
         stringResource(R.string.tasks),
         stringResource(R.string.deliverables),
@@ -444,12 +453,14 @@ fun TasksFragmentView(
         }
         stickyHeader {
             PrimaryTabRow(
-                selectedTabIndex = selectedTab.ordinal
+                selectedTabIndex = GoalTab.valueOf(goal.selectedTab).ordinal
             ) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
-                        selected = selectedTab.ordinal == index,
-                        onClick = { selectedTab = GoalTab.entries[index] },
+                        selected = GoalTab.valueOf(goal.selectedTab).ordinal == index,
+                        onClick = { scope.launch {
+                            viewModel.updateGoal(goal.copy(selectedTab = GoalTab.entries[index].name))
+                        } },
                         text = { Text(title) },
                         selectedContentColor = Color(goalColour),
                         unselectedContentColor = Color.Black,
@@ -458,7 +469,7 @@ fun TasksFragmentView(
                 }
             }
         }
-        when (selectedTab) {
+        when (GoalTab.valueOf(goal.selectedTab)) {
             GoalTab.TASKS -> {
                 items(items = tasksList){ task ->
                     TaskCardView(task, viewModel)
@@ -494,13 +505,12 @@ fun TaskCardView(
 ){
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val taskText = remember { task.task }
-    val taskColour by remember { task.colour }
-    val timeCreated by remember { task.initialDateTime }
-    val endType by remember { task.endType }
-    val endDateTime by remember { task.endDateTime }
-    val status by remember { task.status }
-    val location = remember { task.location }
+    val taskText = remember { TextFieldState(task.task) }
+    val timeCreated by remember { mutableStateOf(LocalDateTime.ofEpochSecond(task.initialDateTime/1000,0,
+        ZoneOffset.UTC)) }
+    val endDateTime by remember {
+        mutableStateOf(LocalDateTime.ofEpochSecond(task.endDateTime/1000,0, ZoneOffset.UTC)) }
+    val location = remember { TextFieldState(task.location) }
 
     Card(
         modifier = Modifier
@@ -518,8 +528,8 @@ fun TaskCardView(
             disabledContentColor = Color.DarkGray
         ),
         shape = RectangleShape,
-        border = BorderStroke(4.dp, if (taskColour!=-1)
-            Color(taskColour)
+        border = BorderStroke(4.dp, if (task.colour!=-1)
+            Color(task.colour)
         else Color.Black)
     ) {
         Column(modifier = Modifier
@@ -548,8 +558,8 @@ fun TaskCardView(
                         .fillMaxWidth()
                         .weight(1f),
                     textAlign = TextAlign.Start,
-                    color = if (taskColour!=-1 && Color(taskColour)!=Color.White)
-                        Color(taskColour).darker()
+                    color = if (task.colour!=-1 && Color(task.colour)!=Color.White)
+                        Color(task.colour).darker()
                     else Color.Black
                 )
                 Text(
@@ -567,12 +577,12 @@ fun TaskCardView(
                         .fillMaxWidth()
                         .weight(1f),
                     textAlign = TextAlign.Start,
-                    color = if (taskColour!=-1 && Color(taskColour)!=Color.White)
-                        Color(taskColour).darker()
+                    color = if (task.colour!=-1 && Color(task.colour)!=Color.White)
+                        Color(task.colour).darker()
                     else Color.Black
                 )
                 Text(
-                    text = status.name,
+                    text = task.status,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -585,8 +595,8 @@ fun TaskCardView(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    color = if (taskColour!=-1 && Color(taskColour)!=Color.White)
-                        Color(taskColour).darker()
+                    color = if (task.colour!=-1 && Color(task.colour)!=Color.White)
+                        Color(task.colour).darker()
                     else Color.Black
                 )
                 Text(
@@ -610,12 +620,12 @@ fun TaskCardView(
                         .fillMaxWidth()
                         .weight(1f),
                     textAlign = TextAlign.Start,
-                    color = if (taskColour!=-1 && Color(taskColour)!=Color.White)
-                        Color(taskColour).darker()
+                    color = if (task.colour!=-1 && Color(task.colour)!=Color.White)
+                        Color(task.colour).darker()
                     else Color.Black
                 )
                 Text(
-                    text = endType.name + if (endType == Task.TaskEndType.DATE)
+                    text = task.endType + if (Task.TaskEndType.valueOf(task.endType) == Task.TaskEndType.DATE)
                         "\n${AppResources.getTimeFullDate(context,endDateTime)}"
                     else "",
                     style = MaterialTheme.typography.bodyMedium
@@ -652,14 +662,15 @@ fun getOnlyOneQuantityText(inputString: String) : String?{
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTaskView(
-    originalTask: MutableStateFlow<Task?>,
-    task: MutableStateFlow<Task?>,
+    originalTask: MutableStateFlow<Flow<Task?>?>,
+    taskStateFlow: MutableStateFlow<Flow<Task?>?>,
     triedToSaveInput: MutableStateFlow<Boolean>,
     colourPickerDialog: ColourPickerDialog,
     processBottomSheetAdd: suspend () -> Unit,
     showErrorMessage: MutableState<Boolean>,
     errorMessage: MutableIntState,
     pickColour: (Color?) -> Unit,
+    updateTask: suspend(Task) -> Unit,
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
@@ -715,7 +726,8 @@ fun AddTaskView(
             }
         }
     }
-    val task by task.collectAsStateWithLifecycle()
+    val taskFlow by taskStateFlow.collectAsStateWithLifecycle()
+    val task by (taskFlow?:MutableStateFlow(null)).collectAsStateWithLifecycle(null)
     task?.let { task ->
         val context = LocalContext.current
 
@@ -723,19 +735,20 @@ fun AddTaskView(
         var showErrorMessage by remember { showErrorMessage }
         val errorMessage by remember { errorMessage }
 
-        val bottomSheetLazyListState = remember { task.scrollPosition }
-        var taskType by remember { task.type }
-        val taskText = remember { task.task }
+        val bottomSheetLazyListState = remember {
+            LazyListState(
+                unpackInt1(task.scrollPosition),
+                unpackInt2(task.scrollPosition)
+            )
+        }
+        val taskText = remember { TextFieldState(task.task) }
         val taskTextFocusRequester = remember { task.taskTextFocusRequester }
-        val location = remember { task.location }
+        val location = remember { TextFieldState(task.location) }
         val locationFocusRequester = remember { task.locationFocusRequester }
         val timesFlow by task.times.collectAsStateWithLifecycle()
         val times by (timesFlow?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
-        var colour by remember { task.colour }
         val colourFocusRequester = remember { task.colourFocusRequester }
-        var endType by remember { task.endType }
-        var quantity by remember { task.quantity }
-        var taskTime by remember { task.time }
+        var taskTime by remember { mutableStateOf(LocalDateTime.ofEpochSecond(task.time/1000,0, ZoneOffset.UTC)) }
 
         LaunchedEffect (showErrorMessage) {
             if (showErrorMessage) { delay(2000) // message disappears after 2 seconds
@@ -779,10 +792,10 @@ fun AddTaskView(
                                     .weight(1f)
                                     .height(TopAppBarDefaults.MediumAppBarCollapsedHeight) // makes it a big square
                                     .background(
-                                        if (taskType == boxType) Color.Blue else Color.LightGray,
+                                        if (Task.TaskType.valueOf(task.type) == boxType) Color.Blue else Color.LightGray,
                                         shape = RectangleShape
                                     )
-                                    .clickable { taskType = boxType },
+                                    .clickable { scope.launch { updateTask(task.copy(type = boxType.name)) } },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -799,18 +812,23 @@ fun AddTaskView(
                     }
                 }
                 item {
-                    when(taskType){
+                    LaunchedEffect(taskText.text) {
+                        updateTask(task.copy(task = taskText.text.toString()))
+                    }
+                    when(Task.TaskType.valueOf(task.type)){
                         Task.TaskType.QUANTITY,
                         Task.TaskType.NORMAL -> {
                             var styledText by remember { mutableStateOf<AnnotatedString?>(null) }
-                            if (taskType == Task.TaskType.QUANTITY){
+                            if (Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY){
                                 LaunchedEffect(Unit) {
                                     getOnlyOneQuantityText(taskText.text.toString())?.let{
-                                        taskText.setTextAndPlaceCursorAtEnd(it)
+                                        if (it != task.task) updateTask(task.copy(task = it))
                                     }
                                 }
                                 LaunchedEffect(taskText.text) {
-                                    quantity = Regex("\\d+").find(taskText.text)?.value?.toLongOrNull()?:0
+                                    updateTask(task.copy(quantity =
+                                        Regex("\\d+").find(taskText.text)?.value?.toLongOrNull()?:0
+                                    ))
                                 }
                                 styledText = buildAnnotatedString {
                                     val regex = Regex("\\d+")
@@ -841,7 +859,7 @@ fun AddTaskView(
                                 state = taskText,
                                 supportingText = {styledText?.let { styledText -> Text(styledText)}},
                                 label = { Text(stringResource(
-                                    if (taskType == Task.TaskType.QUANTITY) R.string.task_with_quantity
+                                    if (Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY) R.string.task_with_quantity
                                         else R.string.task
                                 )) },
                                 modifier = Modifier
@@ -858,7 +876,7 @@ fun AddTaskView(
                                     }
                                 },
                                 inputTransformation = InputTransformation {
-                                    if(taskType == Task.TaskType.QUANTITY) {
+                                    if(Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY) {
                                         val cleaned = getOnlyOneQuantityText(toString())
                                         cleaned?.let { cleaned ->
                                             val start = selection.start.coerceIn(0, cleaned.length)
@@ -906,6 +924,9 @@ fun AddTaskView(
                             if (buttonDurationPick.value) {
                                 TimeDurationPicker(datePicked, taskTime) { hours, minutes ->
                                     taskTime = taskTime.withHour(hours).withMinute(minutes)
+                                    scope.launch {
+                                        updateTask(task.copy(time = taskTime.toInstant(ZoneOffset.UTC).toEpochMilli()))
+                                    }
                                     buttonDurationPick.value = false
                                 }
                             }
@@ -944,6 +965,9 @@ fun AddTaskView(
                     Spacer(modifier = Modifier.width(2.dp))
                 }
                 item {
+                    LaunchedEffect(location.text) {
+                        updateTask(task.copy(location = location.text.toString()))
+                    }
                     OutlinedTextField(
                         state = location,
                         label = { Text(stringResource(R.string.location)) },
@@ -972,14 +996,14 @@ fun AddTaskView(
                             .height(IntrinsicSize.Min),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (colour != -1) {
+                        if (task.colour != -1) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .fillMaxHeight()
                                     .padding(end = 3.dp)
                                     .background(
-                                        Color(colour),
+                                        Color(task.colour),
                                         shape = RectangleShape
                                     )
                                     .weight(1f)
@@ -987,7 +1011,7 @@ fun AddTaskView(
                         }
                         Button(
                             onClick = { pickColour(
-                                Color(task.colour.value)
+                                Color(task.colour)
                             ) },
                             modifier = Modifier
                                 .fillMaxWidth().fillMaxHeight()
@@ -997,7 +1021,7 @@ fun AddTaskView(
                         ) {
                             Row {
                                 Text(stringResource(R.string.pick_colour))
-                                if (triedToSave && colour==-1){
+                                if (triedToSave && task.colour==-1){
                                     Icon(
                                         imageVector = Icons.Default.Warning,
                                         contentDescription = stringResource(R.string.empty_field),
@@ -1012,7 +1036,9 @@ fun AddTaskView(
                     Spacer(modifier = Modifier.width(2.dp))
                 }
                 item {
-                    var pickedDate by remember { task.endDateTime }
+                    var pickedDate by remember { mutableStateOf(
+                        LocalDateTime.ofEpochSecond(task.endDateTime/1000,0,
+                        ZoneOffset.UTC)) }
                     val stateTime = rememberTimePickerState(
                         pickedDate.hour,
                         pickedDate.minute,
@@ -1044,20 +1070,30 @@ fun AddTaskView(
                         onClick = {
                             endTypeOptions = listOf(
                                 MenuItemData(Task.TaskEndType.UNDEFINED.name){
-                                    endType = Task.TaskEndType.UNDEFINED
+                                    scope.launch {
+                                        updateTask(task.copy(endType = Task.TaskEndType.UNDEFINED.name))
+                                    }
                                 },
                                 MenuItemData(Task.TaskEndType.DATE.name){
-                                    endType = Task.TaskEndType.DATE
+                                    scope.launch {
+                                        updateTask(task.copy(endType = Task.TaskEndType.DATE.name))
+                                    }
                                     buttonDatePick = true
                                 },
                                 MenuItemData(Task.TaskEndType.GOAL.name){
-                                    endType = Task.TaskEndType.GOAL
+                                    scope.launch {
+                                        updateTask(task.copy(endType = Task.TaskEndType.GOAL.name))
+                                    }
                                 },
                                 MenuItemData(Task.TaskEndType.DELIVERABLE.name){
-                                    endType = Task.TaskEndType.DELIVERABLE
+                                    scope.launch {
+                                        updateTask(task.copy(endType = Task.TaskEndType.DELIVERABLE.name))
+                                    }
                                 },
                                 MenuItemData(Task.TaskEndType.MARKER.name){
-                                    endType = Task.TaskEndType.MARKER
+                                    scope.launch {
+                                        updateTask(task.copy(endType = Task.TaskEndType.MARKER.name))
+                                    }
                                 }
                             )
                             showEndTypeOptions = true
@@ -1081,7 +1117,7 @@ fun AddTaskView(
                                 }
                             }
                         }
-                        when (endType) {
+                        when (Task.TaskEndType.valueOf(task.endType)) {
                             Task.TaskEndType.UNDEFINED -> {
                                 Text(
                                     modifier = Modifier,
@@ -1195,9 +1231,7 @@ fun DeliverableCardView(
     deliverable: Deliverable,
     editDeliverable: suspend (Deliverable) -> Unit
 ){
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val deliverableText = remember { deliverable.deliverable }
 
     Card(
         modifier = Modifier
@@ -1216,10 +1250,13 @@ fun DeliverableCardView(
         ),
         shape = RectangleShape
     ) {
-        Column(modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight()) {
-            Text(text = deliverableText,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+        ) {
+            Text(
+                text = deliverable.deliverable,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1227,7 +1264,8 @@ fun DeliverableCardView(
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black,
-                fontSize = 16.sp)
+                fontSize = 16.sp
+            )
         }
     }
 }
@@ -1235,8 +1273,8 @@ fun DeliverableCardView(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddDeliverableView(
-    originalDeliverable: MutableStateFlow<Deliverable?>,
-    deliverable: MutableStateFlow<Deliverable?>,
+    originalDeliverableStateFlow: MutableStateFlow<Flow<Deliverable?>?>,
+    deliverableStateFlow: MutableStateFlow<Flow<Deliverable?>?>,
     triedToSaveInput: MutableStateFlow<Boolean>,
     processBottomSheetAdd: suspend () -> Unit,
     showErrorMessage: MutableState<Boolean>,
@@ -1244,10 +1282,12 @@ fun AddDeliverableView(
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     deleteDeliverableClicked: suspend () -> Unit,
-    updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit
+    updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
+    updateDeliverable: suspend (Deliverable) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val originalDeliverable by originalDeliverable.collectAsStateWithLifecycle()
+    val originalDeliverableFlow by originalDeliverableStateFlow.collectAsStateWithLifecycle()
+    val originalDeliverable by (originalDeliverableFlow?:MutableStateFlow(null)).collectAsStateWithLifecycle(null)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1296,7 +1336,8 @@ fun AddDeliverableView(
             }
         }
     }
-    val deliverable by deliverable.collectAsStateWithLifecycle()
+    val deliverableFlow by deliverableStateFlow.collectAsStateWithLifecycle()
+    val deliverable by (deliverableFlow?: MutableStateFlow(null)).collectAsStateWithLifecycle(null)
     deliverable?.let { deliverable ->
         val context = LocalContext.current
 
@@ -1316,7 +1357,14 @@ fun AddDeliverableView(
         val locationFocusRequester = remember { deliverable.locationFocusRequester }
         val timesFlow by deliverable.times.collectAsStateWithLifecycle()
         val times by (timesFlow?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
-        var endType by remember { mutableStateOf(Deliverable.DeliverableEndType.valueOf(deliverable.endType)) }
+
+        LaunchedEffect(deliverableText.text) {
+            updateDeliverable(deliverable.copy(deliverable = deliverableText.text.toString()))
+        }
+
+        LaunchedEffect(location.text) {
+            updateDeliverable(deliverable.copy(location = location.text.toString()))
+        }
 
         LaunchedEffect(showErrorMessage) {
             if (showErrorMessage) {
@@ -1416,6 +1464,8 @@ fun AddDeliverableView(
                         PickTime(stateTime){
                             buttonTimePick = false
                             pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+                            scope.launch { updateDeliverable(deliverable.copy(endDateTime = pickedDate.toInstant(
+                                ZoneOffset.UTC).toEpochMilli())) }
                         }
                     }
                     var showEndTypeOptions by remember { mutableStateOf(false) }
@@ -1426,17 +1476,25 @@ fun AddDeliverableView(
                         onClick = {
                             endTypeOptions = listOf(
                                 MenuItemData(Deliverable.DeliverableEndType.UNDEFINED.name){
-                                    endType = Deliverable.DeliverableEndType.UNDEFINED
+                                    scope.launch {
+                                        updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.UNDEFINED.name))
+                                    }
                                 },
                                 MenuItemData(Deliverable.DeliverableEndType.DATE.name){
-                                    endType = Deliverable.DeliverableEndType.DATE
-                                    buttonDatePick = true
+                                    scope.launch {
+                                        updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.DATE.name))
+                                        buttonDatePick = true
+                                    }
                                 },
                                 MenuItemData(Deliverable.DeliverableEndType.GOAL.name){
-                                    endType = Deliverable.DeliverableEndType.GOAL
+                                    scope.launch {
+                                        updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.GOAL.name))
+                                    }
                                 },
                                 MenuItemData(Deliverable.DeliverableEndType.WORK.name){
-                                    endType = Deliverable.DeliverableEndType.WORK
+                                    scope.launch {
+                                        updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.WORK.name))
+                                    }
                                 }
                             )
                             showEndTypeOptions = true
@@ -1458,7 +1516,7 @@ fun AddDeliverableView(
                                 }
                             }
                         }
-                        when (endType) {
+                        when (Deliverable.DeliverableEndType.valueOf(deliverable.endType)) {
                             Deliverable.DeliverableEndType.UNDEFINED -> {
                                 Text(
                                     stringResource(
@@ -1474,6 +1532,8 @@ fun AddDeliverableView(
                                         localDate,
                                         LocalTime.of(stateTime.hour,stateTime.minute)
                                     )
+                                    scope.launch { updateDeliverable(deliverable.copy(endDateTime = pickedDate.toInstant(
+                                        ZoneOffset.UTC).toEpochMilli())) }
                                     Text(
                                         stringResource(
                                             R.string.end_type,
@@ -1563,11 +1623,14 @@ fun MarkerCardView(
 ){
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val markerText = remember { marker.marker }
-    val dateTime by remember { marker.dateTime }
-    val daysFromNow by remember { mutableStateOf(Period.between(
+    val dateTime = LocalDateTime.ofEpochSecond(
+        marker.dateTime/1000,
+        0,
+        ZoneOffset.UTC
+    )
+    val daysFromNow = Period.between(
         LocalDateTime.now().toLocalDate(),
-        dateTime.toLocalDate()).days) }
+        dateTime.toLocalDate()).days
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1588,7 +1651,7 @@ fun MarkerCardView(
         Column(modifier = Modifier
             .fillMaxWidth()
             .wrapContentHeight()) {
-            Text(text = markerText.text.toString(),
+            Text(text = marker.marker,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1634,13 +1697,14 @@ fun MarkerCardView(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddMarkerView(
-    originalMarker: MutableStateFlow<Marker?>,
-    marker: MutableStateFlow<Marker?>,
+    originalMarker: MutableStateFlow<Flow<Marker?>?>,
+    marker: MutableStateFlow<Flow<Marker?>?>,
     triedToSaveInput: MutableStateFlow<Boolean>,
     processBottomSheetAdd: suspend () -> Unit,
     showErrorMessage: MutableState<Boolean>,
     errorMessage: MutableIntState,
-    deleteMarkerClicked: suspend () -> Unit
+    deleteMarkerClicked: suspend () -> Unit,
+    updateMarker: suspend (Marker) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val originalMarker by originalMarker.collectAsStateWithLifecycle()
@@ -1692,7 +1756,8 @@ fun AddMarkerView(
             }
         }
     }
-    val marker by marker.collectAsStateWithLifecycle()
+    val markerFlow by marker.collectAsStateWithLifecycle()
+    val marker by (markerFlow?:MutableStateFlow(null)).collectAsStateWithLifecycle(null)
     marker?.let { marker ->
         val context = LocalContext.current
 
@@ -1700,9 +1765,16 @@ fun AddMarkerView(
         var showErrorMessage by remember { showErrorMessage }
         val errorMessage by remember { errorMessage }
 
-        val bottomSheetLazyListState = remember { marker.scrollPosition }
-        val markerText = remember { marker.marker }
+        val bottomSheetLazyListState = remember {
+            LazyListState(unpackInt1(marker.scrollPosition),
+                unpackInt2(marker.scrollPosition))
+        }
+        val markerText = remember { TextFieldState(marker.marker) }
         val markerTextFocusRequester = remember { marker.markerTextFocusRequester }
+
+        LaunchedEffect(markerText.text) {
+            updateMarker(marker.copy(marker = markerText.text.toString()))
+        }
 
         LaunchedEffect (showErrorMessage) {
             if (showErrorMessage) { delay(2000) // message disappears after 2 seconds
@@ -1756,7 +1828,8 @@ fun AddMarkerView(
                     Spacer(modifier = Modifier.width(2.dp))
                 }
                 item {
-                    var pickedDate by remember { marker.dateTime }
+                    var pickedDate by remember { mutableStateOf(LocalDateTime.ofEpochSecond(marker.dateTime/1000,0,
+                        ZoneOffset.UTC)) }
                     val stateTime = rememberTimePickerState(
                         pickedDate.hour,
                         pickedDate.minute,
@@ -1777,6 +1850,11 @@ fun AddMarkerView(
                         PickTime(stateTime){
                             buttonTimePick = false
                             pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+                            scope.launch {
+                                updateMarker(
+                                    marker.copy(dateTime = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli())
+                                )
+                            }
                         }
                     }
                     OutlinedButton(modifier = Modifier
@@ -1789,6 +1867,11 @@ fun AddMarkerView(
                                 localDate,
                                 LocalTime.of(stateTime.hour,stateTime.minute)
                             )
+                            scope.launch {
+                                updateMarker(
+                                    marker.copy(dateTime = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli())
+                                )
+                            }
                             Text(
                                 stringResource(
                                     R.string.start_time_and_date,

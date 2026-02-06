@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -175,8 +176,10 @@ class SearchView(
             viewModel.searchScrollPosition.firstVisibleItemScrollOffset
         )) }
 
+        val context = LocalContext.current
+
         LaunchedEffect(searchString.selection, matchCaseCheck, wordCheck) {
-            viewModel.search {
+            viewModel.search(context) {
                 if (initialized){
                     if (viewModel.searchScrollPosition.firstVisibleItemIndex!=0 ||
                         viewModel.searchScrollPosition.firstVisibleItemScrollOffset!=0){

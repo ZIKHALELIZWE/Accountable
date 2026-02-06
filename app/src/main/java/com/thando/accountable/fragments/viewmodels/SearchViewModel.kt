@@ -1,6 +1,7 @@
 package com.thando.accountable.fragments.viewmodels
 
 import android.app.Activity
+import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -53,7 +54,7 @@ class SearchViewModel(
         val snippets = arrayListOf<AnnotatedString>()
         val snippetIndex = MutableStateFlow(0)
 
-        fun addRanges(list:ArrayList<Triple<String,MutableList<IntRange>,Content?>>){
+        fun addRanges(context: Context, list:ArrayList<Triple<String,MutableList<IntRange>,Content?>>){
             ranges.addAll(list)
             list.forEach {
                 searchOccurrences.value += it.second.size
@@ -81,7 +82,7 @@ class SearchViewModel(
                         append(snippet)
                         addStyle(
                             SpanStyle(
-                                background = Color(MainActivity.ResourceProvider.resources.getColor(
+                                background = Color(context.resources.getColor(
                                     R.color.purple_200, null
                                 ))
                             ),
@@ -127,8 +128,8 @@ class SearchViewModel(
         initialized.value = true
     }
 
-    fun search(searchComplete:(()->Unit)?=null){
-        repository.searchFragmentSearch(searchComplete)
+    fun search(context: Context, searchComplete:(()->Unit)?=null){
+        repository.searchFragmentSearch(context, searchComplete)
     }
 
     suspend fun loadAndOpenScript(scriptId: Long, activity: Activity?) {

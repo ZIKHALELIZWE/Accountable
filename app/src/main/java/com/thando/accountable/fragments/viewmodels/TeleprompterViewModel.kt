@@ -15,7 +15,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.AccountableRepository
-import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.SpecialCharacters
@@ -65,7 +64,7 @@ class TeleprompterViewModel(
     private var _controlsVisible = MutableStateFlow(true)
     val controlsVisible: StateFlow<Boolean> get() = _controlsVisible
     var countDownText = MutableStateFlow("")
-    private val _deleteButtonText = MutableStateFlow(MainActivity.ResourceProvider.getString(R.string.restore_default_settings))
+    private val _deleteButtonText = MutableStateFlow(repository.application.getString(R.string.restore_default_settings))
     val deleteButtonText: StateFlow<String> get() = _deleteButtonText
     val countDownTimer = mutableStateOf<CountDownTimer?>(null)
 
@@ -123,7 +122,11 @@ class TeleprompterViewModel(
             _deleteButtonText.value = context.getString(R.string.restore_default_settings)
             deleteButtonFunction = {
                 repository.deleteTeleprompterSettingSpecialCharacter(teleprompterSetting) {
-                    teleprompterSetting.setValues(TeleprompterSettings())
+                    teleprompterSetting.setValues(TeleprompterSettings(
+                        name = MutableStateFlow(
+                            context.getString(R.string.default_settings)
+                        )
+                    ))
                     setSkipSizeValue(rootHeight)
                 }
             }
@@ -356,7 +359,11 @@ class TeleprompterViewModel(
         teleprompterSettings.value?.let { teleprompterSettings ->
             if (teleprompterSettingsList.isNotEmpty()
                 && teleprompterSettings != teleprompterSettingsList.last()
-                && teleprompterSettings.name.value.trim() != TeleprompterSettings().name.value.trim()
+                && teleprompterSettings.name.value.trim() != TeleprompterSettings(
+                    name = MutableStateFlow(
+                        repository.application.getString(R.string.default_settings)
+                    )
+                ).name.value.trim()
             ) {
                 repository.deleteTeleprompterSetting(teleprompterSettingsList.last()){
                     repository.resetDefaultTeleprompterSetting{
@@ -370,7 +377,11 @@ class TeleprompterViewModel(
                         }
                     }
                 }
-            } else if (teleprompterSettings.name.value.trim() != TeleprompterSettings().name.value.trim()){
+            } else if (teleprompterSettings.name.value.trim() != TeleprompterSettings(
+                    name = MutableStateFlow(
+                        repository.application.getString(R.string.default_settings)
+                    )
+            ).name.value.trim()){
                 repository.saveTeleprompterSettings{
                     repository.setTeleprompterSettingToScript(true){
                         repository.resetDefaultTeleprompterSetting{
