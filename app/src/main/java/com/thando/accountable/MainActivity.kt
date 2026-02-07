@@ -208,7 +208,7 @@ fun MainActivityView(
                         }
                     }
                     Column(
-                        modifier = Modifier
+                        modifier = Modifier.testTag("MainActivityNavigationDrawerColumn")
                             .verticalScroll(rememberScrollState())
                     ) {
                         appSettings?.let { appSettings ->
@@ -252,9 +252,11 @@ fun MainActivityView(
                             },
                             label = { Text(stringResource(R.string.home)) },
                             selected = currentFragment == AccountableFragment.HomeFragment,
-                            onClick = { mainActivityViewModel.changeFragment(
+                            onClick = {
+                                mainActivityViewModel.changeFragment(
                                 AccountableFragment.HomeFragment
-                            ) }
+                                )
+                            }
                         )
                         NavigationDrawerItem(
                             modifier = Modifier.padding(horizontal = 16.dp)
@@ -267,7 +269,8 @@ fun MainActivityView(
                             },
                             label = { Text(stringResource(R.string.books)) },
                             selected = currentFragment == AccountableFragment.BooksFragment,
-                            onClick = { mainActivityViewModel.changeFragment(
+                            onClick = {
+                                mainActivityViewModel.changeFragment(
                                 AccountableFragment.BooksFragment
                             ) }
                         )
@@ -282,7 +285,8 @@ fun MainActivityView(
                             selected = currentFragment == AccountableFragment.AppSettingsFragment,
                             icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
                             badge = { Text("20") }, // Placeholder
-                            onClick = { mainActivityViewModel.changeFragment(
+                            onClick = {
+                                mainActivityViewModel.changeFragment(
                                 AccountableFragment.AppSettingsFragment
                             ) }
                         )
@@ -292,7 +296,8 @@ fun MainActivityView(
                             label = { Text("Help and feedback") },
                             selected = currentFragment == AccountableFragment.HelpFragment,
                             icon = { Icon(Icons.AutoMirrored.Outlined.Help, contentDescription = null) },
-                            onClick = { mainActivityViewModel.changeFragment(
+                            onClick = {
+                                mainActivityViewModel.changeFragment(
                                 AccountableFragment.HelpFragment
                             ) }
                         )

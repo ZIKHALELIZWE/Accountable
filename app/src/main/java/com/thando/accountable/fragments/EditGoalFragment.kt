@@ -78,6 +78,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -170,11 +171,15 @@ fun EditGoalView(
     }
 
     AccountableTheme {
+        val editGoal by viewModel.editGoal.collectAsStateWithLifecycle()
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text(stringResource(R.string.new_goal)) },
+                    title = { Text( modifier = Modifier.testTag("EditGoalTitle"), text = stringResource(
+                        if (editGoal != null) R.string.edit_goal
+                        else R.string.new_goal
+                    )) },
                     navigationIcon = {
                         IconButton(
                             modifier = Modifier,
@@ -318,7 +323,7 @@ fun EditGoalFragmentView(
                     OutlinedTextField(
                         state = goal,
                         label = { Text(stringResource(R.string.goal)) },
-                        modifier = Modifier
+                        modifier = Modifier.testTag("EditGoalGoal")
                             .fillMaxWidth()
                             .padding(horizontal = 3.dp)
                             .focusRequester(goalFocusRequester),
@@ -382,7 +387,7 @@ fun EditGoalFragmentView(
                     OutlinedTextField(
                         state = location,
                         label = { Text(stringResource(R.string.location)) },
-                        modifier = Modifier
+                        modifier = Modifier.testTag("EditGoalLocation")
                             .fillMaxWidth()
                             .padding(horizontal = 3.dp)
                             .focusRequester(locationFocusRequester),
@@ -585,13 +590,15 @@ fun EditGoalFragmentView(
                                 onClick = { scope.launch { viewModel.addDeliverable() } },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(8.dp).weight(1f)
+                                    .padding(8.dp)
+                                    .weight(1f)
                             ) { Text(stringResource(R.string.add_deliverable)) }
                             Button(
                                 onClick = { scope.launch { viewModel.selectDeliverable() } },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(8.dp).weight(1f),
+                                    .padding(8.dp)
+                                    .weight(1f),
                                 enabled = goalDeliverables.isNotEmpty() && selectedGoalDeliverables.size < goalDeliverables.size
                             ) { Text(
                                 stringResource(R.string.select_deliverable) +

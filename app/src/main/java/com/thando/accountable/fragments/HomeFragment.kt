@@ -102,7 +102,7 @@ fun HomeView( viewModel : HomeViewModel, mainActivityViewModel: MainActivityView
                             scope.launch {
                                 viewModel.loadGoals()
                             }
-                        }) {
+                        }, modifier = Modifier.testTag("HomeFragmentLoadGoalsButton")) {
                             Icon(
                                 imageVector = ImageVector.vectorResource(R.drawable.ic_stars_black_24dp),
                                 contentDescription = stringResource(R.string.navigate_to_goals_button)

@@ -8,8 +8,12 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.database.tables.Folder
@@ -23,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -31,11 +36,14 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.FixMethodOrder
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowLog
@@ -47,6 +55,7 @@ import kotlin.reflect.KFunction3
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34]) // Force Robolectric to use API 34
 @LooperMode(LooperMode.Mode.LEGACY)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class MainActivityTest {
     @get:Rule
     val instantTaskExecutorRule = InstantTaskExecutorRule()
@@ -63,6 +72,11 @@ class MainActivityTest {
 
     }
 
+    private fun getActivity(): MainActivity {
+        return Robolectric.buildActivity(MainActivity::class.java)
+            .setup().get()
+    }
+
     class FilteredPrintStream(private val delegate: PrintStream) : PrintStream(delegate) {
         override fun println(x: String?) {
             if (x != null) {
@@ -73,34 +87,19 @@ class MainActivityTest {
         }
     }
 
-    @OptIn(ExperimentalTestApi::class, ExperimentalCoroutinesApi::class)
-    fun TestScope.runSuspend(function: suspend TestScope.()->Unit) {
-        val scheduler = TestCoroutineScheduler()
-        // Create our test frame clock
-        val frameClock = TestMonotonicFrameClock( MainScope().plus(scheduler))
-        //CoroutineScope(Dispatchers.Main + frameClock).launch {
-        MainScope().plus(frameClock).launch {
-            function()
-        }
-    }
-
     @Test
-    fun coreClassesNotNull() = runTest {
-        val activity = Robolectric.buildActivity(MainActivity::class.java)
-            .create().start().resume().get()
+    fun `1 coreClassesNotNull`() = runTest {
+        val activity = getActivity()
+        composeTestRule.waitForIdle()
         assertNotNull(activity)
         assertNotNull(activity.viewModel)
         assertNotNull(activity.viewModel.repository)
     }
 
     @Test
-    fun currentFragmentIsHomeFragment() = runTest {
-        val activity = Robolectric.buildActivity(MainActivity::class.java)
-            .create()  // Creates the activity
-            .start()   // Starts the activity
-            .resume()  // Resumes the activity to make it interactive
-            .get()     // Gets the activity instance
-
+    fun `2 currentFragmentIsHomeFragment`() = runTest {
+        val activity = getActivity()
+        composeTestRule.waitForIdle()
         assertNotNull(activity.viewModel.currentFragment.value)
         assertEquals(
             AccountableFragment.HomeFragment,
@@ -113,20 +112,16 @@ class MainActivityTest {
     }
 
     @Test
-    fun directionIsNull() = runTest {
-        val activity = Robolectric.buildActivity(MainActivity::class.java)
-            .create()  // Creates the activity
-            .start()   // Starts the activity
-            .resume()  // Resumes the activity to make it interactive
-            .get()     // Gets the activity instance
+    fun `3 directionIsNull`() = runTest {
+        val activity = getActivity()
+        composeTestRule.waitForIdle()
         assertNull(activity.viewModel.direction.value)
     }
 
     @Test
-    fun `Main Activity Initialized`() = runTest {
-        val activity = Robolectric.buildActivity(MainActivity::class.java)
-            .setup().get()
-
+    fun `4 Main Activity Initialized`() = runTest {
+        val activity = getActivity()
+        composeTestRule.waitForIdle()
         assertNotNull(activity.viewModel.appSettings.value)
         assertNotNull(activity.viewModel.direction)
         assertNotNull(activity.viewModel.accountableNavigationController)
@@ -139,10 +134,9 @@ class MainActivityTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `Switch Fragments`() = runTest {
-        val activity = Robolectric.buildActivity(MainActivity::class.java)
-            .setup().get()
-
+    fun `5 Switch Fragments`() = runTest {
+        val activity = getActivity()
+        composeTestRule.waitForIdle()
         assertNull(activity.viewModel.direction.value)
         assertNotNull(activity.viewModel.currentFragment.value)
         assertEquals(
@@ -163,8 +157,9 @@ class MainActivityTest {
         }
     }
 
-    @OptIn(ExperimentalTestApi::class, ExperimentalCoroutinesApi::class)
-    private fun switchToNavigationDrawer(
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun TestScope.switchToNavigationDrawer(
         activity: MainActivity,
         fragment: AccountableFragment
     ) {
@@ -173,53 +168,71 @@ class MainActivityTest {
         composeTestRule.onNodeWithTag("MainActivityModalNavigationDrawerContent").assertIsNotDisplayed()
 
         activity.viewModel.toggleDrawer()
+        composeTestRule.waitForIdle()
 
         assertTrue(activity.viewModel.drawerState.value == DrawerValue.Open)
         composeTestRule.onNodeWithTag("MainActivityModalNavigationDrawerContent").assertIsDisplayed()
 
+        with(composeTestRule.onNodeWithTag("MainActivityNavigationDrawerColumn")){
+            assertExists()
+            assertIsDisplayed()
+            hasScrollAction()
+        }
+
         // Switch to fragment
         when (fragment) {
             AccountableFragment.HomeFragment -> {
-                composeTestRule.onNodeWithTag("NavigationDrawerItemHomeFragment")
-                    .assertExists()
-                    .assertHasClickAction()
-                activity.viewModel.changeFragment(AccountableFragment.HomeFragment)
-                composeTestRule.waitForIdle()
-                assertEquals(
-                    HomeViewModel::class.java.name,
-                    activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+                clickNavigationDrawerItem(
+                    activity,
+                    "NavigationDrawerItemHomeFragment",
+                    HomeViewModel::class.java.name
                 )
             }
             AccountableFragment.BooksFragment -> {
-                composeTestRule.onNodeWithTag("NavigationDrawerItemBooksFragment").assertExists()
-                activity.viewModel.changeFragment(AccountableFragment.BooksFragment)
-                composeTestRule.waitForIdle()
-                assertEquals(
-                    BooksViewModel::class.java.name,
-                    activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+                clickNavigationDrawerItem(
+                    activity,
+                    "NavigationDrawerItemBooksFragment",
+                    BooksViewModel::class.java.name
                 )
             }
             AccountableFragment.AppSettingsFragment -> {
-                composeTestRule.onNodeWithTag("NavigationDrawerItemAppSettingsFragment").assertExists()
-                activity.viewModel.changeFragment(AccountableFragment.AppSettingsFragment)
-                composeTestRule.waitForIdle()
-                assertEquals(
-                    AppSettingsViewModel::class.java.name,
-                    activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+                clickNavigationDrawerItem(
+                    activity,
+                    "NavigationDrawerItemAppSettingsFragment",
+                    AppSettingsViewModel::class.java.name
                 )
             }
             AccountableFragment.HelpFragment -> {
-                composeTestRule.onNodeWithTag("NavigationDrawerItemHelpFragment").assertExists()
-                activity.viewModel.changeFragment(AccountableFragment.HelpFragment)
-                composeTestRule.waitForIdle()
-                assertEquals(
-                    HelpViewModel::class.java.name,
-                    activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+                clickNavigationDrawerItem(
+                    activity,
+                    "NavigationDrawerItemHelpFragment",
+                    HelpViewModel::class.java.name
                 )
             }
             else -> {}
         }
         currentFragmentIs(activity, fragment)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun TestScope.clickNavigationDrawerItem(
+        activity: MainActivity,
+        tag: String,
+        viewModelName:String
+    ) {
+        with(composeTestRule.onNodeWithTag(tag)) {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performClick()
+        }
+        advanceUntilIdle()
+        composeTestRule.waitForIdle()
+        assertEquals(
+            viewModelName,
+            activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+        )
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -241,7 +254,7 @@ class MainActivityTest {
     }
 
     @Test
-    fun `Folders And Scripts Books Test`() = runTest {
+    fun `6 Folders And Scripts Books Test`() = runTest {
         val activity = Robolectric.buildActivity(MainActivity::class.java)
             .setup().get()
 

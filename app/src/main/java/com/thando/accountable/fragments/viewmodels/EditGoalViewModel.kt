@@ -38,6 +38,7 @@ import java.time.ZoneOffset
 class EditGoalViewModel(
     private val repository: AccountableRepository
 ): ViewModel() {
+    val editGoal = repository.getEditGoal()
     val newGoal = repository.getNewGoal()
     val triedToSave = MutableStateFlow(false)
     val showErrorMessage = mutableStateOf(false)

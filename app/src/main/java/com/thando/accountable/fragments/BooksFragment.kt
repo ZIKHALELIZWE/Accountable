@@ -88,6 +88,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
@@ -105,13 +106,16 @@ import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import kotlin.random.Random
@@ -231,8 +235,11 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
             floatingActionButton = if (viewModel.intentString == null) {
                 @Composable {
                     FloatingActionButton(
-                        onClick = { coroutineScope.launch { viewModel.addFolderScript() } },
-                        modifier = Modifier.padding(16.dp),
+                        onClick = { coroutineScope.launch {
+                            viewModel.addFolderScript()
+                        } },
+                        modifier = Modifier.padding(16.dp)
+                            .testTag("BooksFloatingActionButton"),
                         shape = CircleShape,
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     ) {
@@ -309,7 +316,7 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
                                 )
                             }
                             IconButton(
-                                modifier = Modifier,
+                                modifier = Modifier.testTag("BooksSwitchFolderScriptButton"),
                                 onClick = { viewModel.switchFolderScript() })
                             {
                                 Icon(

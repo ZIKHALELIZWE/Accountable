@@ -308,4 +308,5 @@
     <string name="please_enter_a_quantity">Please Enter A Quantity</string>
     <string name="task_with_time">Task With Time</string>
     <string name="select_deliverable">Select Deliverable</string>
+    <string name="edit_goal">Edit Goal</string>
 </resources>

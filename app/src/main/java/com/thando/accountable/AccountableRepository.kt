@@ -46,6 +46,8 @@ import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -220,6 +222,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun getNewGoal(): StateFlow<Flow<Goal?>?> {
         return newGoal
+    }
+
+    fun getEditGoal(): StateFlow<Goal?> {
+        return editGoal
     }
 
     fun getGoal(): MutableStateFlow<Flow<Goal?>?> {
@@ -1993,54 +1999,44 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun loadEditGoal(id: Long? = null) {
-        withContext(Dispatchers.IO) {
-            if (id != null && id != INITIAL_FOLDER_ID) {
-                // Load Existing Goal
-                val tempEditGoal = MutableStateFlow<Goal?>(
-                    getGoal(id).map { goal ->
-                        goal?.loadGoalTimes(dao)
-                        goal?.loadTasks(dao)
-                        goal?.loadMarkers(dao)
-                        goal?.loadDeliverables(dao)
-                        goal
-                    }.first()
-                        ?: return@withContext
+        if (id != null && id != INITIAL_FOLDER_ID) {
+            // Load Existing Goal
+            val tempEditGoal = MutableStateFlow<Goal?>(
+                getGoal(id).map { goal ->
+                    goal?.loadGoalTimes(dao)
+                    goal?.loadTasks(dao)
+                    goal?.loadMarkers(dao)
+                    goal?.loadDeliverables(dao)
+                    goal
+                }.first()
+                    ?: return
+            )
+            val tempNewGoal = MutableStateFlow<Goal?>(
+                Goal(
+                    parent = tempEditGoal.value!!.parent
                 )
-                val tempNewGoal = MutableStateFlow<Goal?>(
-                    Goal(
-                        parent = tempEditGoal.value!!.parent
-                    )
+            )
+            cloneGoalTo(tempEditGoal.value, tempNewGoal)
+            tempNewGoal.value?.let { newGoal ->
+                dao.update(newGoal)
+            }
+            editGoal.value = tempEditGoal.value
+            newGoal.value = getGoal(tempNewGoal.value?.id)
+        } else {
+            // Make New Goal
+            editGoal.value = null
+            newGoal.update {
+                val tempGoal = Goal(
+                    parent = folder.value?.folderId ?: INITIAL_FOLDER_ID,
+                    position = getGoals(
+                        folder.value?.folderId ?: INITIAL_FOLDER_ID
+                    ).first().size.toLong()
                 )
-                cloneGoalTo(tempEditGoal.value, tempNewGoal)
-                tempNewGoal.value?.let { newGoal ->
-                    dao.update(newGoal)
-                }
-                withContext(Dispatchers.Main) {
-                    editGoal.value = tempEditGoal.value
-                    newGoal.value = getGoal(tempNewGoal.value?.id)
-                }
-            } else {
-                // Make New Goal
-                withContext(Dispatchers.Main) {
-                    editGoal.value = null
-                    newGoal.update {
-                        withContext(Dispatchers.IO) {
-                            val tempGoal = Goal(
-                                parent = folder.value?.folderId ?: INITIAL_FOLDER_ID,
-                                position = getGoals(
-                                    folder.value?.folderId ?: INITIAL_FOLDER_ID
-                                ).first().size.toLong()
-                            )
-                            tempGoal.id = dao.insert(tempGoal)
-                            getGoal(tempGoal.id)
-                        }
-                    }
-                }
+                tempGoal.id = dao.insert(tempGoal)
+                getGoal(tempGoal.id)
             }
         }
-        withContext(Dispatchers.IO) {
-            changeFragment(AccountableFragment.EditGoalFragment)
-        }
+        changeFragment(AccountableFragment.EditGoalFragment)
     }
 
     suspend fun setNewGoalImage(imageUri: Uri? = null) {
