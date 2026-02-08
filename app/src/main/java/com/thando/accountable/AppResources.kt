@@ -13,18 +13,14 @@ import androidx.annotation.AnyRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.thando.accountable.database.tables.AppSettings
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -83,10 +79,10 @@ sealed class AppResources {
             if(inputUri.toString().contains(ContentResolver.SCHEME_ANDROID_RESOURCE)
                 && inputUri.toString().contains("/drawable/")) {
                 val resourceName = inputUri.lastPathSegment?.substringBefore(".")
-                resourceName?.let {
+                if (resourceName != null) {
                     val imageResource = context.resources.getIdentifier(resourceName, "drawable", context.packageName)
                     return ResourcesCompat.getDrawable(context.resources, imageResource, null)
-                }?:return null
+                } else return null
             }
             else return Drawable.createFromStream(context.contentResolver.openInputStream(inputUri),null)
         }
@@ -437,7 +433,7 @@ sealed class AppResources {
             if (inputFileName == AppSettings.DEFAULT_IMAGE_ID) isDrawable = true
         }
 
-        suspend fun setDefaultImage(context: Context):String{
+        fun setDefaultImage(context: Context):String{
             deleteFile(context)
             isDrawable = true
             setUri(context)
@@ -445,11 +441,11 @@ sealed class AppResources {
         }
 
         fun getAbsoluteUri(context: Context):Uri{
-            return getUriFromStorage(context)?:getDefaultUri(context)?:getUriFromDrawable(context, R.drawable.ic_launcher_foreground)
+            return getUriFromStorage(context)?:getDefaultUri(context)?:getUriFromDrawable(context, R.mipmap.ic_launcher)
         }
 
         override fun getDefaultUri(context: Context): Uri? {
-            return if (isDrawable) getUriFromDrawable(context, R.drawable.ic_launcher_foreground)
+            return if (isDrawable) getUriFromDrawable(context, R.mipmap.ic_launcher)
             else null
         }
 
@@ -534,46 +530,30 @@ sealed class AppResources {
     abstract class FileResource(var fileName: String) {
 
         private var uri: MutableStateFlow<Uri?> = MutableStateFlow(null)
-        private var uriState: MutableState<Uri?> = mutableStateOf(null)
         abstract val destinationFolder:String
         abstract fun getDefaultUri(context: Context):Uri?
         private var notInitialized = true
 
-        suspend fun saveFile(context: Context, inputUri: Uri?, contentPrefix: String, id: Long?):String?{
+        fun saveFile(context: Context, inputUri: Uri?, contentPrefix: String, id: Long?):String?{
             if (inputUri == null || id == null) return null
             deleteFile(context)
             fileName = contentPrefix + id
             saveFile( context, inputUri)
-            withContext(Dispatchers.Main) {
-                setUri(context)
-            }
+            setUri(context)
             return fileName
         }
 
         fun setUri(context: Context){
             val file = getUriFromStorage(context)?:getDefaultUri(context)
-            if (notInitialized){
-                uri.update { file }
-                uriState.value = file
-            }
-            uri.update { file }
-            uriState.value = file
+            notInitialized = false
+            uri.value = file
         }
 
         open fun getUri(context: Context): StateFlow<Uri?> {
             if (notInitialized) {
                 setUri(context)
-                notInitialized = false
             }
             return uri
-        }
-
-        open fun getStateUri(context: Context): MutableState<Uri?> {
-            if (notInitialized) {
-                setUri(context)
-                notInitialized = false
-            }
-            return uriState
         }
 
         fun getUriFromStorage(context: Context): Uri? {
@@ -586,14 +566,11 @@ sealed class AppResources {
             }
         }
 
-        suspend fun deleteFile(context: Context):Boolean {
+        fun deleteFile(context: Context):Boolean {
             val deleted = deleteFile(context, fileName)
             if (deleted) {
                 fileName = ""
-                withContext(Dispatchers.Main) {
-                    uri.update{ null }
-                    uriState.value = null
-                }
+                uri.value = null
             }
             return deleted
         }

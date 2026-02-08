@@ -43,7 +43,7 @@ class MediaNotificationManager(
             .setChannelDescriptionResourceId(R.string.media_notification_channel_description)
             .setMediaDescriptionAdapter(DescriptionAdapter(mediaController))
             .setNotificationListener(notificationListener)
-            .setSmallIconResourceId(R.drawable.ic_stars_black_24dp)
+            .setSmallIconResourceId(R.mipmap.ic_launcher)
             .build()
             .apply {
                 setPlayer(player)

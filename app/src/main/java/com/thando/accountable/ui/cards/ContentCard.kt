@@ -292,16 +292,21 @@ fun ImageCard(
 ){
     content.getUri(LocalContext.current)?.let { getContentUri ->
         val uri by getContentUri.collectAsStateWithLifecycle()
+        val context = LocalContext.current
+        var contentImage by remember { mutableStateOf<ImageBitmap?>(null) }
+        LaunchedEffect(uri) {
+            contentImage = uri?.let { uri -> AppResources.getBitmapFromUri(context,uri)?.asImageBitmap() }
+        }
 
         Column(modifier = Modifier.fillMaxWidth()) {
-            Image(
-                bitmap = uri?.let { AppResources.getBitmapFromUri(LocalContext.current, it) }
-                    ?.asImageBitmap()
-                    ?: ImageBitmap(1, 1),
-                contentDescription = stringResource(R.string.image),
-                contentScale = ContentScale.FillWidth,
-                modifier = if (isEditingScript) modifier.fillMaxWidth() else Modifier.fillMaxWidth()
-            )
+            contentImage?.let { contentImage ->
+                Image(
+                    bitmap = contentImage,
+                    contentDescription = stringResource(R.string.image),
+                    contentScale = ContentScale.FillWidth,
+                    modifier = if (isEditingScript) modifier.fillMaxWidth() else Modifier.fillMaxWidth()
+                )
+            }
             TextCard(
                 content,
                 isEditingScript,

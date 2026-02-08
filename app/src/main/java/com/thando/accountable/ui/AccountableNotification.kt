@@ -51,7 +51,7 @@ class AccountableNotification private constructor(
 
         // Build the notification
         builtNotification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stars_black_24dp) // Notification icon
+            .setSmallIcon(R.mipmap.ic_launcher) // Notification icon
             .setContentTitle(title) // Title displayed in the notification
             .setContentText("Initializing...") // Text displayed in the notification
             .setPriority(NotificationCompat.PRIORITY_LOW) // Notification priority for better visibility

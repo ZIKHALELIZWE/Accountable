@@ -1,7 +1,5 @@
 package com.thando.accountable
 
-import android.content.Context
-import android.content.res.Resources
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -12,8 +10,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -55,13 +51,12 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
-import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.fragments.TeleprompterController
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
 
-class MainActivity : ComponentActivity() {
+open class MainActivity : ComponentActivity() {
 
     val viewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory(false) }
     private val galleryLauncher = registerForActivityResult(
@@ -216,13 +211,12 @@ fun MainActivityView(
                             var image by remember { mutableStateOf<ImageBitmap?>(null) }
 
                             LaunchedEffect(imageUri) {
-                                image = imageUri?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri) }
-                                    ?.asImageBitmap()
+                                image = imageUri?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri)?.asImageBitmap() }
                                     ?: AppResources.getBitmapFromUri(
                                         context,
                                         AppResources.getUriFromDrawable(
                                             context,
-                                            R.drawable.ic_stars_black_24dp
+                                            R.mipmap.ic_launcher
                                         )
                                     )?.asImageBitmap()
                             }

@@ -109,7 +109,7 @@ fun AppSettingsView(
                     context,
                     AppResources.getUriFromDrawable(
                         context,
-                        R.drawable.ic_stars_black_24dp
+                        R.mipmap.ic_launcher
                     )
                 )?.asImageBitmap()
         }

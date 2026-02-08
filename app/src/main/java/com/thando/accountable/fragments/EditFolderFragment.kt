@@ -25,8 +25,10 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -127,6 +129,10 @@ fun EditFolderFragmentView(
         val uri by newEditFolder!!.getUri(context).collectAsStateWithLifecycle()
         val folderName = remember { newEditFolder!!.folderName }
         val listState = rememberScrollState()
+        var folderImage by remember { mutableStateOf<ImageBitmap?>(null) }
+        LaunchedEffect(uri) {
+            folderImage = uri?.let { uri -> AppResources.getBitmapFromUri(context,uri)?.asImageBitmap() }
+        }
         Column(
             modifier = modifier
                 .imePadding()
@@ -134,10 +140,9 @@ fun EditFolderFragmentView(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // folder image
-            uri?.let {
+            folderImage?.let { folderImage ->
                 Image(
-                    bitmap = AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
-                        ?: ImageBitmap(1,1),
+                    bitmap = folderImage,
                     contentDescription = stringResource(R.string.folder_image),
                     contentScale = ContentScale.FillWidth
                 )

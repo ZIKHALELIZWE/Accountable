@@ -90,7 +90,7 @@ class MainActivityViewModel(
         repository.changeFragment(newFragment)
     }
 
-    fun setGalleryLauncherReturn(process: ((Uri?) -> Unit)? = null) {
+    fun setGalleryLauncherReturn(process: ((Uri?)->Unit)? = null) {
         galleryLauncherReturnProcess = process
     }
 

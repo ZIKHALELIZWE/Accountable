@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -37,6 +39,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -106,12 +109,13 @@ class ColourPickerDialog {
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp,
                 modifier = Modifier.fillMaxWidth().wrapContentHeight()
+                    .testTag("ColourPickerDialog")
             ) {
                 Column(
                     modifier = Modifier
-                        .padding(16.dp)
+                        .padding(16.dp).verticalScroll(rememberScrollState())
                         .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         stringResource(R.string.choose_a_colour),
@@ -125,7 +129,7 @@ class ColourPickerDialog {
                             }
                     ) {
                         Canvas(
-                            modifier = Modifier.size(size)
+                            modifier = Modifier.size(size).testTag("ColourPickerDialogCanvas")
                                 .pointerInput(Unit) {
                                     detectTapGestures { offset ->
                                         val (newHue, newSaturation) = calculateColour(
@@ -191,14 +195,20 @@ class ColourPickerDialog {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Row {
-                        TextButton(onClick = {
-                            processSelectedColour(
-                                selectedColour.toArgb()
-                            )
-                        }) {
+                        TextButton(
+                            modifier = Modifier.testTag("ColourPickerDialogOKButton"),
+                            onClick = {
+                                processSelectedColour(
+                                    selectedColour.toArgb()
+                                )
+                            }
+                        ) {
                             Text("OK")
                         }
-                        TextButton(onClick = onDismiss) {
+                        TextButton(
+                            modifier = Modifier.testTag("ColourPickerDialogDismissButton"),
+                            onClick = onDismiss
+                        ) {
                             Text("Cancel")
                         }
                     }

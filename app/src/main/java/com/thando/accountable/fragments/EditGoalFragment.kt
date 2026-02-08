@@ -80,6 +80,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -93,7 +94,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
 import com.thando.accountable.AppResources.Companion.getStandardDate
 import com.thando.accountable.AppResources.Companion.getTime
-import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
@@ -103,6 +103,7 @@ import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.DayOfWeek
@@ -279,12 +280,12 @@ fun EditGoalFragmentView(
                     unpackInt2(newGoal.scrollPosition)
                 )
             }
+
             val uri by newGoal.getUri(context).collectAsStateWithLifecycle()
             val goal = remember { TextFieldState(newGoal.goal) }
             val location = remember { TextFieldState(newGoal.location) }
 
             val scope = rememberCoroutineScope()
-            val context = LocalContext.current
 
             val selectedGoalDeliverablesFlow by newGoal.selectedGoalDeliverables.collectAsStateWithLifecycle()
             val selectedGoalDeliverables by (selectedGoalDeliverablesFlow
@@ -303,6 +304,11 @@ fun EditGoalFragmentView(
             val locationFocusRequester = remember { viewModel.locationFocusRequester }
             val colourFocusRequester = remember { viewModel.colourFocusRequester }
             val bottomSheetType by viewModel.bottomSheetType.collectAsStateWithLifecycle()
+
+            var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+            LaunchedEffect(uri) {
+                imageBitmap = uri?.let { uri -> AppResources.getBitmapFromUri(context, uri)?.asImageBitmap() }
+            }
 
             LaunchedEffect(goal.text) {
                 viewModel.updateGoalString(goal.text.toString())
@@ -341,13 +347,13 @@ fun EditGoalFragmentView(
                 item {
                     Spacer(modifier = Modifier.width(2.dp))
                 }
-                uri?.let {
+                imageBitmap?.let { imageBitmap ->
                     item {
                         Image(
-                            bitmap = AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
-                                ?: ImageBitmap(1, 1),
+                            bitmap = imageBitmap,
                             contentDescription = stringResource(R.string.goal_image),
-                            contentScale = ContentScale.FillWidth
+                            contentScale = ContentScale.FillWidth,
+                            modifier = Modifier.testTag("EditGoalImage")
                         )
                     }
                     item {
@@ -365,14 +371,14 @@ fun EditGoalFragmentView(
                                     AppResources.ContentType.IMAGE
                                 )
                             },
-                            modifier = Modifier
+                            modifier = Modifier.testTag("EditGoalChooseImageButton")
                                 .weight(1f)
                                 .padding(8.dp),
                         ) { Text(stringResource(R.string.choose_image)) }
-                        uri?.let {
+                        imageBitmap?.let {
                             Button(
                                 onClick = { scope.launch { viewModel.removeImage() } },
-                                modifier = Modifier
+                                modifier = Modifier.testTag("EditGoalRemoveImageButton")
                                     .weight(1f)
                                     .padding(8.dp),
                                 // enabled =
@@ -414,7 +420,7 @@ fun EditGoalFragmentView(
                     ) {
                         if (newGoal.colour != -1) {
                             Box(
-                                modifier = Modifier
+                                modifier = Modifier.testTag("EditGoalColourDisplayBox")
                                     .fillMaxWidth()
                                     .fillMaxHeight()
                                     .padding(12.dp)
@@ -431,7 +437,7 @@ fun EditGoalFragmentView(
                                     Color(newGoal.colour)
                                 )
                             },
-                            modifier = Modifier
+                            modifier = Modifier.testTag("EditGoalPickColourButton")
                                 .fillMaxWidth()
                                 .padding(8.dp)
                                 .weight(2f)
@@ -489,7 +495,8 @@ fun EditGoalFragmentView(
                     var showEndTypeOptions by remember { mutableStateOf(false) }
                     var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>()) }
                     OutlinedButton(
-                        modifier = Modifier
+                        modifier = Modifier.testTag("EditGoalEndTypeButton")
+                            .semantics(mergeDescendants = false) {}
                             .fillMaxWidth()
                             .padding(3.dp),
                         onClick = {
@@ -519,7 +526,8 @@ fun EditGoalFragmentView(
                         if (showEndTypeOptions) {
                             DropdownMenu(
                                 expanded = true,
-                                onDismissRequest = { showEndTypeOptions = false }
+                                onDismissRequest = { showEndTypeOptions = false },
+                                modifier = Modifier.testTag("EditGoalEndTypeDropDownMenu")
                             ) {
                                 endTypeOptions.forEach { option ->
                                     DropdownMenuItem(
@@ -535,7 +543,7 @@ fun EditGoalFragmentView(
                         when (Goal.GoalEndType.valueOf(newGoal.endType)) {
                             Goal.GoalEndType.UNDEFINED -> {
                                 Text(
-                                    modifier = Modifier,
+                                    modifier = Modifier.testTag("EditGoalEndTypeUndefinedText"),
                                     text = stringResource(
                                         R.string.end_type,
                                         stringResource(R.string.undefined),
@@ -554,7 +562,8 @@ fun EditGoalFragmentView(
                                         viewModel.updatePickedDate(pickedDate)
                                     }
                                     Text(
-                                        stringResource(
+                                        modifier = Modifier.testTag("EditGoalEndTypePickedDateText"),
+                                        text = stringResource(
                                             R.string.end_type,
                                             stringResource(R.string.date),
                                             stringResource(
@@ -565,13 +574,16 @@ fun EditGoalFragmentView(
                                         )
                                     )
                                 } ?: run {
-                                    Text(stringResource(R.string.pick_a_date))
+                                    Text(
+                                        modifier = Modifier.testTag("EditGoalEndTypePickDateText"),
+                                        text = stringResource(R.string.pick_a_date))
                                 }
                             }
 
                             Goal.GoalEndType.DELIVERABLE -> {
                                 Text(
-                                    stringResource(
+                                    modifier = Modifier.testTag("EditGoalEndTypeDeliverableText"),
+                                    text = stringResource(
                                         R.string.end_type,
                                         stringResource(R.string.deliverable),
                                         ""

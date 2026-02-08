@@ -794,7 +794,7 @@ class MainActivityTest {
             val parentFileSize = parentFile.listFiles()?.size
             areEqual(parentFileSize,1,
                 "Only New Folder Image Is Stored")
-            editFolderViewModel.setImage(getUriFromDrawable(R.drawable.ic_stars_black_24dp))
+            editFolderViewModel.setImage(getUriFromDrawable(R.mipmap.ic_launcher))
             editFolderBinding.executePendingBindings()
             areEqual(parentFile.listFiles()?.size,parentFileSize,
                 "Previous Image Deleted")

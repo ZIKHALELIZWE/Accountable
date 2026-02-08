@@ -99,6 +99,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AccountableRepository
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Folder
@@ -227,7 +228,7 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
                     context,
                     AppResources.getUriFromDrawable(
                         context,
-                        R.drawable.ic_stars_black_24dp
+                        R.mipmap.ic_launcher
                     )
                 )?.asImageBitmap()
         }

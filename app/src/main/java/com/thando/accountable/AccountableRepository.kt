@@ -2040,22 +2040,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun setNewGoalImage(imageUri: Uri? = null) {
-        withContext(Dispatchers.IO) {
-            newGoal.value?.first()?.let { newGoal ->
-                deleteNewGoalImage()
-                if (newGoal.id == null) newGoal.id = dao.insert(newGoal)
-                if (imageUri != null) newGoal.saveImage(application, imageUri)
-                dao.update(newGoal)
-            }
+        newGoal.value?.first()?.let { newGoal ->
+            deleteNewGoalImage()
+            if (newGoal.id == null) newGoal.id = dao.insert(newGoal)
+            if (imageUri != null) newGoal.saveImage(application, imageUri)
+            dao.update(newGoal)
         }
     }
 
     suspend fun deleteNewGoalImage() {
-        withContext(Dispatchers.IO) {
-            newGoal.value?.first()?.let { newGoal ->
-                newGoal.deleteFile(application)
-                dao.update(newGoal)
-            }
+        newGoal.value?.first()?.let { newGoal ->
+            newGoal.deleteFile(application)
+            dao.update(newGoal)
         }
     }
 
