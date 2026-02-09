@@ -2,6 +2,7 @@ package com.thando.accountable.fragments
 
 import android.app.Activity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -35,7 +36,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.DropdownMenu
@@ -50,7 +50,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.getSelectedDate
@@ -59,6 +58,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -94,6 +94,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
 import com.thando.accountable.AppResources.Companion.getStandardDate
 import com.thando.accountable.AppResources.Companion.getTime
+import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
@@ -103,7 +104,6 @@ import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.DayOfWeek
@@ -303,7 +303,6 @@ fun EditGoalFragmentView(
             val goalFocusRequester = remember { viewModel.goalFocusRequester }
             val locationFocusRequester = remember { viewModel.locationFocusRequester }
             val colourFocusRequester = remember { viewModel.colourFocusRequester }
-            val bottomSheetType by viewModel.bottomSheetType.collectAsStateWithLifecycle()
 
             var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
             LaunchedEffect(uri) {
@@ -477,30 +476,27 @@ fun EditGoalFragmentView(
                         initialSelectedDateMillis = pickedDate
                             .toInstant(ZoneOffset.UTC).toEpochMilli()
                     )
-                    var buttonDatePick by remember { mutableStateOf(false) }
-                    var buttonTimePick by remember { mutableStateOf(false) }
-                    if (buttonDatePick) {
+
+                    if (viewModel.buttonDatePick.collectAsState().value) {
                         PickDate(stateDate) { pickTime ->
-                            buttonDatePick = false
-                            buttonTimePick = pickTime
+                            viewModel.buttonDatePick.value = false
+                            viewModel.buttonTimePick.value = pickTime
                         }
                     }
-                    if (buttonTimePick) {
+                    if (viewModel.buttonTimePick.collectAsState().value) {
                         PickTime(stateTime) {
-                            buttonTimePick = false
-                            pickedDate =
-                                pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+                            viewModel.buttonTimePick.value = false
+                            pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
                         }
                     }
-                    var showEndTypeOptions by remember { mutableStateOf(false) }
-                    var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>()) }
+
                     OutlinedButton(
                         modifier = Modifier.testTag("EditGoalEndTypeButton")
                             .semantics(mergeDescendants = false) {}
                             .fillMaxWidth()
                             .padding(3.dp),
                         onClick = {
-                            endTypeOptions = listOf(
+                            viewModel.endTypeOptions.value = listOf(
                                 MenuItemData(Goal.GoalEndType.UNDEFINED.name) {
                                     scope.launch {
                                         viewModel.updateEndType(Goal.GoalEndType.UNDEFINED)
@@ -510,7 +506,7 @@ fun EditGoalFragmentView(
                                     scope.launch {
                                         viewModel.updateEndType(Goal.GoalEndType.DATE)
                                     }
-                                    buttonDatePick = true
+                                    viewModel.buttonDatePick.value = true
                                 },
                                 MenuItemData(Goal.GoalEndType.DELIVERABLE.name) {
                                     scope.launch {
@@ -518,23 +514,24 @@ fun EditGoalFragmentView(
                                     }
                                 }
                             )
-                            showEndTypeOptions = true
+                            viewModel.showEndTypeOptions.value = true
                         },
                         shape = RectangleShape,
                         border = BorderStroke(1.dp, Color.DarkGray)
                     ) {
-                        if (showEndTypeOptions) {
+                        if (viewModel.showEndTypeOptions.collectAsState().value) {
                             DropdownMenu(
                                 expanded = true,
-                                onDismissRequest = { showEndTypeOptions = false },
+                                onDismissRequest = { viewModel.showEndTypeOptions.value = false },
                                 modifier = Modifier.testTag("EditGoalEndTypeDropDownMenu")
                             ) {
-                                endTypeOptions.forEach { option ->
+                                viewModel.endTypeOptions.collectAsState().value.forEach { option ->
                                     DropdownMenuItem(
+                                        modifier = Modifier.testTag("EditGoalDropdownMenuItem-${option.text}"),
                                         text = { Text(option.text) },
                                         onClick = {
                                             option.onClick.invoke()
-                                            showEndTypeOptions = false
+                                            viewModel.showEndTypeOptions.value = false
                                         }
                                     )
                                 }
@@ -558,7 +555,9 @@ fun EditGoalFragmentView(
                                         localDate,
                                         LocalTime.of(stateTime.hour, stateTime.minute)
                                     )
-                                    LaunchedEffect(pickedDate) {
+                                    LaunchedEffect(
+                                        pickedDate
+                                    ) {
                                         viewModel.updatePickedDate(pickedDate)
                                     }
                                     Text(
@@ -600,14 +599,14 @@ fun EditGoalFragmentView(
                         ) {
                             Button(
                                 onClick = { scope.launch { viewModel.addDeliverable() } },
-                                modifier = Modifier
+                                modifier = Modifier.testTag("EditGoalAddDeliverableButton")
                                     .fillMaxWidth()
                                     .padding(8.dp)
                                     .weight(1f)
                             ) { Text(stringResource(R.string.add_deliverable)) }
                             Button(
                                 onClick = { scope.launch { viewModel.selectDeliverable() } },
-                                modifier = Modifier
+                                modifier = Modifier.testTag("EditGoalSelectDeliverableButton")
                                     .fillMaxWidth()
                                     .padding(8.dp)
                                     .weight(1f),
@@ -1022,40 +1021,48 @@ fun PickerMenu(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PickDate(state: DatePickerState, closeDialog: (Boolean)->Unit){
     val openDialog = remember { mutableStateOf(true) }
 
     if (openDialog.value) {
+        val testFunction = remember { mutableStateOf<(()->Unit)?>(null) }
         DatePickerDialog(
+            modifier = Modifier.testTag("EditGoalFragmentDatePickerDialog"),
             onDismissRequest = {
                 openDialog.value = false
                 closeDialog(false)
             },
             confirmButton = {
                 TextButton(
+                    modifier = Modifier.testTag("EditGoalDatePickerDialogOKButton"),
                     onClick = {
                         openDialog.value = false
+                        testFunction.value?.invoke()
                         closeDialog(true)
                     }
                 ) {
-                    Text("OK")
+                    Text(stringResource(R.string.save))
                 }
             },
             dismissButton = {
                 TextButton(
+                    modifier = Modifier.testTag("EditGoalDatePickerDialogCANCELButton"),
                     onClick = {
                         openDialog.value = false
                         closeDialog(false)
                     }
                 ) {
-                    Text("CANCEL")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         ) {
-            DatePicker(
-                state = state
-            )
+            LocalActivity.current?.let { activity -> (activity as MainActivity).DatePicker(
+                state
+            ){
+                testFunction.value = it
+            }}
         }
     }
 }
@@ -1065,17 +1072,20 @@ fun PickDate(state: DatePickerState, closeDialog: (Boolean)->Unit){
 fun PickTime(state: TimePickerState, closeDialog: ()->Unit) {
     val openDialog = remember { mutableStateOf(true) }
 
-
     if (openDialog.value) {
+        val testFunction = remember { mutableStateOf<(()->Unit)?>(null) }
         val currentState = rememberTimePickerState(state.hour,state.minute,state.is24hour)
         TimePickerDialog(
+            modifier = Modifier.testTag("EditGoalFragmentTimePickerDialog"),
             onDismissRequest = {
                 openDialog.value = false
                 closeDialog()
             },
             confirmButton = {
                 TextButton(
+                    modifier = Modifier.testTag("EditGoalTimePickerDialogOKButton"),
                     onClick = {
+                        testFunction.value?.invoke()
                         openDialog.value = false
                         state.hour = currentState.hour
                         state.minute = currentState.minute
@@ -1083,24 +1093,27 @@ fun PickTime(state: TimePickerState, closeDialog: ()->Unit) {
                         closeDialog()
                     }
                 ) {
-                    Text("OK")
+                    Text(stringResource(R.string.save))
                 }
             },
             title = { Text(stringResource(R.string.nothing)) },
             dismissButton = {
                 TextButton(
+                    modifier = Modifier.testTag("EditGoalTimePickerDialogCANCELButton"),
                     onClick = {
                         openDialog.value = false
                         closeDialog()
                     }
                 ) {
-                    Text("CANCEL")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         ) {
-            TimePicker(
-                state = currentState
-            )
+            LocalActivity.current?.let { activity -> (activity as MainActivity).TimePicker(
+                currentState
+            ){
+                testFunction.value = it
+            }}
         }
     }
 }

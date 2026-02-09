@@ -27,6 +27,7 @@ import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.proce
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.saveClickedDeliverable
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showBottomSheetCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showInputError
+import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.cards.ColourPickerDialog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +51,11 @@ class EditGoalViewModel(
     val originalDeliverable = MutableStateFlow<Flow<Deliverable?>?>(null)
     val triedToSaveBottomSheet = MutableStateFlow(false)
     val bottomSheetType = MutableStateFlow<Goal.GoalTab?>(null)
+
+    val showEndTypeOptions = MutableStateFlow(false)
+    val buttonDatePick = MutableStateFlow(false)
+    val buttonTimePick = MutableStateFlow(false)
+    val endTypeOptions = MutableStateFlow(listOf<MenuItemData>())
 
     private fun showError(
         message: Int,

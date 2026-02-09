@@ -1,32 +1,38 @@
 package com.thando.accountable.fragments
 
-import android.app.Application
-import android.content.Context
 import android.net.Uri
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.compose.material3.DatePickerState
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TimePickerState
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.packInts
+import androidx.compose.ui.util.unpackInt1
+import androidx.compose.ui.util.unpackInt2
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityTest.FilteredPrintStream
-import com.thando.accountable.MainActivityTest.Log
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
+import com.thando.accountable.fragments.TestMainActivity.Companion.addTime
 import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.fragments.viewmodels.HomeViewModel
@@ -49,20 +55,75 @@ import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowLog
 import java.io.File
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 class TestMainActivity : MainActivity() {
     val jvmTempDir = File(System.getProperty("java.io.tmpdir"), "robolectricFiles")
-    override fun getFilesDir(): File? {
+    private var daysToAdd = 0L
+    private var timeToAdd = packInts(0,0)
+
+    override fun getFilesDir(): File {
         return jvmTempDir
     }
 
+    fun daysToAdd (input: Long) {
+        daysToAdd = input
+    }
+
+    fun timeToAdd(minutes:Int,hours:Int){
+        timeToAdd = packInts(minutes,hours)
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    override fun DatePicker(
+        state: DatePickerState,
+        onDismiss:(()->Unit)->Unit
+    ) {
+        onDismiss.invoke {
+            state.addDays(daysToAdd)
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    override fun TimePicker(
+        state: TimePickerState,
+        onDismiss: (() -> Unit) -> Unit
+    ) {
+        androidx.compose.material3.TimePicker(state)
+        onDismiss.invoke {
+            state.addTime(unpackInt2(timeToAdd),unpackInt1(timeToAdd))
+        }
+    }
+
     companion object {
-        fun logDirectoryContents(dir: File) {
+        fun DatePickerState.addDays(days: Long) {
+            val currentMillis = this.selectedDateMillis ?: return
+            val currentDate = Instant.ofEpochMilli(currentMillis)
+                .atZone(ZoneOffset.UTC)
+                .toLocalDate()
+            val newDate = currentDate.plusDays(days)
+            this.selectedDateMillis = newDate
+                .atStartOfDay(ZoneOffset.UTC)
+                .toInstant()
+                .toEpochMilli()
+        }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        fun TimePickerState.addTime(hours: Int, minutes: Int){
+            val totalMinutes = (this.hour + hours) * 60 + this.minute + minutes
+            this.hour = if ((totalMinutes/60)>23) 23 else (totalMinutes / 60) % 24
+            this.minute = if ((totalMinutes/60)>23) 59 else totalMinutes % 60
+        }
+
+        /*fun logDirectoryContents(dir: File) {
             if (!dir.exists() || !dir.isDirectory) {
                 Log.i("DirLogger", "Invalid directory: ${dir.absolutePath}")
                 return
@@ -76,7 +137,7 @@ class TestMainActivity : MainActivity() {
                 }
             }
             walk(dir)
-        }
+        }*/
     }
 }
 
@@ -482,7 +543,154 @@ class EditGoalTests {
         assertNotNull(editGoalViewModel)
         assertNull(editGoalViewModel.editGoal.value)
 
-        assertEquals(Goal.GoalEndType.UNDEFINED.name,
+        assertEquals(
+            Goal.GoalEndType.UNDEFINED.name,
+            editGoalViewModel.newGoal.value?.first()?.endType
+        )
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeButton").apply {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeDropDownMenu").apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDropdownMenuItem-${Goal.GoalEndType.DELIVERABLE.name}"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            Goal.GoalEndType.DELIVERABLE.name,
+            editGoalViewModel.newGoal.value?.first()?.endType
+        )
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeButton").apply {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeDropDownMenu").apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDropdownMenuItem-${Goal.GoalEndType.UNDEFINED.name}"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            Goal.GoalEndType.UNDEFINED.name,
+            editGoalViewModel.newGoal.value?.first()?.endType
+        )
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun `11 End Type Date`() = runTest {
+        val activity = getActivity()
+        composeTestRule.waitForIdle()
+
+        val editGoalViewModel: EditGoalViewModel =
+            activity.viewModel.accountableNavigationController.fragmentViewModel.value!! as EditGoalViewModel
+        assertNotNull(editGoalViewModel)
+        assertNull(editGoalViewModel.editGoal.value)
+
+        assertEquals(
+            Goal.GoalEndType.UNDEFINED.name,
+            editGoalViewModel.newGoal.value?.first()?.endType
+        )
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeButton").apply {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeDropDownMenu").apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(Goal.GoalEndType.DATE.name,
+            editGoalViewModel.newGoal.value?.first()?.endType)
+
+        assertNotNull(editGoalViewModel.newGoal.value?.first()?.endDateTime)
+        val previousEndDateTime = editGoalViewModel.newGoal.value?.first()?.endDateTime
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalFragmentDatePickerDialog"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDatePickerDialogOKButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDatePickerDialogCANCELButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            previousEndDateTime,
+            editGoalViewModel.newGoal.value?.first()?.endDateTime
+        )
+
+        assertEquals(Goal.GoalEndType.DATE.name,
             editGoalViewModel.newGoal.value?.first()?.endType)
 
         composeTestRule.onNodeWithTag("EditGoalEndTypeButton").apply {
@@ -499,5 +707,236 @@ class EditGoalTests {
             assertExists()
             assertIsDisplayed()
         }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(Goal.GoalEndType.DATE.name,
+            editGoalViewModel.newGoal.value?.first()?.endType)
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalFragmentDatePickerDialog"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDatePickerDialogOKButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            previousEndDateTime,
+            editGoalViewModel.newGoal.value?.first()?.endDateTime
+        )
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalFragmentTimePickerDialog"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalTimePickerDialogCANCELButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalTimePickerDialogOKButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            previousEndDateTime,
+            editGoalViewModel.newGoal.value?.first()?.endDateTime
+        )
+
+        activity.timeToAdd(2,2)
+        activity.daysToAdd(2)
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeButton").apply {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeDropDownMenu").apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalFragmentDatePickerDialog"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDatePickerDialogOKButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            LocalDateTime.ofEpochSecond(
+                previousEndDateTime!!/1000, 0,
+                ZoneOffset.UTC
+            ).plusDays(2).toInstant(ZoneOffset.UTC).toEpochMilli(),
+            editGoalViewModel.newGoal.value!!.first()!!.endDateTime
+        )
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalFragmentTimePickerDialog"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalTimePickerDialogCANCELButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalTimePickerDialogOKButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            hasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        val endTimeDate = LocalDateTime.ofEpochSecond(
+            previousEndDateTime /1000, 0,
+            ZoneOffset.UTC
+        )
+        val timePickerState = TimePickerState(endTimeDate.hour,endTimeDate.minute,true)
+        timePickerState.addTime(2,2)
+        assertEquals(
+            endTimeDate.plusDays(2).withHour(timePickerState.hour)
+                .withMinute(timePickerState.minute).toInstant(ZoneOffset.UTC)
+                .toEpochMilli(),
+            editGoalViewModel.newGoal.value!!.first()!!.endDateTime
+        )
+
+        activity.timeToAdd(0,0)
+        activity.daysToAdd(0)
+    }
+
+    @Test
+    fun `12 End Type Deliverable`() = runTest {
+        val activity = getActivity()
+        composeTestRule.waitForIdle()
+
+        val editGoalViewModel: EditGoalViewModel =
+            activity.viewModel.accountableNavigationController.fragmentViewModel.value!! as EditGoalViewModel
+        assertNotNull(editGoalViewModel)
+        assertNull(editGoalViewModel.editGoal.value)
+
+        assertEquals(
+            Goal.GoalEndType.DATE.name,
+            editGoalViewModel.newGoal.value?.first()?.endType
+        )
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeButton").apply {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("EditGoalEndTypeDropDownMenu").apply {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalDropdownMenuItem-${Goal.GoalEndType.DELIVERABLE.name}"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performClick()
+            advanceUntilIdle()
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(
+            Goal.GoalEndType.DELIVERABLE.name,
+            editGoalViewModel.newGoal.value?.first()?.endType
+        )
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalAddDeliverableButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+        }
+
+        composeTestRule.onNodeWithTag(
+            "EditGoalSelectDeliverableButton"
+        ).apply {
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertIsNotEnabled()
+        }
+
+
     }
 }

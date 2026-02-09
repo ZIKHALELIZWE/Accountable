@@ -3,6 +3,7 @@ package com.thando.accountable
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
+import android.widget.TimePicker
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -22,6 +23,11 @@ import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.outlined.Help
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerColors
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerFormatter
+import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +38,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.TimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -151,6 +159,27 @@ open class MainActivity : ComponentActivity() {
     private fun skipBackAction() {
         // You can expose this via a shared ViewModel or state holder
         TeleprompterController.skipBack()
+    }
+
+    @Composable
+    open fun DatePicker(
+        state: DatePickerState,
+        onDismiss:(()->Unit)->Unit
+    ){
+        androidx.compose.material3.DatePicker(
+            state = state
+        )
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    open fun TimePicker(
+        state: TimePickerState,
+        onDismiss:(()->Unit)->Unit
+    ){
+        androidx.compose.material3.TimePicker(
+            state = state
+        )
     }
 }
 
