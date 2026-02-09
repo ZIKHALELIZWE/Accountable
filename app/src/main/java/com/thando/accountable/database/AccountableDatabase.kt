@@ -147,7 +147,8 @@ abstract class AccountableDatabase: RoomDatabase() {
                             db.execSQL("ALTER TABLE task_table ADD task_time INTEGER DEFAULT undefined NOT NULL")
                         },
                         Migration(8,9){ db ->
-                            db.execSQL("ALTER TABLE goal_table ADD goal_end_date INTEGER DEFAULT ${LocalDateTime.now().toInstant(ZoneOffset.UTC)?.toEpochMilli()} NOT NULL")
+                            db.execSQL("ALTER TABLE goal_table ADD goal_end_date INTEGER DEFAULT ${Converters().fromLocalDateTime(
+                                LocalDateTime.now())} NOT NULL")
                             db.execSQL("ALTER TABLE goal_table ADD goal_end_type TEXT DEFAULT ${Goal.GoalEndType.UNDEFINED.name} NOT NULL")
                         },
                         Migration(9,10) { db ->

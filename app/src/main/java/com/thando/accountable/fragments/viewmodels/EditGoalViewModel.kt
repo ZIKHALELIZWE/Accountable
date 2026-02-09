@@ -7,10 +7,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
-import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableRepository
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
+import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
@@ -33,7 +33,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 class EditGoalViewModel(
     private val repository: AccountableRepository
@@ -56,6 +55,15 @@ class EditGoalViewModel(
     val buttonDatePick = MutableStateFlow(false)
     val buttonTimePick = MutableStateFlow(false)
     val endTypeOptions = MutableStateFlow(listOf<MenuItemData>())
+
+    init {
+        MainActivity.log("Initializing")
+    }
+
+    override fun onCleared() {
+        MainActivity.log("Clearing")
+        super.onCleared()
+    }
 
     private fun showError(
         message: Int,
@@ -85,6 +93,12 @@ class EditGoalViewModel(
         }
     }
 
+    suspend fun updateScrollPosition(scrollPosition: Long) {
+        newGoal.value?.first()?.let { newGoal ->
+            repository.update(newGoal.copy(scrollPosition = scrollPosition))
+        }
+    }
+
     suspend fun updateLocation(location: String) {
         newGoal.value?.first()?.let{ newGoal ->
             repository.update(newGoal.copy(location = location))
@@ -94,7 +108,7 @@ class EditGoalViewModel(
     suspend fun updatePickedDate(pickedDate: LocalDateTime) {
         newGoal.value?.first()?.let{ newGoal ->
             repository.update(newGoal.copy(
-                endDateTime = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                endDateTime = Converters().fromLocalDateTime(pickedDate)
             ))
         }
     }
@@ -291,7 +305,9 @@ class EditGoalViewModel(
             return
         }
         newGoal.value?.first()?.times?.value?.first()?.forEach { time ->
-            val duration = LocalDateTime.ofEpochSecond(time.duration/1000,0, ZoneOffset.UTC)
+            val duration = Converters().toLocalDateTime(
+                    time.duration
+                ).value
             if (duration.hour == 0 && duration.minute == 0) {
                 showError(
                     R.string.please_select_a_duration,
@@ -305,21 +321,6 @@ class EditGoalViewModel(
 
     // Define ViewModel factory in a companion object
     companion object {
-        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(
-                modelClass: Class<T>,
-                extras: CreationExtras
-            ): T {
-                // Get the Application object from extras
-                val application = checkNotNull(extras[APPLICATION_KEY])
-
-                val accountableRepository = AccountableRepository.getInstance(application)
-
-                return EditGoalViewModel(
-                    accountableRepository
-                ) as T
-            }
-        }
+        val Factory: ViewModelProvider.Factory = MainActivity.getEditGoalViewModelFactory()
     }
 }

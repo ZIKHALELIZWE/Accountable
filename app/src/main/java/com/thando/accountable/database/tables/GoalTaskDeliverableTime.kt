@@ -5,6 +5,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
+import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Goal.TimeBlockType
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -24,10 +25,10 @@ data class GoalTaskDeliverableTime (
     var timeBlockType: String = TimeBlockType.ONCE.name,
 
     @ColumnInfo(name = "times_start")
-    var start: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var start: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo(name = "times_duration")
-    var duration: Long = LocalDateTime.now().withHour(0).withMinute(0).toInstant(ZoneOffset.UTC).toEpochMilli()
+    var duration: Long = Converters().fromLocalDateTime(LocalDateTime.now())
 ){
     enum class TimesType{
         GOAL, TASK, DELIVERABLE

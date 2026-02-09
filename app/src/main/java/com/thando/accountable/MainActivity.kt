@@ -3,7 +3,6 @@ package com.thando.accountable
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
-import android.widget.TimePicker
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -12,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,9 +24,6 @@ import androidx.compose.material.icons.automirrored.outlined.Help
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerColors
-import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerFormatter
 import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
@@ -37,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePickerState
 import androidx.compose.runtime.Composable
@@ -48,18 +46,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.fragments.TeleprompterController
+import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicReference
@@ -137,12 +141,6 @@ open class MainActivity : ComponentActivity() {
         }
     }
 
-    companion object{
-        fun log(message:String){
-            Log.i("FATAL EXCEPTION",message)
-        }
-    }
-
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // Detect Bluetooth remote click (often volume or camera key)
         if (keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
@@ -161,25 +159,111 @@ open class MainActivity : ComponentActivity() {
         TeleprompterController.skipBack()
     }
 
-    @Composable
-    open fun DatePicker(
-        state: DatePickerState,
-        onDismiss:(()->Unit)->Unit
-    ){
-        androidx.compose.material3.DatePicker(
-            state = state
-        )
-    }
+    companion object{
+        fun log(message:String){
+            Log.i("FATAL EXCEPTION",message)
+        }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    open fun TimePicker(
-        state: TimePickerState,
-        onDismiss:(()->Unit)->Unit
-    ){
-        androidx.compose.material3.TimePicker(
-            state = state
-        )
+        // Default implementation points to Material3 Icon
+        var iconImpl: @Composable (ImageVector, String, Color) -> Unit =
+            { imageVector, contentDescription, tint ->
+                androidx.compose.material3.Icon(
+                    imageVector = imageVector,
+                    contentDescription = contentDescription,
+                    tint = tint
+                )
+            }
+
+        @Composable
+        fun Icon(imageVector: ImageVector, contentDescription: String, tint: Color) {
+            iconImpl(imageVector, contentDescription, tint)
+        }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        var timePickerImpl: @Composable (TimePickerState, (()->Unit)->Unit) -> Unit =
+            { state, _ ->
+                androidx.compose.material3.TimePicker(
+                    state = state
+                )
+            }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        @Composable
+        fun TimePicker(
+            state: TimePickerState,
+            onDismiss:(()->Unit)->Unit
+        ){
+            timePickerImpl(state,onDismiss)
+        }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        var datePickerImpl: @Composable (DatePickerState, (()->Unit)->Unit) -> Unit =
+            { state, _ ->
+                DatePicker(
+                    state = state
+                )
+            }
+
+        @Composable
+        fun DatePicker(
+            state: DatePickerState,
+            onDismiss:(()->Unit)->Unit
+        ){
+            datePickerImpl(state,onDismiss)
+        }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        var modalBottomSheetImpl: @Composable (
+            () -> Unit,
+            SheetState,
+            Modifier,
+            @Composable (ColumnScope.() -> Unit)
+        ) -> Unit =
+            { onDismissRequest, sheetState, modifier, content ->
+                androidx.compose.material3.ModalBottomSheet(
+                    onDismissRequest = onDismissRequest,
+                    sheetState = sheetState,
+                    modifier = modifier,
+                    content = content
+                )
+            }
+
+        @OptIn(ExperimentalMaterial3Api::class)
+        @Composable
+        fun ModalBottomSheet(
+            onDismissRequest: () -> Unit,
+            sheetState: SheetState,
+            modifier: Modifier,
+            content: @Composable (ColumnScope.() -> Unit)
+        ) {
+            modalBottomSheetImpl(
+                onDismissRequest,
+                sheetState,
+                modifier,
+                content
+            )
+        }
+
+        var getEditGoalViewModelFactoryImpl = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(
+                modelClass: Class<T>,
+                extras: CreationExtras
+            ): T {
+                // Get the Application object from extras
+                val application = checkNotNull(extras[APPLICATION_KEY])
+
+                val accountableRepository = AccountableRepository.getInstance(application)
+
+                return EditGoalViewModel(
+                    accountableRepository
+                ) as T
+            }
+        }
+
+        fun getEditGoalViewModelFactory(): ViewModelProvider.Factory {
+            return getEditGoalViewModelFactoryImpl
+        }
     }
 }
 

@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -46,12 +45,8 @@ import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -2511,7 +2506,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun getDeliverablesWithTimes(parentId: Long): Flow<List<Deliverable>> {
+    fun getDeliverables(parentId: Long): Flow<List<Deliverable>> {
         return dao.getDeliverables(parentId).map { deliverables ->
             deliverables.forEach { deliverable ->
                 deliverable.loadTimes(dao)

@@ -6,6 +6,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
+import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,10 +25,10 @@ data class Deliverable (
     var position: Long,
 
     @ColumnInfo (name = "deliverable_initial_date")
-    var initialDateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var initialDateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "deliverable_end_date")
-    var endDateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var endDateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "deliverable_end_type")
     var endType: String = DeliverableEndType.UNDEFINED.name,

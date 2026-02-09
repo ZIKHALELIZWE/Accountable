@@ -6,6 +6,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
+import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,10 +28,10 @@ data class Task(
     var position: Long,
 
     @ColumnInfo (name = "task_initial_date")
-    var initialDateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var initialDateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "task_end_date")
-    var endDateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var endDateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "task_end_type")
     var endType: String = TaskEndType.UNDEFINED.name,
@@ -48,7 +49,7 @@ data class Task(
     var quantity: Long = 0L,
 
     @ColumnInfo (name = "task_time")
-    var time: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var time: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "task_status")
     var status : String = Goal.Status.PENDING.name,

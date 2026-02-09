@@ -10,6 +10,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
+import com.thando.accountable.database.Converters
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
@@ -25,7 +26,7 @@ data class Marker(
     var position: Long,
 
     @ColumnInfo (name = "marker_date_time")
-    var dateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var dateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "marker_edit_scroll_position")
     var scrollPosition: Long = packInts(0,0),

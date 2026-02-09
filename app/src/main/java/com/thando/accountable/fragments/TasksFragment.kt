@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldState
@@ -38,6 +37,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,7 +45,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
@@ -69,6 +68,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
@@ -80,6 +80,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -90,8 +91,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.util.unpackInt1
-import androidx.compose.ui.util.unpackInt2
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -99,8 +98,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
 import com.thando.accountable.AppResources.Companion.getStandardDate
 import com.thando.accountable.AppResources.Companion.getTime
+import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
+import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.Goal.GoalTab
@@ -114,6 +115,8 @@ import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.LocalDateTime
@@ -264,6 +267,7 @@ fun TaskView(
                     modifier = Modifier.padding(innerPadding)
                 )
                 TaskDeliverableMarkerBottomSheet(
+                    parentGoal = viewModel.goal,
                     bottomSheetTypeState = viewModel.bottomSheetType,
                     dismissBottomSheet = viewModel::dismissBottomSheet,
                     triedToSaveInput = viewModel.triedToSave,
@@ -315,6 +319,7 @@ fun TaskDeliverableMarkerBottomSheet(
     deleteDeliverableClicked: (suspend () -> Unit)?=null,
     originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
     deliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+    parentGoal: StateFlow<Flow<Goal?>?>,
     deleteMarkerClicked: (suspend () -> Unit)?=null,
     originalMarker: MutableStateFlow<Flow<Marker?>?>?=null,
     marker: MutableStateFlow<Flow<Marker?>?>?=null,
@@ -324,11 +329,12 @@ fun TaskDeliverableMarkerBottomSheet(
     val bottomSheetType by bottomSheetTypeState.collectAsStateWithLifecycle()
     bottomSheetType?.let { bottomSheetType ->
         val sheetState = rememberModalBottomSheetState()
-        ModalBottomSheet(
+        MainActivity.ModalBottomSheet(
             onDismissRequest = {
                 scope.launch { dismissBottomSheet() }
             },
-            sheetState = sheetState
+            sheetState = sheetState,
+            modifier = Modifier.testTag("TasksFragmentDeliverablesBottomSheet")
         ) {
             when (bottomSheetType) {
                 GoalTab.TASKS -> {
@@ -354,6 +360,7 @@ fun TaskDeliverableMarkerBottomSheet(
                     AddDeliverableView(
                         originalDeliverableStateFlow = originalDeliverable,
                         deliverableStateFlow = deliverable,
+                        parentGoal = parentGoal,
                         triedToSaveInput = triedToSaveInput,
                         processBottomSheetAdd = processBottomSheetAdd,
                         showErrorMessage = showErrorMessage,
@@ -390,10 +397,16 @@ fun TasksFragmentView(
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
-    val tabListState = remember { LazyListState(
-        unpackInt1(goal.tabListState),
-        unpackInt2(goal.tabListState)
-    ) }
+    val tabListState = remember {
+        Converters().fromScrollStateLazy(goal.tabListState)
+    }
+    LaunchedEffect(tabListState) {
+        snapshotFlow { tabListState.isScrollInProgress }
+            .filter { !it } // only when scrolling ends
+            .collect {
+                viewModel.updateGoal(goal.copy(tabListState = Converters().toScrollStateLazy(tabListState)))
+            }
+    }
     val goalTitle = remember { TextFieldState(goal.goal) }
     val tabs = listOf(
         stringResource(R.string.tasks),
@@ -506,10 +519,16 @@ fun TaskCardView(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val taskText = remember { TextFieldState(task.task) }
-    val timeCreated by remember { mutableStateOf(LocalDateTime.ofEpochSecond(task.initialDateTime/1000,0,
-        ZoneOffset.UTC)) }
+    val timeCreated by remember {
+        Converters().toLocalDateTime(
+            task.initialDateTime
+        )
+    }
     val endDateTime by remember {
-        mutableStateOf(LocalDateTime.ofEpochSecond(task.endDateTime/1000,0, ZoneOffset.UTC)) }
+        Converters().toLocalDateTime(
+            task.endDateTime
+        )
+    }
     val location = remember { TextFieldState(task.location) }
 
     Card(
@@ -736,10 +755,16 @@ fun AddTaskView(
         val errorMessage by remember { errorMessage }
 
         val bottomSheetLazyListState = remember {
-            LazyListState(
-                unpackInt1(task.scrollPosition),
-                unpackInt2(task.scrollPosition)
-            )
+            Converters().fromScrollStateLazy(task.scrollPosition)
+        }
+        LaunchedEffect(bottomSheetLazyListState) {
+            snapshotFlow { bottomSheetLazyListState.isScrollInProgress }
+                .filter { !it } // only when scrolling ends
+                .collect {
+                    updateTask(task.copy(
+                        scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)
+                    ))
+                }
         }
         val taskText = remember { TextFieldState(task.task) }
         val taskTextFocusRequester = remember { task.taskTextFocusRequester }
@@ -748,8 +773,11 @@ fun AddTaskView(
         val timesFlow by task.times.collectAsStateWithLifecycle()
         val times by (timesFlow?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
         val colourFocusRequester = remember { task.colourFocusRequester }
-        var taskTime by remember { mutableStateOf(LocalDateTime.ofEpochSecond(task.time/1000,0, ZoneOffset.UTC)) }
-
+        var taskTime by remember {
+            Converters().toLocalDateTime(
+                task.time
+            )
+        }
         LaunchedEffect (showErrorMessage) {
             if (showErrorMessage) { delay(2000) // message disappears after 2 seconds
                 showErrorMessage = false
@@ -782,7 +810,9 @@ fun AddTaskView(
             ) {
                 item {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(3.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(3.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         Task.TaskType.entries.forEach { boxType ->
@@ -925,13 +955,14 @@ fun AddTaskView(
                                 TimeDurationPicker(datePicked, taskTime) { hours, minutes ->
                                     taskTime = taskTime.withHour(hours).withMinute(minutes)
                                     scope.launch {
-                                        updateTask(task.copy(time = taskTime.toInstant(ZoneOffset.UTC).toEpochMilli()))
+                                        updateTask(task.copy(time = Converters().fromLocalDateTime(taskTime)))
                                     }
                                     buttonDurationPick.value = false
                                 }
                             }
                             FlowRow(
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
                                     .padding(3.dp),
                                 maxItemsInEachRow = Int.MAX_VALUE // allow natural wrapping
                             ) {
@@ -992,7 +1023,8 @@ fun AddTaskView(
                 item {
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth().padding(3.dp)
+                            .fillMaxWidth()
+                            .padding(3.dp)
                             .height(IntrinsicSize.Min),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1014,7 +1046,8 @@ fun AddTaskView(
                                 Color(task.colour)
                             ) },
                             modifier = Modifier
-                                .fillMaxWidth().fillMaxHeight()
+                                .fillMaxWidth()
+                                .fillMaxHeight()
                                 .weight(2f)
                                 .focusRequester(colourFocusRequester),
                             shape = RectangleShape
@@ -1045,7 +1078,7 @@ fun AddTaskView(
                         true
                     )
                     val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                        initialSelectedDateMillis = Converters().fromLocalDateTime(pickedDate)
                     )
                     var buttonDatePick by remember { mutableStateOf(false) }
                     var buttonTimePick by remember { mutableStateOf(false) }
@@ -1275,6 +1308,7 @@ fun DeliverableCardView(
 fun AddDeliverableView(
     originalDeliverableStateFlow: MutableStateFlow<Flow<Deliverable?>?>,
     deliverableStateFlow: MutableStateFlow<Flow<Deliverable?>?>,
+    parentGoal: StateFlow<Flow<Goal?>?>,
     triedToSaveInput: MutableStateFlow<Boolean>,
     processBottomSheetAdd: suspend () -> Unit,
     showErrorMessage: MutableState<Boolean>,
@@ -1315,6 +1349,7 @@ fun AddDeliverableView(
                     R.string.add,stringResource(R.string.deliverable)
                 ),
                 modifier = Modifier
+                    .testTag("TasksFragmentDeliverableTitle")
                     .fillMaxWidth()
                     .padding(vertical = 15.dp, horizontal = 5.dp),
                 textAlign = TextAlign.Center,
@@ -1324,11 +1359,12 @@ fun AddDeliverableView(
             )
             IconButton(
                 modifier = Modifier
+                    .testTag("TasksFragmentDeliverableProcessDeliverable")
                     .padding(horizontal = 5.dp)
                     .align(Alignment.CenterEnd),
                 onClick = { scope.launch { processBottomSheetAdd() } }
             ) {
-                Icon(
+                MainActivity.Icon(
                     imageVector = Icons.Default.Done,
                     contentDescription = stringResource(R.string.add_task_deliverable_or_marker),
                     tint = Color.Green
@@ -1336,278 +1372,323 @@ fun AddDeliverableView(
             }
         }
     }
+    val parentGoalFlow by parentGoal.collectAsStateWithLifecycle()
+    val parentGoal by (parentGoalFlow?: MutableStateFlow(null)).collectAsStateWithLifecycle(null)
     val deliverableFlow by deliverableStateFlow.collectAsStateWithLifecycle()
     val deliverable by (deliverableFlow?: MutableStateFlow(null)).collectAsStateWithLifecycle(null)
-    deliverable?.let { deliverable ->
-        val context = LocalContext.current
+    parentGoal?.let{ parentGoal ->
+        deliverable?.let { deliverable ->
+            val context = LocalContext.current
 
-        val triedToSave by triedToSaveInput.collectAsStateWithLifecycle()
-        var showErrorMessage by remember { showErrorMessage }
-        val errorMessage by remember { errorMessage }
+            val triedToSave by triedToSaveInput.collectAsStateWithLifecycle()
+            var showErrorMessage by remember { showErrorMessage }
+            val errorMessage by remember { errorMessage }
 
-        val bottomSheetLazyListState = remember {
-            LazyListState(
-                unpackInt1(deliverable.scrollPosition),
-                unpackInt2(deliverable.scrollPosition)
-            )
-        }
-        val deliverableText = remember { TextFieldState(deliverable.deliverable) }
-        val deliverableTextFocusRequester = remember { deliverable.deliverableTextFocusRequester }
-        val location = remember { TextFieldState(deliverable.location) }
-        val locationFocusRequester = remember { deliverable.locationFocusRequester }
-        val timesFlow by deliverable.times.collectAsStateWithLifecycle()
-        val times by (timesFlow?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
-
-        LaunchedEffect(deliverableText.text) {
-            updateDeliverable(deliverable.copy(deliverable = deliverableText.text.toString()))
-        }
-
-        LaunchedEffect(location.text) {
-            updateDeliverable(deliverable.copy(location = location.text.toString()))
-        }
-
-        LaunchedEffect(showErrorMessage) {
-            if (showErrorMessage) {
-                delay(2000) // message disappears after 2 seconds
-                showErrorMessage = false
+            val bottomSheetLazyListState = remember {
+                Converters().fromScrollStateLazy(deliverable.scrollPosition)
             }
-        }
+            LaunchedEffect(bottomSheetLazyListState) {
+                snapshotFlow { bottomSheetLazyListState.isScrollInProgress }
+                    .filter { !it } // only when scrolling ends
+                    .collect {
+                        updateDeliverable(deliverable.copy(
+                            scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)))
+                    }
+            }
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            AnimatedVisibility(visible = showErrorMessage) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        .background(Color.Red)
-                        .padding(4.dp)
-                        .align(Alignment.CenterHorizontally)
-                ) {
-                    Text(
-                        text = stringResource(errorMessage),
+            val deliverableText = remember { TextFieldState(deliverable.deliverable) }
+            val deliverableTextFocusRequester = remember { deliverable.deliverableTextFocusRequester }
+            val location = remember { TextFieldState(deliverable.location) }
+            val locationFocusRequester = remember { deliverable.locationFocusRequester }
+            val timesFlow by deliverable.times.collectAsStateWithLifecycle()
+            val times by (timesFlow?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
+
+            LaunchedEffect(deliverableText.text) {
+                updateDeliverable(deliverable.copy(deliverable = deliverableText.text.toString()))
+            }
+
+            LaunchedEffect(location.text) {
+                updateDeliverable(deliverable.copy(location = location.text.toString()))
+            }
+
+            LaunchedEffect(showErrorMessage) {
+                if (showErrorMessage) {
+                    delay(2000) // message disappears after 2 seconds
+                    showErrorMessage = false
+                }
+            }
+
+            Column(modifier = Modifier.fillMaxSize()) {
+                AnimatedVisibility(visible = showErrorMessage) {
+                    Box(
                         modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                            .background(Color.Red)
                             .padding(4.dp)
-                            .align(Alignment.Center),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-            LazyColumn(
-                state = bottomSheetLazyListState,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                item {
-                    OutlinedTextField(
-                        state = deliverableText,
-                        label = { Text(stringResource(R.string.deliverable)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 3.dp)
-                            .focusRequester(deliverableTextFocusRequester),
-                        trailingIcon = {
-                            if (triedToSave && deliverableText.text.isEmpty()){
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = stringResource(R.string.empty_field),
-                                    tint = Color.Red
-                                )
-                            }
-                        }
-                    )
-                }
-                item {
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                item {
-                    OutlinedTextField(
-                        state = location,
-                        label = { Text(stringResource(R.string.location)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 3.dp)
-                            .focusRequester(locationFocusRequester),
-                        trailingIcon = {
-                            if (triedToSave && location.text.isEmpty()){
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = stringResource(R.string.empty_field),
-                                    tint = Color.Red
-                                )
-                            }
-                        }
-                    )
-                }
-                item {
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                item {
-                    var pickedDate by remember { mutableStateOf(LocalDateTime.ofEpochSecond(
-                        deliverable.endDateTime/1000,0,
-                        ZoneOffset.UTC)) }
-                    val stateTime = rememberTimePickerState(
-                        pickedDate.hour,
-                        pickedDate.minute,
-                        true
-                    )
-                    val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
-                    )
-                    var buttonDatePick by remember { mutableStateOf(false) }
-                    var buttonTimePick by remember { mutableStateOf(false) }
-                    if (buttonDatePick) {
-                        PickDate(stateDate){ pickTime ->
-                            buttonDatePick = false
-                            buttonTimePick = pickTime
-                        }
-                    }
-                    if (buttonTimePick) {
-                        PickTime(stateTime){
-                            buttonTimePick = false
-                            pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
-                            scope.launch { updateDeliverable(deliverable.copy(endDateTime = pickedDate.toInstant(
-                                ZoneOffset.UTC).toEpochMilli())) }
-                        }
-                    }
-                    var showEndTypeOptions by remember { mutableStateOf(false) }
-                    var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>())}
-                    OutlinedButton(modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-                        onClick = {
-                            endTypeOptions = listOf(
-                                MenuItemData(Deliverable.DeliverableEndType.UNDEFINED.name){
-                                    scope.launch {
-                                        updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.UNDEFINED.name))
-                                    }
-                                },
-                                MenuItemData(Deliverable.DeliverableEndType.DATE.name){
-                                    scope.launch {
-                                        updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.DATE.name))
-                                        buttonDatePick = true
-                                    }
-                                },
-                                MenuItemData(Deliverable.DeliverableEndType.GOAL.name){
-                                    scope.launch {
-                                        updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.GOAL.name))
-                                    }
-                                },
-                                MenuItemData(Deliverable.DeliverableEndType.WORK.name){
-                                    scope.launch {
-                                        updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.WORK.name))
-                                    }
-                                }
-                            )
-                            showEndTypeOptions = true
-                        }
+                            .align(Alignment.CenterHorizontally)
                     ) {
-                        if (showEndTypeOptions) {
-                            DropdownMenu(
-                                expanded = true,
-                                onDismissRequest = { showEndTypeOptions = false }
-                            ) {
-                                endTypeOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option.text) },
-                                        onClick = {
-                                            option.onClick.invoke()
-                                            showEndTypeOptions = false
-                                        }
+                        Text(
+                            text = stringResource(errorMessage),
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .align(Alignment.Center),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                LazyColumn(
+                    state = bottomSheetLazyListState,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    item {
+                        OutlinedTextField(
+                            state = deliverableText,
+                            label = { Text(stringResource(R.string.deliverable)) },
+                            modifier = Modifier
+                                .testTag("TaskFragmentDeliverableDeliverableText")
+                                .fillMaxWidth()
+                                .padding(horizontal = 3.dp)
+                                .focusRequester(deliverableTextFocusRequester),
+                            trailingIcon = {
+                                if (triedToSave && deliverableText.text.isEmpty()){
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = stringResource(R.string.empty_field),
+                                        tint = Color.Red
                                     )
                                 }
                             }
-                        }
-                        when (Deliverable.DeliverableEndType.valueOf(deliverable.endType)) {
-                            Deliverable.DeliverableEndType.UNDEFINED -> {
-                                Text(
-                                    stringResource(
-                                        R.string.end_type,
-                                        stringResource(R.string.undefined),
-                                        ""
+                        )
+                    }
+                    item {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                    item {
+                        OutlinedTextField(
+                            state = location,
+                            label = { Text(stringResource(R.string.location)) },
+                            modifier = Modifier
+                                .testTag("TaskFragmentDeliverableLocationText")
+                                .fillMaxWidth()
+                                .padding(horizontal = 3.dp)
+                                .focusRequester(locationFocusRequester),
+                            trailingIcon = {
+                                if (triedToSave && location.text.isEmpty()){
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = stringResource(R.string.empty_field),
+                                        tint = Color.Red
                                     )
-                                )
+                                }
                             }
-                            Deliverable.DeliverableEndType.DATE -> {
-                                stateDate.getSelectedDate()?.let { localDate ->
-                                    pickedDate = LocalDateTime.of(
-                                        localDate,
-                                        LocalTime.of(stateTime.hour,stateTime.minute)
-                                    )
-                                    scope.launch { updateDeliverable(deliverable.copy(endDateTime = pickedDate.toInstant(
-                                        ZoneOffset.UTC).toEpochMilli())) }
+                        )
+                    }
+                    item {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                    item {
+                        var pickedDate by remember {
+                            Converters().toLocalDateTime(
+                                deliverable.endDateTime
+                            )
+                        }
+                        val stateTime = rememberTimePickerState(
+                            pickedDate.hour,
+                            pickedDate.minute,
+                            true
+                        )
+                        val stateDate = rememberDatePickerState(
+                            initialSelectedDateMillis = Converters().fromLocalDateTime(pickedDate)
+                        )
+                        var buttonDatePick by remember { mutableStateOf(false) }
+                        var buttonTimePick by remember { mutableStateOf(false) }
+                        if (buttonDatePick) {
+                            PickDate(stateDate){ pickTime ->
+                                buttonDatePick = false
+                                buttonTimePick = pickTime
+                            }
+                        }
+                        if (buttonTimePick) {
+                            PickTime(stateTime){
+                                buttonTimePick = false
+                                pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+                                scope.launch { updateDeliverable(deliverable.copy(endDateTime = pickedDate.toInstant(
+                                    ZoneOffset.UTC).toEpochMilli())) }
+                            }
+                        }
+                        var showEndTypeOptions by remember { mutableStateOf(false) }
+                        var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>())}
+                        OutlinedButton(modifier = Modifier
+                            .testTag("TasksFragmentDeliverableEndTypeButton")
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                            onClick = {
+                                endTypeOptions = listOf(
+                                    MenuItemData(Deliverable.DeliverableEndType.UNDEFINED.name){
+                                        scope.launch {
+                                            updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.UNDEFINED.name))
+                                        }
+                                    },
+                                    MenuItemData(Deliverable.DeliverableEndType.DATE.name){
+                                        scope.launch {
+                                            updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.DATE.name))
+                                            buttonDatePick = true
+                                        }
+                                    },
+                                    MenuItemData(Deliverable.DeliverableEndType.GOAL.name){
+                                        scope.launch {
+                                            updateDeliverable(deliverable.copy(
+                                                endType = Deliverable.DeliverableEndType.GOAL.name,
+                                                goalId = null
+                                            ))
+                                        }
+                                    },
+                                    MenuItemData(Deliverable.DeliverableEndType.WORK.name){
+                                        scope.launch {
+                                            updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.WORK.name))
+                                        }
+                                    }
+                                )
+                                showEndTypeOptions = true
+                            }
+                        ) {
+                            if (showEndTypeOptions) {
+                                DropdownMenu(
+                                    expanded = true,
+                                    onDismissRequest = { showEndTypeOptions = false },
+                                    modifier = Modifier.testTag("TasksFragmentDeliverableEndTypeDropDownMenu")
+                                ) {
+                                    endTypeOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            modifier = Modifier.testTag("TasksFragmentDeliverableDropdownMenuItem-${option.text}"),
+                                            text = { Text(option.text) },
+                                            onClick = {
+                                                option.onClick.invoke()
+                                                showEndTypeOptions = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            when (Deliverable.DeliverableEndType.valueOf(deliverable.endType)) {
+                                Deliverable.DeliverableEndType.UNDEFINED -> {
                                     Text(
                                         stringResource(
                                             R.string.end_type,
-                                            stringResource(R.string.date),
-                                            stringResource(
-                                                R.string.start_time_and_date,
-                                                getTime(pickedDate),
-                                                getStandardDate(context, pickedDate)
-                                            )
+                                            stringResource(R.string.undefined),
+                                            ""
                                         )
                                     )
-                                }?: run {
-                                    Text(stringResource(R.string.pick_a_date))
+                                }
+                                Deliverable.DeliverableEndType.DATE -> {
+                                    stateDate.getSelectedDate()?.let { localDate ->
+                                        pickedDate = LocalDateTime.of(
+                                            localDate,
+                                            LocalTime.of(stateTime.hour,stateTime.minute)
+                                        )
+                                        scope.launch { updateDeliverable(deliverable.copy(endDateTime = pickedDate.toInstant(
+                                            ZoneOffset.UTC).toEpochMilli())) }
+                                        Text(
+                                            stringResource(
+                                                R.string.end_type,
+                                                stringResource(R.string.date),
+                                                stringResource(
+                                                    R.string.start_time_and_date,
+                                                    getTime(pickedDate),
+                                                    getStandardDate(context, pickedDate)
+                                                )
+                                            )
+                                        )
+                                    }?: run {
+                                        Text(stringResource(R.string.pick_a_date))
+                                    }
+                                }
+                                Deliverable.DeliverableEndType.GOAL -> {
+                                    Text(
+                                        stringResource(
+                                            R.string.end_type,
+                                            stringResource(R.string.goal),
+                                            ""
+                                        )
+                                    )
+                                }
+                                Deliverable.DeliverableEndType.WORK -> {
+                                    Text(
+                                        stringResource(
+                                            R.string.end_type,
+                                            stringResource(R.string.work),
+                                            ""
+                                        )
+                                    )
                                 }
                             }
-                            Deliverable.DeliverableEndType.GOAL -> {
-                                Text(
-                                    stringResource(
-                                        R.string.end_type,
-                                        stringResource(R.string.goal),
-                                        ""
-                                    )
-                                )
-                            }
-                            Deliverable.DeliverableEndType.WORK -> {
-                                Text(
-                                    stringResource(
-                                        R.string.end_type,
-                                        stringResource(R.string.work),
-                                        ""
-                                    )
+                        }
+                    }
+                    item {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                    item{
+                        if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) !=
+                            Deliverable.DeliverableEndType.GOAL
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(3.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = stringResource(R.string.required_to_complete_goal))
+                                Checkbox(
+                                    modifier = Modifier.testTag("TasksFragmentDeliverableCheckbox"),
+                                    checked = deliverable.goalId!=null,
+                                    onCheckedChange = { checked -> scope.launch {
+                                        updateDeliverable(deliverable.copy(goalId = if (checked) parentGoal.id else null))
+                                    }}
                                 )
                             }
                         }
                     }
-                }
-                item {
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                stickyHeader {
-                    Button(
-                        onClick = { scope.launch { addTimeBlock() } },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                    ) { Text(stringResource(R.string.add_time_block)) }
-                }
-                items(items = times, key = { it.id?:Random.nextLong() }) { item ->
-                    TimeInputView(
-                        item,
-                        triedToSaveInput,
-                        deleteTimeBlock,
-                        updateTimeBlock
-                    )
-                    if (times.indexOf(item) != times.lastIndex) {
-                        Spacer(modifier = Modifier.width(2.dp))
-                    }
-                }
-                originalDeliverable?.let {
                     item {
                         Spacer(modifier = Modifier.width(2.dp))
                     }
-                    item {
-                        IconButton(
+                    stickyHeader {
+                        Button(
+                            onClick = { scope.launch { addTimeBlock() } },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(4.dp)
-                                .background(color = Color.Red),
-                            onClick = { scope.launch { deleteDeliverableClicked() } }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.delete_marker)
-                            )
+                                .padding(8.dp)
+                        ) { Text(stringResource(R.string.add_time_block)) }
+                    }
+                    items(items = times, key = { it.id?:Random.nextLong() }) { item ->
+                        TimeInputView(
+                            item,
+                            triedToSaveInput,
+                            deleteTimeBlock,
+                            updateTimeBlock
+                        )
+                        if (times.indexOf(item) != times.lastIndex) {
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
+                    }
+                    originalDeliverable?.let {
+                        item {
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
+                        item {
+                            IconButton(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(4.dp)
+                                    .background(color = Color.Red),
+                                onClick = { scope.launch { deleteDeliverableClicked() } }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.delete_marker)
+                                )
+                            }
                         }
                     }
                 }
@@ -1623,11 +1704,9 @@ fun MarkerCardView(
 ){
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val dateTime = LocalDateTime.ofEpochSecond(
-        marker.dateTime/1000,
-        0,
-        ZoneOffset.UTC
-    )
+    val dateTime = Converters().toLocalDateTime(
+            marker.dateTime
+        ).value
     val daysFromNow = Period.between(
         LocalDateTime.now().toLocalDate(),
         dateTime.toLocalDate()).days
@@ -1766,8 +1845,16 @@ fun AddMarkerView(
         val errorMessage by remember { errorMessage }
 
         val bottomSheetLazyListState = remember {
-            LazyListState(unpackInt1(marker.scrollPosition),
-                unpackInt2(marker.scrollPosition))
+            Converters().fromScrollStateLazy(marker.scrollPosition)
+        }
+        LaunchedEffect(bottomSheetLazyListState) {
+            snapshotFlow { bottomSheetLazyListState.isScrollInProgress }
+                .filter { !it } // only when scrolling ends
+                .collect {
+                    updateMarker(marker.copy(
+                        scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)
+                    ))
+                }
         }
         val markerText = remember { TextFieldState(marker.marker) }
         val markerTextFocusRequester = remember { marker.markerTextFocusRequester }
@@ -1828,15 +1915,18 @@ fun AddMarkerView(
                     Spacer(modifier = Modifier.width(2.dp))
                 }
                 item {
-                    var pickedDate by remember { mutableStateOf(LocalDateTime.ofEpochSecond(marker.dateTime/1000,0,
-                        ZoneOffset.UTC)) }
+                    var pickedDate by remember {
+                        Converters().toLocalDateTime(
+                            marker.dateTime
+                        )
+                    }
                     val stateTime = rememberTimePickerState(
                         pickedDate.hour,
                         pickedDate.minute,
                         true
                     )
                     val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                        initialSelectedDateMillis = Converters().fromLocalDateTime(pickedDate)
                     )
                     var buttonDatePick by remember { mutableStateOf(false) }
                     var buttonTimePick by remember { mutableStateOf(false) }
@@ -1852,7 +1942,7 @@ fun AddMarkerView(
                             pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
                             scope.launch {
                                 updateMarker(
-                                    marker.copy(dateTime = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli())
+                                    marker.copy(dateTime = Converters().fromLocalDateTime(pickedDate))
                                 )
                             }
                         }
@@ -1869,7 +1959,7 @@ fun AddMarkerView(
                             )
                             scope.launch {
                                 updateMarker(
-                                    marker.copy(dateTime = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli())
+                                    marker.copy(dateTime = Converters().fromLocalDateTime(pickedDate))
                                 )
                             }
                             Text(

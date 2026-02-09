@@ -2,7 +2,6 @@ package com.thando.accountable.fragments
 
 import android.app.Activity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldState
@@ -65,6 +63,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,8 +83,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.unpackInt1
-import androidx.compose.ui.util.unpackInt2
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -97,6 +94,7 @@ import com.thando.accountable.AppResources.Companion.getTime
 import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
+import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
@@ -104,12 +102,12 @@ import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.ZoneOffset
 import java.time.temporal.TemporalAdjusters
 import kotlin.enums.EnumEntries
 import kotlin.random.Random
@@ -231,6 +229,7 @@ fun EditGoalView(
                     mainActivityViewModel
                 )
                 TaskDeliverableMarkerBottomSheet(
+                    parentGoal = viewModel.newGoal,
                     bottomSheetTypeState = viewModel.bottomSheetType,
                     dismissBottomSheet = viewModel::dismissBottomSheet,
                     triedToSaveInput = viewModel.triedToSave,
@@ -266,7 +265,7 @@ fun EditGoalFragmentView(
     viewModel: EditGoalViewModel,
     mainActivityViewModel: MainActivityViewModel,
     modifier: Modifier = Modifier
-){
+) {
     val newGoalStateFlow by viewModel.newGoal.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -275,10 +274,16 @@ fun EditGoalFragmentView(
 
         newGoal?.let { newGoal ->
             val scrollState = remember {
-                LazyListState(
-                    unpackInt1(newGoal.scrollPosition),
-                    unpackInt2(newGoal.scrollPosition)
-                )
+                Converters().fromScrollStateLazy(newGoal.scrollPosition)
+            }
+            LaunchedEffect(scrollState) {
+                snapshotFlow { scrollState.isScrollInProgress }
+                    .filter { !it } // only when scrolling ends
+                    .collect {
+                        viewModel.updateScrollPosition(
+                            Converters().toScrollStateLazy(scrollState)
+                        )
+                    }
             }
 
             val uri by newGoal.getUri(context).collectAsStateWithLifecycle()
@@ -460,11 +465,8 @@ fun EditGoalFragmentView(
                 }
                 item {
                     var pickedDate by remember {
-                        mutableStateOf(
-                            LocalDateTime.ofEpochSecond(
-                                newGoal.endDateTime/1000, 0,
-                                ZoneOffset.UTC
-                            )
+                        Converters().toLocalDateTime(
+                        newGoal.endDateTime
                         )
                     }
                     val stateTime = rememberTimePickerState(
@@ -473,8 +475,7 @@ fun EditGoalFragmentView(
                         true
                     )
                     val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = pickedDate
-                            .toInstant(ZoneOffset.UTC).toEpochMilli()
+                        initialSelectedDateMillis = Converters().fromLocalDateTime(pickedDate)
                     )
 
                     if (viewModel.buttonDatePick.collectAsState().value) {
@@ -674,10 +675,16 @@ fun TimeInputView(
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateGoalTaskDeliverableTime: suspend (GoalTaskDeliverableTime) -> Unit
 ){
-    var pickedDate by remember { mutableStateOf(LocalDateTime.ofEpochSecond(time.start/1000,0,
-        ZoneOffset.UTC)) }
-    var pickedDuration by remember { mutableStateOf(LocalDateTime.ofEpochSecond(time.duration/1000,0,
-        ZoneOffset.UTC)) }
+    var pickedDate by remember {
+        Converters().toLocalDateTime(
+            time.start
+        )
+    }
+    var pickedDuration by remember {
+        Converters().toLocalDateTime(
+            time.duration
+        )
+    }
     val resources = LocalResources.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -732,7 +739,7 @@ fun TimeInputView(
                             scope.launch {
                                 updateGoalTaskDeliverableTime(
                                     time.copy(
-                                        start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                        start = Converters().fromLocalDateTime(pickedDate)
                                     )
                                 )
                             }
@@ -748,7 +755,7 @@ fun TimeInputView(
                             scope.launch {
                                 updateGoalTaskDeliverableTime(
                                     time.copy(
-                                        duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                        duration = Converters().fromLocalDateTime(pickedDuration)
                                     )
                                 )
                             }
@@ -765,7 +772,7 @@ fun TimeInputView(
                         scope.launch {
                             updateGoalTaskDeliverableTime(
                                 time.copy(
-                                    duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                    duration = Converters().fromLocalDateTime(pickedDuration)
                                 )
                             )
                         }
@@ -811,7 +818,7 @@ fun TimeInputView(
                                 scope.launch {
                                     updateGoalTaskDeliverableTime(
                                         time.copy(
-                                            start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                            start = Converters().fromLocalDateTime(pickedDate)
                                         )
                                     )
                                 }
@@ -827,7 +834,7 @@ fun TimeInputView(
                             scope.launch {
                                 updateGoalTaskDeliverableTime(
                                     time.copy(
-                                        start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                        start = Converters().fromLocalDateTime(pickedDate)
                                     )
                                 )
                             }
@@ -843,7 +850,7 @@ fun TimeInputView(
                             scope.launch {
                                 updateGoalTaskDeliverableTime(
                                     time.copy(
-                                        duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                        duration = Converters().fromLocalDateTime(pickedDuration)
                                     )
                                 )
                             }
@@ -865,7 +872,7 @@ fun TimeInputView(
                         scope.launch {
                             updateGoalTaskDeliverableTime(
                                 time.copy(
-                                    duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                    duration = Converters().fromLocalDateTime(pickedDuration)
                                 )
                             )
                         }
@@ -880,7 +887,7 @@ fun TimeInputView(
                         true
                     )
                     val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                        initialSelectedDateMillis = Converters().fromLocalDateTime(pickedDate)
                     )
                     var buttonDatePick by remember { mutableStateOf(false) }
                     var buttonTimePick by remember { mutableStateOf(false) }
@@ -898,7 +905,7 @@ fun TimeInputView(
                             scope.launch {
                                 updateGoalTaskDeliverableTime(
                                     time.copy(
-                                        start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                        start = Converters().fromLocalDateTime(pickedDate)
                                     )
                                 )
                             }
@@ -915,7 +922,7 @@ fun TimeInputView(
                                 scope.launch {
                                     updateGoalTaskDeliverableTime(
                                         time.copy(
-                                            duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                            duration = Converters().fromLocalDateTime(pickedDuration)
                                         )
                                     )
                                 }
@@ -927,7 +934,7 @@ fun TimeInputView(
                             scope.launch {
                                 updateGoalTaskDeliverableTime(
                                     time.copy(
-                                        start = pickedDate.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                        start = Converters().fromLocalDateTime(pickedDate)
                                     )
                                 )
                             }
@@ -952,7 +959,7 @@ fun TimeInputView(
                             scope.launch {
                                 updateGoalTaskDeliverableTime(
                                     time.copy(
-                                        duration = pickedDuration.toInstant(ZoneOffset.UTC).toEpochMilli()
+                                        duration = Converters().fromLocalDateTime(pickedDuration)
                                     )
                                 )
                             }
@@ -1058,11 +1065,11 @@ fun PickDate(state: DatePickerState, closeDialog: (Boolean)->Unit){
                 }
             }
         ) {
-            LocalActivity.current?.let { activity -> (activity as MainActivity).DatePicker(
+            MainActivity.DatePicker(
                 state
             ){
                 testFunction.value = it
-            }}
+            }
         }
     }
 }
@@ -1109,11 +1116,11 @@ fun PickTime(state: TimePickerState, closeDialog: ()->Unit) {
                 }
             }
         ) {
-            LocalActivity.current?.let { activity -> (activity as MainActivity).TimePicker(
+            MainActivity.TimePicker(
                 currentState
             ){
                 testFunction.value = it
-            }}
+            }
         }
     }
 }

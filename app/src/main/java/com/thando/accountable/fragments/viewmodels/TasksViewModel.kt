@@ -4,6 +4,7 @@ import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
@@ -13,6 +14,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableRepository
 import com.thando.accountable.MainActivity
 import com.thando.accountable.R
+import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
@@ -80,7 +82,9 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                 return false
             }
             task.times.value?.first()?.forEach { time ->
-                val duration = LocalDateTime.ofEpochSecond(time.duration/1000,0, ZoneOffset.UTC)
+                val duration = Converters().toLocalDateTime(
+                        time.duration
+                    ).value
                 if (duration.hour == 0 && duration.minute == 0) {
                     showError(
                         R.string.please_select_a_duration,
@@ -397,7 +401,9 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                     }
                 }
                 deliverable.times.value?.first()?.forEach { time ->
-                    val duration = LocalDateTime.ofEpochSecond(time.duration/1000,0, ZoneOffset.UTC)
+                    val duration = Converters().toLocalDateTime(
+                            time.duration
+                        ).value
                     if (duration.hour == 0 && duration.minute == 0) {
                         showError(
                             R.string.please_select_a_duration,
@@ -602,7 +608,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             goal?.let { goal ->
                 deliverable.value = repository.getDeliverable(repository.insert(Deliverable(
                     parent = goal.id ?:return,
-                    position = repository.getDeliverablesWithTimes(
+                    position = repository.getDeliverables(
                         goal.id?:return
                     ).first().size.toLong(),
                     location = goal.location

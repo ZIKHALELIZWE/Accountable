@@ -9,6 +9,7 @@ import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
+import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +30,7 @@ data class Goal(
     var goalCategory: String = "",
 
     @ColumnInfo (name = "goal_date_time")
-    var initialDateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var initialDateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "goal_position")
     var position: Long = 0L,
@@ -59,10 +60,10 @@ data class Goal(
     var goal : String = "",
 
     @ColumnInfo (name = "goal_date_of_completion")
-    var dateOfCompletion : Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var dateOfCompletion : Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "goal_end_date")
-    var endDateTime: Long = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
+    var endDateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "goal_end_type")
     var endType: String = GoalEndType.UNDEFINED.name,

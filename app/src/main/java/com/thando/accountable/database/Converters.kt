@@ -8,6 +8,9 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.util.packInts
+import androidx.compose.ui.util.unpackInt1
+import androidx.compose.ui.util.unpackInt2
 import androidx.room.TypeConverter
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AppResources
@@ -142,23 +145,25 @@ class Converters {
     }
 
     @TypeConverter
-    fun toScrollStateNull(lazyListState: LazyListState?): Int? {
-        return lazyListState?.firstVisibleItemIndex
+    fun toScrollStateLazyNull(lazyListState: LazyListState?): Long? {
+        return lazyListState?.firstVisibleItemIndex?.let { firstVisibleItemIndex ->
+            packInts(firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset)
+        }
     }
 
     @TypeConverter
-    fun fromScrollStateLazyNull(scrollValue: Int?): LazyListState? {
-        return scrollValue?.let{LazyListState(it)}
+    fun fromScrollStateLazyNull(scrollValue: Long?): LazyListState? {
+        return scrollValue?.let{LazyListState(unpackInt1(it),unpackInt2(it))}
     }
 
     @TypeConverter
-    fun toScrollState(lazyListState: LazyListState): Int {
-        return lazyListState.firstVisibleItemIndex
+    fun toScrollStateLazy(lazyListState: LazyListState): Long {
+        return packInts(lazyListState.firstVisibleItemIndex,lazyListState.firstVisibleItemScrollOffset)
     }
 
     @TypeConverter
-    fun fromScrollStateLazy(scrollValue: Int): LazyListState {
-        return LazyListState(scrollValue)
+    fun fromScrollStateLazy(scrollValue: Long): LazyListState {
+        return LazyListState(unpackInt1(scrollValue), unpackInt2(scrollValue))
     }
 
     @TypeConverter
@@ -282,7 +287,12 @@ class Converters {
     }
 
     @TypeConverter
-    fun fromLocalDateTime(dateTime: MutableState<LocalDateTime>): Long {
+    fun fromLocalDateTime(dateTime: LocalDateTime): Long {
+        return dateTime.toInstant(ZoneOffset.UTC).toEpochMilli()
+    }
+
+    @TypeConverter
+    fun fromLocalDateTimeMutable(dateTime: MutableState<LocalDateTime>): Long {
         return dateTime.value.toInstant(ZoneOffset.UTC).toEpochMilli()
     }
     @TypeConverter

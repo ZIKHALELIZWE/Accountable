@@ -102,6 +102,7 @@ import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
+import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.Script
@@ -930,10 +931,16 @@ fun GoalCard(
     }
     val scriptUri by uriStateFlow.collectAsStateWithLifecycle()
 
-    val goalInitialDateTime = remember { LocalDateTime.ofEpochSecond(goal.initialDateTime/1000,0,
-        ZoneOffset.UTC) }
-    val goalDateOfCompletion = remember { LocalDateTime.ofEpochSecond(goal.dateOfCompletion/1000,0,
-        ZoneOffset.UTC) }
+    val goalInitialDateTime by remember {
+        Converters().toLocalDateTime(
+            goal.initialDateTime
+        )
+    }
+    val goalDateOfCompletion by remember {
+        Converters().toLocalDateTime(
+            goal.dateOfCompletion
+        )
+    }
     val title = remember { TextFieldState(goal.goal) }
     val location = remember { TextFieldState(goal.location) }
     val goalColour by remember { mutableIntStateOf(goal.colour) }
