@@ -2,13 +2,10 @@ package com.thando.accountable
 
 import androidx.compose.material3.DrawerValue
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.fragments.viewmodels.AppSettingsViewModel
@@ -16,7 +13,6 @@ import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.fragments.viewmodels.HelpViewModel
 import com.thando.accountable.fragments.viewmodels.HomeViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -110,7 +106,7 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
 
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun TestScope.switchToNavigationDrawer(
+    private fun switchToNavigationDrawer(
         activity: MainActivity,
         fragment: AccountableFragment
     ) {
@@ -166,19 +162,14 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun TestScope.clickNavigationDrawerItem(
+    private fun clickNavigationDrawerItem(
         activity: MainActivity,
         tag: String,
-        viewModelName:String
+        viewModelName: String
     ) {
         withTag(tag) {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
         assertEquals(
             viewModelName,
             activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name

@@ -100,12 +100,9 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             activity.viewModel.currentFragment.value
         )
         withTag("HomeFragmentLoadGoalsButton") {
-            assertExists()
-            assertHasClickAction()
-            assertIsDisplayed()
-            performClick()
+            performPressWithoutScroll()
         }
-        advanceUntilIdle()
+
         checkFragmentIs(
             activity, AccountableFragment.GoalsFragment,
             BooksViewModel::class.java.name
@@ -131,13 +128,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNotNull(booksViewModel.showScripts.value?.value)
         assertFalse(booksViewModel.showScripts.value!!.value)
         withTag("BooksSwitchFolderScriptButton") {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        advanceUntilIdle()
-        composeTestRule.waitForIdle()
         assertTrue(booksViewModel.showScripts.value!!.value)
         assertNotNull(booksViewModel.goalsList.value)
         assertNull(booksViewModel.foldersList.value)
@@ -150,12 +142,9 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     fun `05 Open Edit Goal And Check Views`() = runTest {
         val activity = getTestMainActivity()
         withTag("BooksFloatingActionButton") {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        advanceUntilIdle()
+        
         checkFragmentIs(
             activity,
             AccountableFragment.EditGoalFragment,
@@ -242,13 +231,9 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNull(activity.viewModel.galleryLauncherMultipleReturnProcess)
         withTag("EditGoalChooseImageButton") {
             assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
             assertTextContains(activity.getString(R.string.choose_image))
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         // Simulate return process
         activity.viewModel.processGalleryLauncherResult(uri)
@@ -289,13 +274,10 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         withTag("EditGoalChooseImageButton") {
             assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
             assertTextContains(activity.getString(R.string.choose_image))
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
+
         // Simulate return process
         activity.viewModel.processGalleryLauncherResult(uri)
         advanceUntilIdle()
@@ -323,13 +305,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         }
 
         withTag("EditGoalPickColourButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("ColourPickerDialog") {
             assertExists()
@@ -337,13 +314,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         }
 
         withTag("ColourPickerDialogDismissButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         assertEquals(-1, editGoalViewModel.newGoal.value?.first()?.colour)
         withTag("ColourPickerDialog") {
@@ -351,13 +323,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         }
 
         withTag("EditGoalPickColourButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("ColourPickerDialogCanvas") {
             assertExists()
@@ -368,13 +335,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         finishProcesses()
 
         withTag("ColourPickerDialogOKButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("ColourPickerDialog") {
             assertDoesNotExist()
@@ -401,13 +363,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag("EditGoalEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("EditGoalEndTypeDropDownMenu") {
             assertExists()
@@ -417,12 +374,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDropdownMenuItem-${Goal.GoalEndType.DELIVERABLE.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Goal.GoalEndType.DELIVERABLE.name,
@@ -430,13 +383,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag("EditGoalEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("EditGoalEndTypeDropDownMenu") {
             assertExists()
@@ -446,12 +394,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDropdownMenuItem-${Goal.GoalEndType.UNDEFINED.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Goal.GoalEndType.UNDEFINED.name,
@@ -472,35 +416,16 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.newGoal.value?.first()?.endType
         )
 
-        withTag("EditGoalEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
-        }
-        finishProcesses()
-
-        withTag("EditGoalEndTypeDropDownMenu") {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
-        }
-        finishProcesses()
-
-        assertEquals(
-            Goal.GoalEndType.DATE.name,
-            editGoalViewModel.newGoal.value?.first()?.endType
+        testDateAndTimePicker(
+            activity,
+            getTimeAsLong = { editGoalViewModel.newGoal.value?.first()?.endDateTime },
+            getExpectedEndType = { Goal.GoalEndType.DATE.name },
+            getActualEndType = { editGoalViewModel.newGoal.value?.first()?.endType },
+            endTypeButtonTag = { "EditGoalEndTypeButton" },
+            dropDownMenuTag = { "EditGoalEndTypeDropDownMenu" },
+            dropDownMenuItemTag = { "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}" },
         )
-
+        /*
         assertNotNull(editGoalViewModel.newGoal.value?.first()?.endDateTime)
         val previousEndDateTime = editGoalViewModel.newGoal.value?.first()?.endDateTime
 
@@ -522,12 +447,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDatePickerDialogCANCELButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             previousEndDateTime,
@@ -540,13 +461,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag("EditGoalEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("EditGoalEndTypeDropDownMenu") {
             assertExists()
@@ -556,12 +472,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Goal.GoalEndType.DATE.name,
@@ -578,12 +490,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDatePickerDialogOKButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             previousEndDateTime,
@@ -608,12 +516,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalTimePickerDialogOKButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             previousEndDateTime,
@@ -624,13 +528,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         activity.daysToAdd(2)
 
         withTag("EditGoalEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("EditGoalEndTypeDropDownMenu") {
             assertExists()
@@ -640,12 +539,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         withTag(
             "EditGoalFragmentDatePickerDialog"
@@ -657,12 +552,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDatePickerDialogOKButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Converters().fromLocalDateTime(
@@ -691,12 +582,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalTimePickerDialogOKButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         val endTimeDate = Converters().toLocalDateTime(
             previousEndDateTime
@@ -712,7 +599,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         activity.timeToAdd(0, 0)
-        activity.daysToAdd(0)
+        activity.daysToAdd(0)*/
     }
 
     @Test
@@ -728,13 +615,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag("EditGoalEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("EditGoalEndTypeDropDownMenu") {
             assertExists()
@@ -744,12 +626,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDropdownMenuItem-${Goal.GoalEndType.DELIVERABLE.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Goal.GoalEndType.DELIVERABLE.name,
@@ -780,12 +658,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalAddDeliverableButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertNull(editGoalViewModel.originalDeliverable.value)
         assertNotNull(editGoalViewModel.deliverable.value)
@@ -883,13 +757,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -899,12 +768,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.DATE.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
@@ -917,13 +782,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         }
 
         withTag("EditGoalDatePickerDialogCANCELButton") {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        advanceUntilIdle()
-        composeTestRule.waitForIdle()
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
@@ -931,13 +791,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -947,12 +802,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.UNDEFINED.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
@@ -975,13 +826,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -991,12 +837,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.DATE.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
@@ -1024,12 +866,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDatePickerDialogCANCELButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             previousEndDateTime,
@@ -1042,13 +880,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -1058,12 +891,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.DATE.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
@@ -1080,12 +909,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDatePickerDialogOKButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             previousEndDateTime,
@@ -1110,12 +935,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalTimePickerDialogOKButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             previousEndDateTime,
@@ -1126,13 +947,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         activity.daysToAdd(2)
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -1142,12 +958,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.DATE.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         withTag(
             "EditGoalFragmentDatePickerDialog"
@@ -1159,12 +971,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalDatePickerDialogOKButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Converters().fromLocalDateTime(
@@ -1193,12 +1001,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "EditGoalTimePickerDialogOKButton"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         val endTimeDate = Converters().toLocalDateTime(
             previousEndDateTime
@@ -1241,13 +1045,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         }
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -1257,12 +1056,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.GOAL.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Deliverable.DeliverableEndType.GOAL.name,
@@ -1276,13 +1071,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         }
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -1292,12 +1082,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.UNDEFINED.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
@@ -1307,13 +1093,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNull(editGoalViewModel.deliverable.value?.first()?.goalId)
 
         withTag("TasksFragmentDeliverableSwitch") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         assertEquals(
             editGoalViewModel.newGoal.value?.first()?.id,
@@ -1321,13 +1102,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -1337,12 +1113,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.GOAL.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Deliverable.DeliverableEndType.GOAL.name,
@@ -1382,13 +1154,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNull(editGoalViewModel.deliverable.value?.first()?.goalId)
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -1398,12 +1165,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.WORK.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Deliverable.DeliverableEndType.WORK.name,
@@ -1413,13 +1176,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         //todo check if work views and values are present
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
-            assertExists()
-            performScrollTo()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithScroll()
         }
-        finishProcesses()
 
         withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
             assertExists()
@@ -1429,12 +1187,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.UNDEFINED.name}"
         ) {
-            assertExists()
-            assertIsDisplayed()
-            assertHasClickAction()
-            performClick()
+            performPressWithoutScroll()
         }
-        finishProcesses()
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
@@ -1457,8 +1211,11 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.deliverable.value?.first()?.endType
         )
 
+        assertNotNull(editGoalViewModel.deliverable.value?.first()?.times)
+
         TimeBlockTest(
             "TasksFragmentDeliverableAddTimeBlockButton",
+            editGoalViewModel.deliverable.value!!.first()!!.times,
             Triple(
                 instantTaskExecutorRule,
                 composeTestRule,

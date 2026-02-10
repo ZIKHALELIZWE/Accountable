@@ -626,32 +626,30 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             deliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
             saveDeliverable: (suspend () -> Unit)?=null,
         ) {
-            withContext(Dispatchers.IO){
-                if (
-                    bottomSheetType.value == Goal.GoalTab.TASKS
-                    && task?.value?.first() != null
-                ){
-                    if (task.value?.first()?.id == null) saveTask?.invoke()
-                    task.value?.first()?.id?.let {
-                        val newTime = GoalTaskDeliverableTime(
-                            parent = it,
-                            type = GoalTaskDeliverableTime.TimesType.TASK.name
-                        )
-                        newTime.id = saveTime(newTime)
-                    }
+            if (
+                bottomSheetType.value == Goal.GoalTab.TASKS
+                && task?.value?.first() != null
+            ){
+                if (task.value?.first()?.id == null) saveTask?.invoke()
+                task.value?.first()?.id?.let {
+                    val newTime = GoalTaskDeliverableTime(
+                        parent = it,
+                        type = GoalTaskDeliverableTime.TimesType.TASK.name
+                    )
+                    newTime.id = saveTime(newTime)
                 }
-                else if (
-                    bottomSheetType.value == Goal.GoalTab.DELIVERABLES
-                    && deliverable?.value?.first() != null
-                ){
-                    if (deliverable.value?.first()?.id == null) saveDeliverable?.invoke()
-                    deliverable.value?.first()?.id?.let {
-                        val newTime = GoalTaskDeliverableTime(
-                            parent = it,
-                            type = GoalTaskDeliverableTime.TimesType.DELIVERABLE.name
-                        )
-                        newTime.id = saveTime(newTime)
-                    }
+            }
+            else if (
+                bottomSheetType.value == Goal.GoalTab.DELIVERABLES
+                && deliverable?.value?.first() != null
+            ){
+                if (deliverable.value?.first()?.id == null) saveDeliverable?.invoke()
+                deliverable.value?.first()?.id?.let {
+                    val newTime = GoalTaskDeliverableTime(
+                        parent = it,
+                        type = GoalTaskDeliverableTime.TimesType.DELIVERABLE.name
+                    )
+                    newTime.id = saveTime(newTime)
                 }
             }
         }
@@ -663,19 +661,17 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             task: MutableStateFlow<Flow<Task?>?>?=null,
             deliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
         ) {
-            withContext(Dispatchers.IO) {
-                if (
-                    bottomSheetType.value == Goal.GoalTab.TASKS
-                    && task?.value != null
-                ){
-                    repository.deleteGoalTaskDeliverableTime(timeBlock)
-                }
-                else if (
-                    bottomSheetType.value == Goal.GoalTab.DELIVERABLES
-                    && deliverable?.value?.first() != null
-                ){
-                    repository.deleteGoalTaskDeliverableTime(timeBlock)
-                }
+            if (
+                bottomSheetType.value == Goal.GoalTab.TASKS
+                && task?.value != null
+            ){
+                repository.deleteGoalTaskDeliverableTime(timeBlock)
+            }
+            else if (
+                bottomSheetType.value == Goal.GoalTab.DELIVERABLES
+                && deliverable?.value?.first() != null
+            ){
+                repository.deleteGoalTaskDeliverableTime(timeBlock)
             }
         }
 

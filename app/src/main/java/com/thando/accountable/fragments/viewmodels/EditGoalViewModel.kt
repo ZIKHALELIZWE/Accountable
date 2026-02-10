@@ -56,15 +56,6 @@ class EditGoalViewModel(
     val buttonTimePick = MutableStateFlow(false)
     val endTypeOptions = MutableStateFlow(listOf<MenuItemData>())
 
-    init {
-        MainActivity.log("Initializing")
-    }
-
-    override fun onCleared() {
-        MainActivity.log("Clearing")
-        super.onCleared()
-    }
-
     private fun showError(
         message: Int,
         focusRequester: FocusRequester

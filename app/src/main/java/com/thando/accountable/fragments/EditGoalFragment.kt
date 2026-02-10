@@ -693,7 +693,7 @@ fun TimeInputView(
     val durationPickerFocusRequester = remember { time.durationPickerFocusRequester }
 
     Card(
-        modifier = Modifier.testTag("EditGoalTimeInputViewCard")
+        modifier = Modifier.testTag("EditGoalTimeInputViewCard-${time.id}")
             .fillMaxWidth()
             .padding(4.dp),
         elevation = CardDefaults.cardElevation(4.dp)
@@ -703,6 +703,7 @@ fun TimeInputView(
                 .fillMaxWidth()
                 .height(IntrinsicSize.Max)) {
                 PickerMenu(
+                    testTagId = time.id,
                     modifier = Modifier.weight(4f),
                     options = Goal.TimeBlockType.entries,
                     selectedOption = Goal.TimeBlockType.valueOf(time.timeBlockType)
@@ -710,7 +711,7 @@ fun TimeInputView(
                     updateGoalTaskDeliverableTime(time.copy(timeBlockType = it.name))
                 } }
                 IconButton(
-                    modifier = Modifier
+                    modifier = Modifier.testTag("EditGoalTimeInputDeleteButton-${time.id}")
                         .fillMaxSize()
                         .padding(4.dp)
                         .weight(1f)
@@ -911,7 +912,7 @@ fun TimeInputView(
                             }
                         }
                     }
-                    OutlinedButton(modifier = Modifier
+                    OutlinedButton(modifier = Modifier.testTag("EditGoalTimeInputSelectDateAndTimeButton")
                         .fillMaxWidth()
                         .padding(4.dp),
                         onClick = { buttonDatePick = true }
@@ -990,6 +991,7 @@ private fun checkDuration(newTime: TimePickerState, duration: LocalDateTime, cha
 
 @Composable
 fun PickerMenu(
+    testTagId:Long?,
     modifier: Modifier,
     options: EnumEntries<Goal.TimeBlockType>,
     selectedOption: Goal.TimeBlockType?,
@@ -999,7 +1001,7 @@ fun PickerMenu(
 
     Box(modifier = modifier) {
         // Trigger
-        OutlinedButton(modifier = Modifier
+        OutlinedButton(modifier = Modifier.testTag("EditGoalPickerMenuButton-$testTagId")
             .fillMaxWidth()
             .padding(4.dp),
             onClick = { expanded = true }) {
@@ -1012,11 +1014,13 @@ fun PickerMenu(
 
         // Menu
         DropdownMenu(
+            modifier = Modifier.testTag("EditGoalPickerMenuDropdownMenu-$testTagId"),
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
+                    modifier = Modifier.testTag("EditGoalPickerMenuItem-$testTagId-${option.name}"),
                     text = { Text(option.name) },
                     onClick = {
                         onOptionSelected(option)
