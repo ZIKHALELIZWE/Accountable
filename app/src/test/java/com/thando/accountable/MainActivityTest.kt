@@ -1,20 +1,14 @@
 package com.thando.accountable
 
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.compose.material3.DrawerValue
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.TestMonotonicFrameClock
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
-import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performScrollToNode
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.fragments.viewmodels.AppSettingsViewModel
@@ -22,61 +16,23 @@ import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.fragments.viewmodels.HelpViewModel
 import com.thando.accountable.fragments.viewmodels.HomeViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.plus
-import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.FixMethodOrder
-import org.junit.Rule
 import org.junit.Test
-import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
-import org.robolectric.Robolectric
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config
-import org.robolectric.annotation.LooperMode
-import org.robolectric.shadows.ShadowLog
 import java.io.PrintStream
 import kotlin.reflect.KFunction2
 import kotlin.reflect.KFunction3
 
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34]) // Force Robolectric to use API 34
-@LooperMode(LooperMode.Mode.LEGACY)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-class MainActivityTest {
-    @get:Rule
-    val instantTaskExecutorRule = InstantTaskExecutorRule()
-    @get:Rule
-    val composeTestRule = createComposeRule()
-
-    @Before
-    fun setup() {
-        ShadowLog.stream = FilteredPrintStream(System.out)
-    }
-
-    @After
-    fun cleanup() {
-
-    }
-
-    private fun getActivity(): MainActivity {
-        return Robolectric.buildActivity(MainActivity::class.java)
-            .setup().get()
-    }
-
+class MainActivityTest: AccountableComposeRobolectricTest() {
     class FilteredPrintStream(private val delegate: PrintStream) : PrintStream(delegate) {
         override fun println(x: String?) {
             if (x != null) {
@@ -89,8 +45,7 @@ class MainActivityTest {
 
     @Test
     fun `1 coreClassesNotNull`() = runTest {
-        val activity = getActivity()
-        composeTestRule.waitForIdle()
+        val activity = getTestMainActivity()
         assertNotNull(activity)
         assertNotNull(activity.viewModel)
         assertNotNull(activity.viewModel.repository)
@@ -98,8 +53,7 @@ class MainActivityTest {
 
     @Test
     fun `2 currentFragmentIsHomeFragment`() = runTest {
-        val activity = getActivity()
-        composeTestRule.waitForIdle()
+        val activity = getTestMainActivity()
         assertNotNull(activity.viewModel.currentFragment.value)
         assertEquals(
             AccountableFragment.HomeFragment,
@@ -113,30 +67,27 @@ class MainActivityTest {
 
     @Test
     fun `3 directionIsNull`() = runTest {
-        val activity = getActivity()
-        composeTestRule.waitForIdle()
+        val activity = getTestMainActivity()
         assertNull(activity.viewModel.direction.value)
     }
 
     @Test
     fun `4 Main Activity Initialized`() = runTest {
-        val activity = getActivity()
-        composeTestRule.waitForIdle()
+        val activity = getTestMainActivity()
         assertNotNull(activity.viewModel.appSettings.value)
         assertNotNull(activity.viewModel.direction)
         assertNotNull(activity.viewModel.accountableNavigationController)
-        composeTestRule.onNodeWithTag("NavigationDrawerItemHomeFragment").assertExists()
+        withTag("NavigationDrawerItemHomeFragment").assertExists()
         if (AccountableNavigationController.isDrawerFragment(
                 activity.viewModel.currentFragment.value!!
             )
-        ) composeTestRule.onNodeWithTag("NavigationDrawerItemHomeFragment").assertIsSelected()
+        ) withTag("NavigationDrawerItemHomeFragment").assertIsSelected()
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
     fun `5 Switch Fragments`() = runTest {
-        val activity = getActivity()
-        composeTestRule.waitForIdle()
+        val activity = getTestMainActivity()
         assertNull(activity.viewModel.direction.value)
         assertNotNull(activity.viewModel.currentFragment.value)
         assertEquals(
@@ -165,15 +116,15 @@ class MainActivityTest {
     ) {
         assertTrue(activity.viewModel.drawerEnabled.value)
         assertFalse(activity.viewModel.drawerState.value == DrawerValue.Open)
-        composeTestRule.onNodeWithTag("MainActivityModalNavigationDrawerContent").assertIsNotDisplayed()
+        withTag("MainActivityModalNavigationDrawerContent").assertIsNotDisplayed()
 
         activity.viewModel.toggleDrawer()
-        composeTestRule.waitForIdle()
+        finishProcesses()
 
         assertTrue(activity.viewModel.drawerState.value == DrawerValue.Open)
-        composeTestRule.onNodeWithTag("MainActivityModalNavigationDrawerContent").assertIsDisplayed()
+        withTag("MainActivityModalNavigationDrawerContent").assertIsDisplayed()
 
-        with(composeTestRule.onNodeWithTag("MainActivityNavigationDrawerColumn")){
+        withTag("MainActivityNavigationDrawerColumn"){
             assertExists()
             assertIsDisplayed()
             hasScrollAction()
@@ -220,15 +171,14 @@ class MainActivityTest {
         tag: String,
         viewModelName:String
     ) {
-        with(composeTestRule.onNodeWithTag(tag)) {
+        withTag(tag) {
             assertExists()
             performScrollTo()
             assertIsDisplayed()
             assertHasClickAction()
             performClick()
         }
-        advanceUntilIdle()
-        composeTestRule.waitForIdle()
+        finishProcesses()
         assertEquals(
             viewModelName,
             activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
@@ -255,8 +205,7 @@ class MainActivityTest {
 
     @Test
     fun `6 Folders And Scripts Books Test`() = runTest {
-        val activity = Robolectric.buildActivity(MainActivity::class.java)
-            .setup().get()
+        val activity = getTestMainActivity()
 
         switchToNavigationDrawer(activity, AccountableFragment.BooksFragment)
 
@@ -275,11 +224,11 @@ class MainActivityTest {
         assertNotNull(booksViewModel.foldersList.value)
         assertEquals(false,booksViewModel.showScripts.value?.value)
         booksViewModel.switchFolderScript()
-        composeTestRule.waitForIdle()
+        finishProcesses()
         assertNotNull(booksViewModel.scriptsList.value)
         assertEquals(true, booksViewModel.showScripts.value?.value)
         booksViewModel.switchFolderScript()
-        composeTestRule.waitForIdle()
+        finishProcesses()
         assertNull(booksViewModel.goalsList.value)
         /*areEqual(-1L,
             repository.getScriptsOrGoalsFolderId().value,

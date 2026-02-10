@@ -693,7 +693,7 @@ fun TimeInputView(
     val durationPickerFocusRequester = remember { time.durationPickerFocusRequester }
 
     Card(
-        modifier = Modifier
+        modifier = Modifier.testTag("EditGoalTimeInputViewCard")
             .fillMaxWidth()
             .padding(4.dp),
         elevation = CardDefaults.cardElevation(4.dp)

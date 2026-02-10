@@ -49,6 +49,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1640,8 +1641,8 @@ fun AddDeliverableView(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(text = stringResource(R.string.required_to_complete_goal))
-                                Checkbox(
-                                    modifier = Modifier.testTag("TasksFragmentDeliverableCheckbox"),
+                                Switch(
+                                    modifier = Modifier.testTag("TasksFragmentDeliverableSwitch"),
                                     checked = deliverable.goalId!=null,
                                     onCheckedChange = { checked -> scope.launch {
                                         updateDeliverable(deliverable.copy(goalId = if (checked) parentGoal.id else null))
@@ -1656,7 +1657,7 @@ fun AddDeliverableView(
                     stickyHeader {
                         Button(
                             onClick = { scope.launch { addTimeBlock() } },
-                            modifier = Modifier
+                            modifier = Modifier.testTag("TasksFragmentDeliverableAddTimeBlockButton")
                                 .fillMaxWidth()
                                 .padding(8.dp)
                         ) { Text(stringResource(R.string.add_time_block)) }
