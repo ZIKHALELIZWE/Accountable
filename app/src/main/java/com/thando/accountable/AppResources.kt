@@ -10,6 +10,7 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.widget.Toast
 import androidx.annotation.AnyRes
+import androidx.annotation.StringRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TimePickerState
 import androidx.compose.runtime.Composable
@@ -200,6 +201,29 @@ sealed class AppResources {
                 DayOfWeek.THURSDAY -> context.getString(R.string.Thu)
                 DayOfWeek.TUESDAY -> context.getString(R.string.Tue)
                 DayOfWeek.WEDNESDAY -> context.getString(R.string.Wed)
+            }
+        }
+
+        enum class DaysOfTheWeek(val day:Int) {
+            Mon(R.string.Mon),
+            Tue(R.string.Tue),
+            Wed(R.string.Wed),
+            Thu(R.string.Thu),
+            Fri(R.string.Fri),
+            Sat(R.string.Sat),
+            Sun(R.string.Sun)
+        }
+
+        fun getDayOfWeek(context: Context, day: String): DayOfWeek{
+            return when(day) {
+                context.getString(R.string.Mon) -> DayOfWeek.MONDAY
+                context.getString(R.string.Tue) -> DayOfWeek.TUESDAY
+                context.getString(R.string.Wed) -> DayOfWeek.WEDNESDAY
+                context.getString(R.string.Thu) -> DayOfWeek.THURSDAY
+                context.getString(R.string.Fri) -> DayOfWeek.FRIDAY
+                context.getString(R.string.Sat) -> DayOfWeek.SATURDAY
+                context.getString(R.string.Sun) -> DayOfWeek.SUNDAY
+                else -> DayOfWeek.MONDAY
             }
         }
 

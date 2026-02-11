@@ -79,6 +79,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -685,7 +687,7 @@ fun TimeInputView(
             time.duration
         )
     }
-    val resources = LocalResources.current
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -746,9 +748,10 @@ fun TimeInputView(
                             }
                         }
                     }
-                    OutlinedButton(modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
+                    OutlinedButton(
+                        modifier = Modifier.testTag("EditGoalTimeInputDailyTimeButton")
+                            .fillMaxWidth()
+                            .padding(4.dp),
                         onClick = { buttonTimePick = true }
                     ) {
                         checkDuration(stateTime, pickedDuration){ newDuration ->
@@ -781,15 +784,7 @@ fun TimeInputView(
                 }
                 Goal.TimeBlockType.WEEKLY -> {
                     var selectedDay by remember { mutableStateOf(pickedDate.let{
-                        when(it.dayOfWeek) {
-                            DayOfWeek.MONDAY -> resources.getString(R.string.Mon)
-                            DayOfWeek.TUESDAY -> resources.getString(R.string.Tue)
-                            DayOfWeek.WEDNESDAY -> resources.getString(R.string.Wed)
-                            DayOfWeek.THURSDAY -> resources.getString(R.string.Thu)
-                            DayOfWeek.FRIDAY -> resources.getString(R.string.Fri)
-                            DayOfWeek.SATURDAY -> resources.getString(R.string.Sat)
-                            DayOfWeek.SUNDAY -> resources.getString(R.string.Sun)
-                        }
+                        AppResources.getDayWord(context,it)
                     }) }
                     val stateTime = rememberTimePickerState(
                         pickedDate.hour,
@@ -805,16 +800,7 @@ fun TimeInputView(
                             day?.let {
                                 selectedDay = it
                                 pickedDate = pickedDate.with(TemporalAdjusters.nextOrSame(
-                                    when(it) {
-                                        resources.getString(R.string.Mon) -> DayOfWeek.MONDAY
-                                        resources.getString(R.string.Tue) -> DayOfWeek.TUESDAY
-                                        resources.getString(R.string.Wed) -> DayOfWeek.WEDNESDAY
-                                        resources.getString(R.string.Thu) -> DayOfWeek.THURSDAY
-                                        resources.getString(R.string.Fri) -> DayOfWeek.FRIDAY
-                                        resources.getString(R.string.Sat) -> DayOfWeek.SATURDAY
-                                        resources.getString(R.string.Sun) -> DayOfWeek.SUNDAY
-                                        else -> DayOfWeek.MONDAY
-                                    }
+                                    AppResources.getDayOfWeek(context,it)
                                 ))
                                 scope.launch {
                                     updateGoalTaskDeliverableTime(
@@ -841,7 +827,7 @@ fun TimeInputView(
                             }
                         }
                     }
-                    OutlinedButton(modifier = Modifier
+                    OutlinedButton(modifier = Modifier.testTag("EditGoalTimeInputWeeklyAndTimeButton")
                         .fillMaxWidth()
                         .padding(4.dp),
                         onClick = { buttonWeekDayPick = true }
@@ -1129,6 +1115,11 @@ fun PickTime(state: TimePickerState, closeDialog: ()->Unit) {
     }
 }
 
+// Custom semantics key for background color (used in test)
+val BackgroundColorKey = SemanticsPropertyKey<Color>("BackgroundColor")
+var SemanticsPropertyReceiver.backgroundColor by BackgroundColorKey
+fun Modifier.testBackground(color: Color): Modifier =
+    this.background(color).semantics { backgroundColor = color }
 @Composable
 fun PickWeekday(
     selectedDay: String,
@@ -1137,22 +1128,14 @@ fun PickWeekday(
     val openDialog = remember { mutableStateOf(true) }
 
     if (openDialog.value) {
-        val daysOfWeek = listOf(
-            stringResource(R.string.Mon),
-            stringResource(R.string.Tue),
-            stringResource(R.string.Wed),
-            stringResource(R.string.Thu),
-            stringResource(R.string.Fri),
-            stringResource(R.string.Sat),
-            stringResource(R.string.Sun)
-        )
+        val daysOfWeek = AppResources.Companion.DaysOfTheWeek.entries.map { stringResource(it.day) }
         Dialog(
             onDismissRequest = {
                 openDialog.value = false
                 onDaySelected(null)
             }
         ){
-            Box(modifier = Modifier
+            Box(modifier = Modifier.testTag("EditGoalPickWeekdayDialog")
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color.White)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1165,9 +1148,9 @@ fun PickWeekday(
                         items(daysOfWeek) { day ->
                             val isSelected = day == selectedDay
                             Box(
-                                modifier = Modifier
+                                modifier = Modifier.testTag("EditGoalPickWeekdayDay-${day}")
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isSelected) Color.Blue else Color.LightGray)
+                                    .testBackground(if (isSelected) Color.Blue else Color.LightGray)
                                     .clickable {
                                         openDialog.value = false
                                         onDaySelected(day)
@@ -1204,7 +1187,7 @@ fun DurationPickerButton(
         }
     }
 
-    OutlinedButton(modifier = Modifier
+    OutlinedButton(modifier = Modifier.testTag("EditGoalTimeInputPickDurationButton")
         .fillMaxWidth()
         .padding(4.dp)
         .focusRequester(durationPickerFocusRequester),
@@ -1243,6 +1226,11 @@ fun DurationPickerButton(
     }
 }
 
+// Custom semantics key for background color (used in test)
+val SliderRangeKey = SemanticsPropertyKey<ClosedFloatingPointRange<Float>>("SliderRange")
+var SemanticsPropertyReceiver.sliderRange by SliderRangeKey
+fun Modifier.setSliderRange(range: ClosedFloatingPointRange<Float>): Modifier =
+    this.semantics { sliderRange = range }
 @Composable
 fun TimeDurationPicker(
     pickedTime: LocalDateTime,
@@ -1252,22 +1240,27 @@ fun TimeDurationPicker(
     val openDialog = remember { mutableStateOf(true) }
 
     if (openDialog.value) {
-        var selectableHours by remember { mutableIntStateOf(23 - pickedTime.hour) }
+        val selectableHours =23 - pickedTime.hour
+
         var selectedHours by remember {
             mutableIntStateOf(durationPicked?.hour?.let{
                 if (it>selectableHours) selectableHours else it
             }?: 0)
         }
 
-        var selectableMinutes by remember { mutableIntStateOf(if (selectedHours  == selectableHours) 59 - pickedTime.minute else 59) }
+        var selectableMinutes by remember { mutableIntStateOf(
+            if (selectedHours  == selectableHours) 59 - pickedTime.minute else 59
+        ) }
         var selectedMinutes by remember {
             mutableIntStateOf(durationPicked?.minute?.let {
                 if (it>selectableMinutes) selectableMinutes else it
             }?: 0)
         }
 
-        selectableMinutes = if (selectedHours  == selectableHours) 59 - pickedTime.minute else 59
-        if (selectedMinutes>selectableMinutes) selectedMinutes = selectableMinutes
+        LaunchedEffect(selectedHours) {
+            selectableMinutes = if (selectedHours  == selectableHours) 59 - pickedTime.minute else 59
+            if (selectedMinutes>selectableMinutes) selectedMinutes = selectableMinutes
+        }
 
         Dialog(
             onDismissRequest = {
@@ -1276,7 +1269,7 @@ fun TimeDurationPicker(
             }
         ) {
             Box(
-                modifier = Modifier
+                modifier = Modifier.testTag("EditGoalTimeInputDurationPickerDialog")
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color.White)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1340,7 +1333,9 @@ fun TimeDurationPicker(
                             },
                             valueRange = 0f..selectableHours.toFloat(),
                             steps = selectableHours-1, // 23 hours total
-                            modifier = Modifier.padding(start = 8.dp)
+                            modifier = Modifier.padding(start = 8.dp).setSliderRange(
+                                0f..selectableHours.toFloat()// only for testing purposes
+                            ).testTag("EditGoalDurationPickerHourSlider")
                         )
                     }
 
@@ -1367,7 +1362,9 @@ fun TimeDurationPicker(
                             },
                             valueRange = 0f..selectableMinutes.toFloat(),
                             steps = selectableMinutes-1, // 59 minutes total
-                            modifier = Modifier.padding(start = 8.dp)
+                            modifier = Modifier.padding(start = 8.dp).setSliderRange(
+                                0f..selectableMinutes.toFloat()// only for testing purposes
+                            ).testTag("EditGoalDurationPickerMinuteSlider")
                         )
                     }
                 }

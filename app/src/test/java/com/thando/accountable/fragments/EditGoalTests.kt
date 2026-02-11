@@ -31,6 +31,7 @@ import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.fragments.viewmodels.HomeViewModel
+import com.thando.accountable.input_forms.DateAndTimePickerTest
 import com.thando.accountable.input_forms.TimeBlockTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -416,190 +417,20 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.newGoal.value?.first()?.endType
         )
 
-        testDateAndTimePicker(
-            activity,
+        DateAndTimePickerTest(
             getTimeAsLong = { editGoalViewModel.newGoal.value?.first()?.endDateTime },
             getExpectedEndType = { Goal.GoalEndType.DATE.name },
             getActualEndType = { editGoalViewModel.newGoal.value?.first()?.endType },
             endTypeButtonTag = { "EditGoalEndTypeButton" },
             dropDownMenuTag = { "EditGoalEndTypeDropDownMenu" },
             dropDownMenuItemTag = { "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}" },
-        )
-        /*
-        assertNotNull(editGoalViewModel.newGoal.value?.first()?.endDateTime)
-        val previousEndDateTime = editGoalViewModel.newGoal.value?.first()?.endDateTime
-
-        withTag(
-            "EditGoalFragmentDatePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDatePickerDialogOKButton"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-        }
-
-        withTag(
-            "EditGoalDatePickerDialogCANCELButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            previousEndDateTime,
-            editGoalViewModel.newGoal.value?.first()?.endDateTime
-        )
-
-        assertEquals(
-            Goal.GoalEndType.DATE.name,
-            editGoalViewModel.newGoal.value?.first()?.endType
-        )
-
-        withTag("EditGoalEndTypeButton") {
-            performPressWithScroll()
-        }
-
-        withTag("EditGoalEndTypeDropDownMenu") {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            Goal.GoalEndType.DATE.name,
-            editGoalViewModel.newGoal.value?.first()?.endType
-        )
-
-        withTag(
-            "EditGoalFragmentDatePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDatePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            previousEndDateTime,
-            editGoalViewModel.newGoal.value?.first()?.endDateTime
-        )
-
-        withTag(
-            "EditGoalFragmentTimePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalTimePickerDialogCANCELButton"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-        }
-
-        withTag(
-            "EditGoalTimePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            previousEndDateTime,
-            editGoalViewModel.newGoal.value?.first()?.endDateTime
-        )
-
-        activity.timeToAdd(2, 2)
-        activity.daysToAdd(2)
-
-        withTag("EditGoalEndTypeButton") {
-            performPressWithScroll()
-        }
-
-        withTag("EditGoalEndTypeDropDownMenu") {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDropdownMenuItem-${Goal.GoalEndType.DATE.name}"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        withTag(
-            "EditGoalFragmentDatePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDatePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            Converters().fromLocalDateTime(
-                Converters().toLocalDateTime(
-                    previousEndDateTime!!
-                ).value.plusDays(2)
-            ),
-            editGoalViewModel.newGoal.value!!.first()!!.endDateTime
-        )
-
-        withTag(
-            "EditGoalFragmentTimePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalTimePickerDialogCANCELButton"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-        }
-
-        withTag(
-            "EditGoalTimePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        val endTimeDate = Converters().toLocalDateTime(
-            previousEndDateTime
-        ).value
-        val timePickerState = TimePickerState(endTimeDate.hour, endTimeDate.minute, true)
-        timePickerState.addTime(2, 2)
-        assertEquals(
-            Converters().fromLocalDateTime(
-                endTimeDate.plusDays(2).withHour(timePickerState.hour)
-                    .withMinute(timePickerState.minute)
-            ),
-            editGoalViewModel.newGoal.value!!.first()!!.endDateTime
-        )
-
-        activity.timeToAdd(0, 0)
-        activity.daysToAdd(0)*/
+            selectDateAndTimeButtonTag = null,
+            parentParameters = Triple(
+                instantTaskExecutorRule,
+                composeTestRule,
+                activity
+            )
+        ).runTests(this@EditGoalTests::class)
     }
 
     @Test
@@ -1221,6 +1052,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
                 composeTestRule,
                 activity
             )
-        ).runTests()
+        ).runTests(this@EditGoalTests::class)
     }
 }

@@ -9,7 +9,6 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -22,19 +21,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.CreationExtras
-import com.thando.accountable.AccountableComposeRobolectricTest.TestMainActivity.Companion.addTime
 import com.thando.accountable.MainActivityTest.FilteredPrintStream
 import com.thando.accountable.MainActivityTest.Log
-import com.thando.accountable.database.Converters
-import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.FixMethodOrder
 import org.junit.Rule
@@ -49,6 +42,7 @@ import org.robolectric.shadows.ShadowLog
 import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
 import kotlin.reflect.full.declaredMemberFunctions
 import kotlin.reflect.full.findAnnotation
@@ -132,235 +126,46 @@ abstract class AccountableComposeRobolectricTest(
             }
     }
 
-    fun runTests(){
-        Log.i("${this::class.simpleName}","")
-        getTestFunctions().forEach {
-            it.call(this)
-            Log.w(it.name,"Passed")
+    object LogTest {
+        private var tabs = 0
+
+        fun increaseTabs() { tabs++ }
+
+        fun decreaseTabs(num:Int) { tabs-=num }
+
+        private fun getTabs(): String = StringBuilder().apply {
+            repeat(tabs) { append("\t") }
+        }.toString()
+
+        fun i(tag: String, message: String) {
+            Log.i(getTabs() + tag,message)
+        }
+
+        fun e(tag: String, message: String) {
+            Log.e(getTabs() + tag,message)
+        }
+
+        fun w(tag: String, message: String) {
+            Log.w(getTabs() + tag,message)
         }
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    fun testDateAndTimePicker(
-        activity: TestMainActivity,
-        getTimeAsLong: suspend ()->Long?,
-        getExpectedEndType:()->String,
-        getActualEndType: suspend ()->String?,
-        endTypeButtonTag: suspend ()->String,
-        dropDownMenuTag: suspend ()->String,
-        dropDownMenuItemTag: suspend ()->String,
-        selectDateAndTimeButtonTag: String? = null
-    ) = runTest {
-        withTag(endTypeButtonTag()) {
-            performPressWithScroll()
-        }
-
-        withTag(dropDownMenuTag()) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(dropDownMenuItemTag()) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            getExpectedEndType(),
-            getActualEndType()
-        )
-
-        val previousEndDateTime = getTimeAsLong()
-        assertNotNull(previousEndDateTime)
-
-        selectDateAndTimeButtonTag?.let {
-            withTag(it){
-                performPressWithScroll()
+    fun runTests(parentClass: KClass<*>){
+        LogTest.i("${parentClass.simpleName}","")
+        LogTest.increaseTabs()
+        LogTest.i("${this::class.simpleName}","")
+        LogTest.increaseTabs()
+        getTestFunctions().forEach { function ->
+            runCatching {
+                function.call(this)
+            }.onSuccess {
+                LogTest.w(function.name,"Passed")
+            }.onFailure {
+                LogTest.e(function.name,"Failed")
+                throw it
             }
         }
-
-        withTag(
-            "EditGoalFragmentDatePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDatePickerDialogOKButton"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-        }
-
-        withTag(
-            "EditGoalDatePickerDialogCANCELButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            previousEndDateTime,
-            getTimeAsLong()
-        )
-
-        assertEquals(
-            getExpectedEndType(),
-            getActualEndType()
-        )
-
-        withTag(endTypeButtonTag()) {
-            performPressWithScroll()
-        }
-
-        withTag(dropDownMenuTag()) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            dropDownMenuItemTag()
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            getExpectedEndType(),
-            getActualEndType()
-        )
-
-        selectDateAndTimeButtonTag?.let {
-            withTag(it){
-                performPressWithScroll()
-            }
-        }
-
-        withTag(
-            "EditGoalFragmentDatePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDatePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            previousEndDateTime,
-            getTimeAsLong()
-        )
-
-        withTag(
-            "EditGoalFragmentTimePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalTimePickerDialogCANCELButton"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-        }
-
-        withTag(
-            "EditGoalTimePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            previousEndDateTime,
-            getTimeAsLong()
-        )
-
-        activity.timeToAdd(2, 2)
-        activity.daysToAdd(2)
-
-        withTag(endTypeButtonTag()) {
-            performPressWithScroll()
-        }
-
-        withTag(dropDownMenuTag()) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            dropDownMenuItemTag()
-        ) {
-            performPressWithoutScroll()
-        }
-
-        selectDateAndTimeButtonTag?.let {
-            withTag(it){
-                performPressWithScroll()
-            }
-        }
-
-        withTag(
-            "EditGoalFragmentDatePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDatePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            Converters().fromLocalDateTime(
-                Converters().toLocalDateTime(
-                    previousEndDateTime!!
-                ).value.plusDays(2)
-            ),
-            getTimeAsLong()
-        )
-
-        withTag(
-            "EditGoalFragmentTimePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalTimePickerDialogCANCELButton"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-            hasClickAction()
-        }
-
-        withTag(
-            "EditGoalTimePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        val endTimeDate = Converters().toLocalDateTime(
-            previousEndDateTime
-        ).value
-        val timePickerState = TimePickerState(endTimeDate.hour, endTimeDate.minute, true)
-        timePickerState.addTime(2, 2)
-        assertEquals(
-            Converters().fromLocalDateTime(
-                endTimeDate.plusDays(2).withHour(timePickerState.hour)
-                    .withMinute(timePickerState.minute)
-            ),
-            getTimeAsLong()
-        )
-
-        activity.timeToAdd(0, 0)
-        activity.daysToAdd(0)
+        LogTest.decreaseTabs(2)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -454,11 +259,11 @@ abstract class AccountableComposeRobolectricTest(
 
             /*fun logDirectoryContents(dir: File) {
                 if (!dir.exists() || !dir.isDirectory) {
-                    Log.i("DirLogger", "Invalid directory: ${dir.absolutePath}")
+                    LogTest.i("DirLogger", "Invalid directory: ${dir.absolutePath}")
                     return
                 }
                 fun walk(file: File, indent: String = "") {
-                    Log.i("DirLogger", "$indent${file.name}: Children = ${file.listFiles()?.size}")
+                    LogTest.i("DirLogger", "$indent${file.name}: Children = ${file.listFiles()?.size}")
                     if (file.isDirectory) {
                         file.listFiles()?.forEach { child ->
                             walk(child, "$indent ")
