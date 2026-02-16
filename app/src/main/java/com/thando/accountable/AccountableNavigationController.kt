@@ -9,7 +9,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -226,50 +225,23 @@ class AccountableNavigationController(
         var startDestination by remember { mutableStateOf<AccountableFragment?>(null) }
 
         LaunchedEffect(Unit) {
-            mainActivityViewModel.direction.collect { direction ->
-                if (direction != null && navController!=null){
-                    scope.launch { mainActivityViewModel.toggleDrawer(false) }
-                    mainActivityViewModel.clearGalleryLaunchers()
-                    (0 until navController!!.currentBackStack.value.size).forEach { _ ->
-                        navController!!.popBackStack()
-                    }
-                    if (
-                        isDrawerFragment(direction)
-                    ) mainActivityViewModel.enableDrawer()
-                    else mainActivityViewModel.disableDrawer()
-                    navController!!.navigate(
-                        direction.name
-                    ){ launchSingleTop = true }
-                    mainActivityViewModel.directionChanged()
+            mainActivityViewModel.currentFragment.filterNotNull().firstOrNull()?.let { fragment ->
+                var currentFragment = fragment
+                if (isIntentActivity) {
+                    currentFragment =
+                        if (
+                            fragment == AccountableFragment.BooksFragment ||
+                            fragment == AccountableFragment.SearchFragment
+                        ) fragment else AccountableFragment.BooksFragment
                 }
-            }
-        }
 
-        LaunchedEffect(Unit) {
-            mainActivityViewModel.currentFragment
-                .filterNotNull()
-                .firstOrNull()?.let { fragment ->
-                    var currentFragment = fragment
-                    if (isIntentActivity) {
-                        currentFragment =
-                            if (
-                                fragment == AccountableFragment.BooksFragment ||
-                                fragment == AccountableFragment.SearchFragment
-                            ) fragment else AccountableFragment.BooksFragment
-                    }
-
-                    scope.launch { mainActivityViewModel.toggleDrawer(false) }
-                    mainActivityViewModel.clearGalleryLaunchers()
-                    navController?.let { navController ->
-                        (0 until navController.currentBackStack.value.size).forEach { _ ->
-                            navController.popBackStack()
-                        }
-                    }
-                    if (
-                        isDrawerFragment(currentFragment)
-                    ) mainActivityViewModel.enableDrawer()
-                    else mainActivityViewModel.disableDrawer()
-                    startDestination = currentFragment
+                scope.launch { mainActivityViewModel.toggleDrawer(false) }
+                mainActivityViewModel.clearGalleryLaunchers()
+                if (
+                    isDrawerFragment(currentFragment)
+                ) mainActivityViewModel.enableDrawer()
+                else mainActivityViewModel.disableDrawer()
+                startDestination = currentFragment
             }
         }
 
@@ -350,6 +322,26 @@ class AccountableNavigationController(
                             viewModel<SearchViewModel>(factory = SearchViewModel.Factory)
                         fragmentViewModel.update { viewModel }
                         SearchView(viewModel, mainActivityViewModel).searchView()
+                    }
+                }
+
+                LaunchedEffect(Unit) {
+                    mainActivityViewModel.direction.collect { direction ->
+                        if (direction != null){
+                            scope.launch { mainActivityViewModel.toggleDrawer(false) }
+                            mainActivityViewModel.clearGalleryLaunchers()
+                            if (
+                                isDrawerFragment(direction)
+                            ) mainActivityViewModel.enableDrawer()
+                            else mainActivityViewModel.disableDrawer()
+                            navController.navigate(
+                                direction.name
+                            ){
+                                popUpTo(0) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                            mainActivityViewModel.directionChanged()
+                        }
                     }
                 }
             }

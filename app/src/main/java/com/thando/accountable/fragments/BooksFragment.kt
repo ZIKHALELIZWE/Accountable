@@ -110,16 +110,15 @@ import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
-private val bottomBarHeightFraction = 0.14f
+private const val bottomBarHeightFraction = 0.14f
 private val barColor = Color(red = 255f, green = 255f, blue = 255f, alpha = 0.5f)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
@@ -207,19 +206,9 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
 
         var result by remember { mutableStateOf<Flow<ImageBitmap?>>(flowOf(null)) }
         LaunchedEffect(folder, appSettings) {
-            result = (if (folder != null) folder!!.getUri(context)
+            result = if (folder != null) folder!!.getUri(context)
             else if (appSettings != null) appSettings!!.getUri(context)
-            else MutableStateFlow(null)).mapLatest {
-                it?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri) }
-                    ?.asImageBitmap()
-                    ?: AppResources.getBitmapFromUri(
-                        context,
-                        AppResources.getUriFromDrawable(
-                            context,
-                            R.mipmap.ic_launcher
-                        )
-                    )?.asImageBitmap()
-            }
+            else flowOf(AppResources.getAppIcon(context)).flowOn(MainActivity.IO)
         }
 
         val image by result.collectAsStateWithLifecycle(null)
@@ -617,12 +606,7 @@ fun FolderCard(
         viewModel.getFolderContentPreview(folder)
     }
 
-    val folderImage by folder.getUri(context).mapLatest {
-        withContext(MainActivity.IO) {
-            it?.let { AppResources.getBitmapFromUri(context, it) }
-                ?.asImageBitmap()
-        }
-    }.collectAsStateWithLifecycle(null)
+    val folderImage by folder.getUri(context).collectAsStateWithLifecycle(null)
 
     Card(
         modifier = modifier
@@ -750,139 +734,166 @@ fun ScriptCard(
         }
     }
 
-    var contentPreview by remember { mutableStateOf<AccountableRepository.ContentPreview?>(null) }
-    val context = LocalContext.current
+    script.scriptId?.let {
+        var contentPreview by remember { mutableStateOf(getScriptContentPreview(script.scriptId!!)) }
+        val context = LocalContext.current
 
-    LaunchedEffect(script) {
-        contentPreview = script.scriptId?.let { getScriptContentPreview(it) }
-        contentPreview?.init {
-            contentPreviewAsync = null
-        }
-    }
-
-    val scriptDateTime by remember { script.scriptDateTime }
-    val title = remember { script.scriptTitle }
-    val description by contentPreview?.getDescription()?.collectAsStateWithLifecycle("")
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val imageBitmap by combine(
-        contentPreview?.getDisplayImage()?:MutableStateFlow(null),
-        script.getUri(context)
-    ) { displayImage, scriptUri ->
-        withContext(MainActivity.IO) {
-            (scriptUri ?: displayImage)?.let {
-                AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
+        LaunchedEffect(contentPreview) {
+            contentPreview.init {
+                contentPreviewAsync = null
             }
         }
-    }.collectAsStateWithLifecycle(null)
 
-    val numImages by contentPreview?.getNumImages()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val numVideos by contentPreview?.getNumVideos()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val numAudios by contentPreview?.getNumAudios()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val numDocuments by contentPreview?.getNumDocuments()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val numScript by contentPreview?.getNumScripts()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .wrapContentHeight()
-            .combinedClickable(
-                onLongClick = {
-                    if (clickable) {
-                        onLongClick()
-                    }
-                },
-                onClick = {
-                    if (clickable) {
-                        onClick()
-                    }
-                }
-            ),
-        shape = RectangleShape,
-        colors = CardColors(Color.White,
-            Color.Black,
-            Color.LightGray,
-            Color.DarkGray)
-    ) {
-        Row (modifier = Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min)) {
-            Card(modifier = Modifier
-                .height(113.dp)
-                .width(113.dp),
-                colors = CardColors(Color.White,
-                    Color.White,
-                    Color.LightGray,
-                    Color.DarkGray),
-            ) {
-                imageBitmap?.let { imageBitmap ->
-                    Image(
-                        bitmap = imageBitmap,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .height(113.dp)
-                            .width(113.dp),
-                        contentDescription = stringResource(R.string.script_display_image)
-                    )
+        val scriptDateTime by remember { script.scriptDateTime }
+        val title = remember { script.scriptTitle }
+        val description by contentPreview.getDescription().collectAsStateWithLifecycle("")
+        val imageBitmap by combine(
+            contentPreview.getDisplayImage(),
+            script.getUri(context)
+        ) { displayImage, scriptUri ->
+            withContext(MainActivity.IO) {
+                (scriptUri ?: displayImage)?.let {
+                    AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
                 }
             }
-            Column(modifier = Modifier
-                .padding(end = 5.dp)
-                .fillMaxHeight()
-                .weight(1f),
-                verticalArrangement = Arrangement.SpaceBetween
+        }.collectAsStateWithLifecycle(null)
+
+        val numImages by contentPreview.getNumImages().collectAsStateWithLifecycle(0)
+        val numVideos by contentPreview.getNumVideos().collectAsStateWithLifecycle(0)
+        val numAudios by contentPreview.getNumAudios().collectAsStateWithLifecycle(0)
+        val numDocuments by contentPreview.getNumDocuments().collectAsStateWithLifecycle(0)
+        val numScript by contentPreview.getNumScripts().collectAsStateWithLifecycle(0)
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .combinedClickable(
+                    onLongClick = {
+                        if (clickable) {
+                            onLongClick()
+                        }
+                    },
+                    onClick = {
+                        if (clickable) {
+                            onClick()
+                        }
+                    }
+                ),
+            shape = RectangleShape,
+            colors = CardColors(
+                Color.White,
+                Color.Black,
+                Color.LightGray,
+                Color.DarkGray
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min)
             ) {
-                Text(text = title.text.toString(),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleLarge,
+                Card(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(5.dp),
-                    textAlign = TextAlign.Start,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    fontSize = 16.sp) // Title
-                Text(text = description?:"",
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                        .height(113.dp)
+                        .width(113.dp),
+                    colors = CardColors(
+                        Color.White,
+                        Color.White,
+                        Color.LightGray,
+                        Color.DarkGray
+                    ),
+                ) {
+                    imageBitmap?.let { imageBitmap ->
+                        Image(
+                            bitmap = imageBitmap,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .height(113.dp)
+                                .width(113.dp),
+                            contentDescription = stringResource(R.string.script_display_image)
+                        )
+                    }
+                }
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 5.dp),
-                    textAlign = TextAlign.Start,
-                    color = Color.Black,
-                    fontSize = 12.sp) // Description
-                Row(
-                    modifier = Modifier
-                        .padding(5.dp)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        .padding(end = 5.dp)
+                        .fillMaxHeight()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = AppResources.getTime(scriptDateTime),
-                        modifier = Modifier.padding(end = 5.dp),
+                        text = title.text.toString(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(5.dp),
                         textAlign = TextAlign.Start,
-                        fontSize = 12.sp
-                    ) // Entry Time
-                    val modifier = Modifier
-                    numImages?.let { numImages -> MediaIcon(numImages, Icons.Default.Image,modifier) }
-                    numVideos?.let { numVideos -> MediaIcon(numVideos, Icons.Default.Videocam,modifier) }
-                    numAudios?.let { numAudios -> MediaIcon(numAudios, Icons.Default.Mic,modifier) }
-                    numDocuments?.let { numDocuments -> MediaIcon(numDocuments, Icons.Default.Book,modifier) }
-                    numScript?.let { numScript -> MediaIcon(numScript, Icons.AutoMirrored.Filled.LibraryBooks,modifier) }
-
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
+                        fontSize = 16.sp
+                    ) // Title
                     Text(
-                        text = AppResources.getFullDate(context, scriptDateTime),
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.End,
+                        text = description,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 5.dp),
+                        textAlign = TextAlign.Start,
+                        color = Color.Black,
                         fontSize = 12.sp
-                    ) // Entry Date
+                    ) // Description
+                    Row(
+                        modifier = Modifier
+                            .padding(5.dp)
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = AppResources.getTime(scriptDateTime),
+                            modifier = Modifier.padding(end = 5.dp),
+                            textAlign = TextAlign.Start,
+                            fontSize = 12.sp
+                        ) // Entry Time
+                        val modifier = Modifier
+                        MediaIcon(
+                            numImages,
+                            Icons.Default.Image,
+                            modifier
+                        )
+                        MediaIcon(
+                            numVideos,
+                            Icons.Default.Videocam,
+                            modifier
+                        )
+                        MediaIcon(
+                            numAudios,
+                            Icons.Default.Mic,
+                            modifier
+                        )
+                        MediaIcon(
+                            numDocuments,
+                            Icons.Default.Book,
+                            modifier
+                        )
+                        MediaIcon(
+                            numScript,
+                            Icons.AutoMirrored.Filled.LibraryBooks,
+                            modifier
+                        )
+
+                        Text(
+                            text = AppResources.getFullDate(context, scriptDateTime),
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.End,
+                            fontSize = 12.sp
+                        ) // Entry Date
+                    }
+                    //Text() // Entry Size
                 }
-                //Text() // Entry Size
             }
         }
     }
@@ -905,142 +916,168 @@ fun GoalCard(
         }
     }
 
-    var contentPreview by remember { mutableStateOf<AccountableRepository.GoalContentPreview?>(null) }
-    val context = LocalContext.current
+    goal.id?.let {
+        val contentPreview by remember { mutableStateOf(getGoalContentPreview(goal.id!!)) }
+        val context = LocalContext.current
 
-    LaunchedEffect(goal) {
-        contentPreview = goal.id?.let { getGoalContentPreview(it) }
-        contentPreview?.init {
-            contentPreviewAsync = null
-        }
-    }
-
-    val goalInitialDateTime by remember {
-        Converters().toLocalDateTime(
-            goal.initialDateTime
-        )
-    }
-    val goalDateOfCompletion by remember {
-        Converters().toLocalDateTime(
-            goal.dateOfCompletion
-        )
-    }
-    val title = remember { TextFieldState(goal.goal) }
-    val location = remember { TextFieldState(goal.location) }
-    val goalColour by remember { mutableIntStateOf(goal.colour) }
-    val description by contentPreview?.getDescription()?.collectAsStateWithLifecycle("")
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val displayImage by contentPreview?.getDisplayImage()?.collectAsStateWithLifecycle()
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val imageBitmap by goal.getUri(context).mapLatest { scriptUri ->
-        withContext(MainActivity.IO) {
-            (scriptUri?:displayImage)?.let { AppResources.getBitmapFromUri(context, it)?.asImageBitmap() }
-        }
-    }.collectAsStateWithLifecycle(null)
-
-    val numImages by contentPreview?.getNumImages()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val numVideos by contentPreview?.getNumVideos()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val numAudios by contentPreview?.getNumAudios()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val numDocuments by contentPreview?.getNumDocuments()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val numScript by contentPreview?.getNumScripts()?.collectAsStateWithLifecycle(0)
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .wrapContentHeight()
-            .combinedClickable(
-                onLongClick = {
-                    if (clickable) {
-                        onLongClick()
-                    }
-                },
-                onClick = {
-                    if (clickable) {
-                        onClick()
-                    }
-                }
-            ),
-        shape = RectangleShape,
-        colors = CardColors(Color.White,
-            Color.Black,
-            Color.LightGray,
-            Color.DarkGray)
-    ) {
-        Row (modifier = Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min)) {
-            Card(modifier = Modifier
-                .height(113.dp)
-                .width(113.dp),
-                colors = CardColors(Color(goalColour),
-                    Color.White,
-                    Color.LightGray,
-                    Color.DarkGray),
-            ) {
-                imageBitmap?.let { imageBitmap ->
-                    Image(
-                        bitmap = imageBitmap,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .height(113.dp)
-                            .width(113.dp).padding(2.dp),
-                        contentDescription = stringResource(R.string.script_display_image)
-                    )
-                }
+        LaunchedEffect(contentPreview) {
+            contentPreview.init {
+                contentPreviewAsync = null
             }
-            Column(modifier = Modifier
-                .padding(end = 5.dp)
-                .fillMaxHeight()
-                .weight(1f),
-                verticalArrangement = Arrangement.SpaceBetween
+        }
+
+        val goalInitialDateTime by remember {
+            Converters().toLocalDateTime(
+                goal.initialDateTime
+            )
+        }
+        val goalDateOfCompletion by remember {
+            Converters().toLocalDateTime(
+                goal.dateOfCompletion
+            )
+        }
+        val title = remember { TextFieldState(goal.goal) }
+        val location = remember { TextFieldState(goal.location) }
+        val goalColour by remember { mutableIntStateOf(goal.colour) }
+        val imageBitmap by combine(
+            goal.getUri(context),
+            contentPreview.getDisplayImage(context)
+        ) { goalImage, displayImage ->
+            goalImage?:displayImage
+        }.collectAsStateWithLifecycle(null)
+
+        val numImages by contentPreview.getNumImages().collectAsStateWithLifecycle(0)
+        val numVideos by contentPreview.getNumVideos().collectAsStateWithLifecycle(0)
+        val numAudios by contentPreview.getNumAudios().collectAsStateWithLifecycle(0)
+        val numDocuments by contentPreview.getNumDocuments().collectAsStateWithLifecycle(0)
+        val numScript by contentPreview.getNumScripts().collectAsStateWithLifecycle(0)
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .combinedClickable(
+                    onLongClick = {
+                        if (clickable) {
+                            onLongClick()
+                        }
+                    },
+                    onClick = {
+                        if (clickable) {
+                            onClick()
+                        }
+                    }
+                ),
+            shape = RectangleShape,
+            colors = CardColors(
+                Color.White,
+                Color.Black,
+                Color.LightGray,
+                Color.DarkGray
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min)
             ) {
-                Text(text = title.text.toString(),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleLarge,
+                Card(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(5.dp),
-                    textAlign = TextAlign.Start,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    fontSize = 16.sp) // Title
-                Text(text = stringResource(
-                    R.string.location_with_string,
-                    location.text.toString()),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                        .height(113.dp)
+                        .width(113.dp),
+                    colors = CardColors(
+                        Color(goalColour),
+                        Color.White,
+                        Color.LightGray,
+                        Color.DarkGray
+                    ),
+                ) {
+                    imageBitmap?.let { imageBitmap ->
+                        Image(
+                            bitmap = imageBitmap,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .height(113.dp)
+                                .width(113.dp).padding(2.dp),
+                            contentDescription = stringResource(R.string.script_display_image)
+                        )
+                    }
+                }
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 5.dp),
-                    textAlign = TextAlign.Start,
-                    color = Color.Black,
-                    fontSize = 12.sp) // Location
-                Row(
-                    modifier = Modifier
-                        .padding(5.dp)
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        .padding(end = 5.dp)
+                        .fillMaxHeight()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = stringResource(R.string.start_date,
-                            AppResources.getFullDate(context, goalInitialDateTime)),
-                        modifier = Modifier.padding(end = 5.dp),
+                        text = title.text.toString(),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(5.dp),
                         textAlign = TextAlign.Start,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black,
+                        fontSize = 16.sp
+                    ) // Title
+                    Text(
+                        text = stringResource(
+                            R.string.location_with_string,
+                            location.text.toString()
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 5.dp),
+                        textAlign = TextAlign.Start,
+                        color = Color.Black,
                         fontSize = 12.sp
-                    )
-                    val modifier = Modifier
-                    numImages?.let { numImages -> MediaIcon(numImages, Icons.Default.Image,modifier) }
-                    numVideos?.let { numVideos -> MediaIcon(numVideos, Icons.Default.Videocam,modifier) }
-                    numAudios?.let { numAudios -> MediaIcon(numAudios, Icons.Default.Mic,modifier) }
-                    numDocuments?.let { numDocuments -> MediaIcon(numDocuments, Icons.Default.Book,modifier) }
-                    numScript?.let { numScript -> MediaIcon(numScript, Icons.AutoMirrored.Filled.LibraryBooks,modifier) }
-                    goalDateOfCompletion.let { goalDateOfCompletion ->
+                    ) // Location
+                    Row(
+                        modifier = Modifier
+                            .padding(5.dp)
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.start_date,
+                                AppResources.getFullDate(context, goalInitialDateTime)
+                            ),
+                            modifier = Modifier.padding(end = 5.dp),
+                            textAlign = TextAlign.Start,
+                            fontSize = 12.sp
+                        )
+                        val modifier = Modifier
+                        MediaIcon(
+                            numImages,
+                            Icons.Default.Image,
+                            modifier
+                        )
+                        MediaIcon(
+                            numVideos,
+                            Icons.Default.Videocam,
+                            modifier
+                        )
+                        MediaIcon(
+                            numAudios,
+                            Icons.Default.Mic,
+                            modifier
+                        )
+                        MediaIcon(
+                            numDocuments,
+                            Icons.Default.Book,
+                            modifier
+                        )
+                        MediaIcon(
+                            numScript,
+                            Icons.AutoMirrored.Filled.LibraryBooks,
+                            modifier
+                        )
                         Text(
                             text = AppResources.getFullDate(context, goalDateOfCompletion),
                             modifier = Modifier.weight(1f),
@@ -1048,8 +1085,8 @@ fun GoalCard(
                             fontSize = 12.sp
                         )
                     }
+                    //Text() // Entry Size
                 }
-                //Text() // Entry Size
             }
         }
     }

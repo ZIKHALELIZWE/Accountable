@@ -2,6 +2,8 @@ package com.thando.accountable.database.tables
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.util.packInts
 import androidx.room.ColumnInfo
 import androidx.room.Entity
@@ -11,7 +13,6 @@ import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.mapLatest
 import java.time.LocalDateTime
 
 @Entity(tableName = "goal_table")
@@ -201,5 +202,8 @@ data class Goal(
         }
     }
 
-    fun getUri(context: Context): Flow<Uri?> = imageResource.getUri(context)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun getUri(context: Context): Flow<ImageBitmap?> = imageResource.getUri(context).mapLatest { scriptUri ->
+        scriptUri?.let { AppResources.getBitmapFromUri(context, it)?.asImageBitmap() }
+    }.flowOn(MainActivity.IO)
 }

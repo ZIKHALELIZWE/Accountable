@@ -73,7 +73,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -108,12 +107,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.temporal.TemporalAdjusters
@@ -301,13 +296,7 @@ fun EditGoalFragmentView(
                 }
         }
 
-        val imageBitmap by newGoal.getUri(context).mapLatest { uri ->
-            withContext(MainActivity.IO) {
-                uri?.let { uri ->
-                    AppResources.getBitmapFromUri(context, uri)?.asImageBitmap()
-                }
-            }
-        }.collectAsStateWithLifecycle(null)
+        val imageBitmap by newGoal.getUri(context).collectAsStateWithLifecycle(null)
         val goal = remember { TextFieldState(newGoal.goal) }
         val location = remember { TextFieldState(newGoal.location) }
 

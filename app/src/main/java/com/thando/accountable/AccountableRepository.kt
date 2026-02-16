@@ -14,11 +14,12 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
@@ -50,12 +51,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -151,21 +152,25 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     init {
-     // todo for some reason it won't run tests when this is active   accountablePlayer.init(application)
+        if (MainActivity.IO == Dispatchers.IO) {
+            // If not running tests then init. Will not run tests otherwise
+            accountablePlayer.init(application)
+        }
         repositoryScope.launch {
-            appSettings.update { dao.appSettings() }
+            appSettings.value = dao.appSettings()
 
-            val loadInitialFolder: suspend (inputFolderType: Folder.FolderType) -> Unit = { type ->
-                scriptsOrGoalsFolderType.update { type }
-                loadFolder(INITIAL_FOLDER_ID)
+            if (appSettings.value!!.initialFragment == AccountableFragment.HomeFragment){
+                changeFragment(
+                    AccountableFragment.HomeFragment,
+                    AccountableFragment.AppSettingsFragment
+                )
             }
-
-            if (appSettings.value?.initialFragment == AccountableFragment.BooksFragment) {
-                loadInitialFolder(Folder.FolderType.SCRIPTS)
-            } else if (appSettings.value?.initialFragment == AccountableFragment.GoalsFragment) {
-                loadInitialFolder(Folder.FolderType.GOALS)
+            else {
+                changeFragment(
+                    appSettings.value!!.initialFragment,
+                    AccountableFragment.HomeFragment
+                )
             }
-            currentFragment.value = appSettings.value?.initialFragment
         }
     }
 
@@ -568,14 +573,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     // Navigation Code
-    fun changeFragment(newFragment: AccountableFragment) {
-        currentFragment.value?.let { currentFragmentInScope ->
+    fun changeFragment(
+        newFragment: AccountableFragment, initializingFragment: AccountableFragment?=null
+    ) {
+        val currentFragmentInScope = initializingFragment?:currentFragment.value
+        currentFragmentInScope?.let { currentFragmentInScope ->
             val (validatedFragment, navArgs) = AccountableNavigationController.getFragmentDirections(
                 currentFragmentInScope,
                 newFragment
             )
             if (validatedFragment == null) return
-
+            if (initializingFragment!=null) currentFragment.value = validatedFragment
             if (navArgs.isDrawerFragment) {
                 appSettings.value?.initialFragment = newFragment
                 repositoryScope.launch {
@@ -1792,8 +1800,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
             return description
         }
 
-        fun getDisplayImage(): StateFlow<Uri?> {
-            return displayImage
+        fun getDisplayImage(context: Context): Flow<ImageBitmap?> {
+            return displayImage.mapLatest { scriptUri ->
+                scriptUri?.let { AppResources.getBitmapFromUri(context, it)?.asImageBitmap() }
+            }.flowOn(MainActivity.IO)
         }
     }
 

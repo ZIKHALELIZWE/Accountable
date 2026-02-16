@@ -29,22 +29,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
-import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.EditFolderViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,11 +124,7 @@ fun EditFolderFragmentView(
     val scope = rememberCoroutineScope()
 
     if (newEditFolder != null) {
-        val folderImage by newEditFolder!!.getUri(context).mapLatest {
-            withContext(MainActivity.IO) {
-                it?.let { uri -> AppResources.getBitmapFromUri(context,uri)?.asImageBitmap() }
-            }
-        }.collectAsStateWithLifecycle(null)
+        val folderImage by newEditFolder!!.getUri(context).collectAsStateWithLifecycle(null)
         val folderName = remember { newEditFolder!!.folderName }
         val listState = rememberScrollState()
 

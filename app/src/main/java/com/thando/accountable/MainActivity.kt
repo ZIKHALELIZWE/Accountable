@@ -46,7 +46,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -66,13 +65,13 @@ import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.withContext
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 import java.util.concurrent.atomic.AtomicReference
@@ -348,33 +347,9 @@ fun MainActivityView(
                             .verticalScroll(rememberScrollState())
                     ) {
                         appSettings?.let { appSettings ->
-                            val image by appSettings.getUri(context).mapLatest { imageUri ->
-                                withContext(MainActivity.IO) {
-                                    imageUri?.let { imageUri ->
-                                        AppResources.getBitmapFromUri(context, imageUri)?.asImageBitmap()
-                                    }
-                                        ?: AppResources.getBitmapFromUri(
-                                            context,
-                                            AppResources.getUriFromDrawable(
-                                                context,
-                                                R.mipmap.ic_launcher
-                                            )
-                                        )?.asImageBitmap()
-                                }
-                            }.collectAsStateWithLifecycle(null)
-                            /*var image by remember { mutableStateOf<ImageBitmap?>(null) }
-                            LaunchedEffect(imageUri) {
-                                imageUri?.let { imageUri ->
-                                    AppResources.getBitmapFromUri(context, imageUri)?.asImageBitmap()
-                                }
-                                    ?: AppResources.getBitmapFromUri(
-                                        context,
-                                        AppResources.getUriFromDrawable(
-                                            context,
-                                            R.mipmap.ic_launcher
-                                        )
-                                    )?.asImageBitmap()
-                            }*/
+                            val image by appSettings.getUri(context).mapLatest { imageBitmap ->
+                                 imageBitmap?:AppResources.getAppIcon(context)
+                            }.flowOn(MainActivity.IO).collectAsStateWithLifecycle(null)
                             image?.let { image ->
                                 Image(
                                     bitmap = image,

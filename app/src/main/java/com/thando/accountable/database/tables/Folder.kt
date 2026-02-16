@@ -5,14 +5,20 @@ import android.net.Uri
 import android.view.View
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.mapLatest
 
 @Entity(tableName = "folder_table")
 open class Folder(
@@ -92,8 +98,12 @@ open class Folder(
         }
     }
 
-    fun getUri(context: Context): Flow<Uri?> {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun getUri(context: Context): Flow<ImageBitmap?> {
         _progressBarVisibility.value = View.GONE
-        return imageResource.getUri(context)
+        return imageResource.getUri(context).mapLatest {
+            it?.let { AppResources.getBitmapFromUri(context, it) }
+                ?.asImageBitmap()
+        }.flowOn(MainActivity.IO)
     }
 }

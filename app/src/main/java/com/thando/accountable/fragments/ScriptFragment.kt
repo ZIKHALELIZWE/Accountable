@@ -44,8 +44,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,7 +53,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -83,23 +80,19 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.ScriptViewModel
-import com.thando.accountable.ui.cards.GetContentCard
 import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.basicDropdownMenu
+import com.thando.accountable.ui.cards.GetContentCard
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
-import java.util.Calendar
 import kotlin.random.Random
 
 @Composable
@@ -740,8 +733,8 @@ fun ScriptFragmentCatalog(
     val teleprompterTextColor by teleprompterSettings?.textColour?.collectAsStateWithLifecycle()?:remember { mutableStateOf(null) }
     val teleprompterTextSize by (teleprompterSettings?.textSize?:MutableStateFlow(null)).collectAsStateWithLifecycle()
 
-
     val scriptContentList = remember { viewModel.scriptContentList }
+
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize().imePadding()
@@ -847,7 +840,10 @@ fun ScriptFragmentCatalog(
                 }
             }
         }
-        items(items = scriptContentList, key = {listContent-> listContent.id?:Random.nextLong()}) { content ->
+        items(
+            items = scriptContentList,
+            key = {listContent-> listContent.id?:Random.nextLong()}
+        ) { content ->
             val mod = Modifier.pointerInput(Unit) {
                 detectTapGestures(
                     onLongPress = { onBottomSheetChange(null to content) }

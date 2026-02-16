@@ -179,16 +179,7 @@ fun TaskView(
 
     AccountableTheme {
         goal?.let { goal ->
-            val image by goal.getUri(context).mapLatest {
-                withContext(MainActivity.IO) {
-                    it?.let { imageUri ->
-                        AppResources.getBitmapFromUri(
-                            context,
-                            imageUri
-                        )
-                    }?.asImageBitmap()
-                }
-            }.collectAsStateWithLifecycle(null)
+            val image by goal.getUri(context).collectAsStateWithLifecycle(null)
             val goalColour by remember { mutableIntStateOf( goal.colour) }
 
             Scaffold(

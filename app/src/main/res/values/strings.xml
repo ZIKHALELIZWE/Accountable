@@ -313,4 +313,5 @@
     <string name="pick_deliverable">Pick Deliverable</string>
     <string name="select_deliverables">Select Deliverables</string>
     <string name="delete_deliverable">Delete Deliverable</string>
+    <string name="image_not_found">Image Not Found</string>
 </resources>

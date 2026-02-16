@@ -5,6 +5,8 @@ import android.content.Context
 import android.net.Uri
 import android.util.Range
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
@@ -19,6 +21,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -186,6 +190,13 @@ data class Content(
             AppResources.ContentType.VIDEO -> videoResource.getUri(context)
             null -> null
         }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun getImageBitmap(context: Context):Flow<ImageBitmap?> {
+        return imageResource.getUri(context).mapLatest { uri ->
+            uri?.let { uri -> AppResources.getBitmapFromUri(context,uri)?.asImageBitmap() }
+        }.flowOn(MainActivity.IO)
     }
 
     fun getText(markupLanguage: MarkupLanguage?, context: Context, textSize: Float){

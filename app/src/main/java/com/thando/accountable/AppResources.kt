@@ -13,6 +13,8 @@ import androidx.annotation.AnyRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
@@ -106,6 +108,13 @@ sealed class AppResources {
                 e.printStackTrace()
                 null
             }
+        }
+
+        fun getAppIcon(context: Context): ImageBitmap? {
+            return Drawable.createFromStream(context.contentResolver.openInputStream(getUriFromDrawable(
+                context,
+                R.mipmap.ic_launcher
+            )),null)?.toBitmap()?.asImageBitmap()
         }
 
         val ContentTypeAccessor = mapOf(

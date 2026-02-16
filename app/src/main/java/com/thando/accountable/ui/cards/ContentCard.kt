@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Card
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.fromColorLong
 import androidx.compose.ui.graphics.toArgb
@@ -69,16 +71,12 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.player.Media3PlayerView
 import com.thando.accountable.player.TrackItem
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.CoroutineContext
 
 @Composable
 fun GetContentCard(
@@ -257,7 +255,8 @@ fun TextCard(
     else {
         TextField(
             state = if (contentFileName!=null) fileName else text,
-            modifier = modifier.fillMaxWidth()
+            modifier = modifier
+                .fillMaxWidth()
                 .onFocusChanged { focusState -> hasFocus = focusState.isFocused },
             placeholder = { Text(stringResource(if (contentFileName!=null) R.string.video_name
             else if (description) R.string.image_description
@@ -296,34 +295,24 @@ fun ImageCard(
     markupLanguage: MarkupLanguage?,
     teleprompterSettings: TeleprompterSettings? = null
 ){
-    content.getUri(LocalContext.current)?.let { getContentUri ->
-        val context = LocalContext.current
-        val contentImage by getContentUri.mapLatest { uri ->
-            withContext(MainActivity.IO) {
-                uri?.let { uri -> AppResources.getBitmapFromUri(context,uri)?.asImageBitmap() }
-            }
-        }.collectAsStateWithLifecycle(null)
-
-        Column(modifier = Modifier.fillMaxWidth()) {
-            contentImage?.let { contentImage ->
-                Image(
-                    bitmap = contentImage,
-                    contentDescription = stringResource(R.string.image),
-                    contentScale = ContentScale.FillWidth,
-                    modifier = if (isEditingScript) modifier.fillMaxWidth() else Modifier.fillMaxWidth()
-                )
-            }
-            TextCard(
-                content,
-                isEditingScript,
-                textIndex,
-                appSettings,
-                markupLanguage,
-                teleprompterSettings = teleprompterSettings,
-                description = true,
-                modifier = Modifier.padding(start = 15.dp)
-            )
-        }
+    val contentImage by content.getImageBitmap(LocalContext.current).collectAsStateWithLifecycle(null)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Image(
+            bitmap = contentImage?:AppResources.getAppIcon(LocalContext.current)?: ImageBitmap(1,1),
+            contentDescription = contentImage?.let { stringResource(R.string.image) }?: run { stringResource(R.string.image_not_found) },
+            contentScale = ContentScale.FillWidth,
+            modifier = if (isEditingScript) modifier.fillMaxWidth() else Modifier.fillMaxWidth()
+        )
+        TextCard(
+            content,
+            isEditingScript,
+            textIndex,
+            appSettings,
+            markupLanguage,
+            teleprompterSettings = teleprompterSettings,
+            description = true,
+            modifier = Modifier.padding(start = 15.dp)
+        )
     }
 }
 
@@ -345,87 +334,92 @@ fun VideoCard(
     val textColour by teleprompterSettings?.textColour?.collectAsStateWithLifecycle()
         ?:MutableStateFlow(Color.Black.toArgb()).collectAsStateWithLifecycle()
 
-    content.getUri(LocalContext.current)?.let { getContentUri ->
-        val uri by getContentUri.collectAsStateWithLifecycle(null)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        var buttonDrawable by remember { mutableStateOf(Icons.Filled.AccessTime) }
+        val uri by (content.getUri(LocalContext.current)?: flowOf(null)).collectAsStateWithLifecycle(null)
         uri?.let { uri ->
             scope.launch {
-                withContext(MainActivity.IO){
+                withContext(MainActivity.IO) {
                     content.trackItem.value =
                         content.id?.let { getVideoMetadata(it, uri, context) }
                 }
             }
             trackItem?.let { trackItem ->
-                var buttonDrawable by remember { mutableStateOf(Icons.Filled.PlayArrow) }
+                buttonDrawable = Icons.Filled.PlayArrow
 
-                if (isPlaying){
+                if (isPlaying) {
                     buttonDrawable = Icons.Filled.Close
-                }
-                else{
+                } else {
                     if (accountablePlayer.isContentPlaying(content)) {
                         content.isPlaying.update { true }
-                    }
-                    else{
+                    } else {
                         accountablePlayer.close(content)
                         buttonDrawable = Icons.Filled.PlayArrow
                     }
                 }
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Media3PlayerView(
-                        content, trackItem.thumbnail,accountablePlayer, isPlaying,
-                        isEditingScript,
-                        modifier
-                    )
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(4.dp),
-                        elevation = CardDefaults.cardElevation(4.dp),
-                        colors = CardColors(MaterialTheme.colorScheme.secondary,
-                            Color.Black,
-                            Color.LightGray,
-                            Color.DarkGray)
-                    ) {
-                        Row(modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically){
-                            Column (horizontalAlignment = Alignment.CenterHorizontally){
-                                IconButton(onClick = {
-                                    content.isPlaying.update { isPlaying.not() }
-                                })
-                                {
-                                    Icon(
-                                        imageVector = buttonDrawable,
-                                        contentDescription = stringResource(R.string.play_pause)
-                                    )
-                                }
-                                Text(trackItem.duration.toLongOrNull()?.let { formatMillisToMinutesAndSeconds(it)}?:trackItem.duration,
-                                    color = Color(textColour))
-                            }
-                            TextCard(
-                                content,
-                                isEditingScript,
-                                textIndex,
-                                appSettings,
-                                markupLanguage,
-                                teleprompterSettings = teleprompterSettings,
-                                description = false,
-                                contentFileName = trackItem.title + " : " + trackItem.artistName
-                            )
-                        }
+                Media3PlayerView(
+                    content, trackItem.thumbnail, accountablePlayer, isPlaying,
+                    isEditingScript,
+                    modifier
+                )
+            }
+        }?: run {
+            Image(
+                bitmap = AppResources.getAppIcon(LocalContext.current)?: ImageBitmap(1,1),
+                contentDescription = stringResource(R.string.image_not_found),
+                contentScale = ContentScale.FillWidth,
+                modifier = if (isEditingScript) modifier.fillMaxWidth() else Modifier.fillMaxWidth()
+            )
+        }
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            elevation = CardDefaults.cardElevation(4.dp),
+            colors = CardColors(MaterialTheme.colorScheme.secondary,
+                Color.Black,
+                Color.LightGray,
+                Color.DarkGray)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically){
+                Column (horizontalAlignment = Alignment.CenterHorizontally){
+                    IconButton(onClick = {
+                        content.isPlaying.update { isPlaying.not() }
+                    })
+                    {
+                        Icon(
+                            imageVector = buttonDrawable,
+                            contentDescription = stringResource(R.string.play_pause)
+                        )
                     }
-                    TextCard(
-                        content,
-                        isEditingScript,
-                        textIndex,
-                        appSettings,
-                        markupLanguage,
-                        teleprompterSettings = teleprompterSettings,
-                        description = true,
-                        modifier = Modifier.padding(start = 15.dp)
-                    )
+                    Text(
+                        trackItem?.duration?.toLongOrNull()?.let { formatMillisToMinutesAndSeconds(it)}?: (trackItem?.duration
+                            ?: ""),
+                        color = Color(textColour))
                 }
+                TextCard(
+                    content,
+                    isEditingScript,
+                    textIndex,
+                    appSettings,
+                    markupLanguage,
+                    teleprompterSettings = teleprompterSettings,
+                    description = false,
+                    contentFileName = trackItem?.title + " : " + trackItem?.artistName
+                )
             }
         }
+        TextCard(
+            content,
+            isEditingScript,
+            textIndex,
+            appSettings,
+            markupLanguage,
+            teleprompterSettings = teleprompterSettings,
+            description = true,
+            modifier = Modifier.padding(start = 15.dp)
+        )
     }
 }
 
@@ -535,7 +529,9 @@ fun AudioCard(
                             Color.LightGray,
                             Color.DarkGray)
                     ) {
-                        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                        Row(modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min),
                             verticalAlignment = Alignment.CenterVertically){
                             Column (horizontalAlignment = Alignment.CenterHorizontally){
                                 IconButton(onClick = {
