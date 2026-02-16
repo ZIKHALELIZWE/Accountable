@@ -10,6 +10,7 @@ import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerNotificationManager
 import com.google.common.util.concurrent.ListenableFuture
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.player.AccountablePlayer.Companion.NOW_PLAYING_CHANNEL_ID
 import com.thando.accountable.player.AccountablePlayer.Companion.NOW_PLAYING_NOTIFICATION_ID
@@ -27,7 +28,7 @@ class MediaNotificationManager(
     notificationListener: PlayerNotificationManager.NotificationListener
 ) {
     private val serviceJob = SupervisorJob()
-    private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
+    private val serviceScope = CoroutineScope(MainActivity.Main + serviceJob)
     private val notificationManager: PlayerNotificationManager
 
     init {
@@ -94,7 +95,7 @@ class MediaNotificationManager(
                 currentIconUri = iconUri
                 val byteArray = controller.get().mediaMetadata.artworkData
                 serviceScope.launch {
-                    withContext(Dispatchers.IO){
+                    withContext(MainActivity.IO){
                         currentBitmap = AppResources.getBitmapFromByteArray(byteArray)
                         currentBitmap?.let { callback.onBitmap(it) }
                     }

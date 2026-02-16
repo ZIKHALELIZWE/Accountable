@@ -13,6 +13,7 @@ import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.fragments.viewmodels.HelpViewModel
 import com.thando.accountable.fragments.viewmodels.HomeViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -212,15 +213,15 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
         assertNull(booksViewModel.intentString)
         assertNotNull(booksViewModel.appSettings.value)
 
-        assertNotNull(booksViewModel.foldersList.value)
-        assertEquals(false,booksViewModel.showScripts.value?.value)
+        assertNotNull(booksViewModel.foldersList.first())
+        assertEquals(false,booksViewModel.showScripts.first())
         booksViewModel.switchFolderScript()
         finishProcesses()
-        assertNotNull(booksViewModel.scriptsList.value)
-        assertEquals(true, booksViewModel.showScripts.value?.value)
+        assertNotNull(booksViewModel.scriptsList.first())
+        assertEquals(true, booksViewModel.showScripts.first())
         booksViewModel.switchFolderScript()
         finishProcesses()
-        assertNull(booksViewModel.goalsList.value)
+        assertNull(booksViewModel.goalsList.first())
         /*areEqual(-1L,
             repository.getScriptsOrGoalsFolderId().value,
             "Repository Folder ID")

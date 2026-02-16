@@ -11,6 +11,7 @@ import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.time.LocalDateTime
@@ -92,5 +93,5 @@ data class Script (
         scriptPicture = null
     }
 
-    fun getUri(context: Context): StateFlow<Uri?> = imageResource.getUri(context)
+    fun getUri(context: Context): Flow<Uri?> = imageResource.getUri(context)
 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,12 +45,16 @@ import com.thando.accountable.ui.AccountableNotification
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -63,10 +68,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AccountableRepository(val application: Application): AutoCloseable {
     var dao: RepositoryDao = AccountableDatabase.getInstance(application).repositoryDao
     private val repositoryJob = Job()
-    private val repositoryScope = CoroutineScope(Dispatchers.Main + repositoryJob)
+    private val repositoryScope = CoroutineScope(MainActivity.Main + repositoryJob)
     private var loadFoldersListJob: CompletableJob? = null
     private var loadScriptsListJob: CompletableJob? = null
 
@@ -171,12 +177,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return folder
     }
 
-    fun getShowScripts(): StateFlow<MutableStateFlow<Boolean>?> {
-        return showScripts
+    fun getShowScripts(): Flow<Boolean> {
+        return showScripts.flatMapLatest {
+                it ?: MutableStateFlow(false)
+        }.flowOn(MainActivity.IO)
     }
 
-    fun getFolderOrder(): StateFlow<MutableStateFlow<Boolean>?> {
-        return folderOrder
+    fun getFolderOrder(): Flow<Boolean> {
+        return folderOrder.flatMapLatest {
+                it ?: MutableStateFlow(false)
+        }.flowOn(MainActivity.IO)
     }
 
     fun getListLoaded(): StateFlow<Boolean> {
@@ -195,16 +205,22 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return appSettings
     }
 
-    fun getFoldersList(): StateFlow<Flow<List<Folder>>?> {
-        return foldersList
+    fun getFoldersList(): Flow<List<Folder>> {
+        return foldersList.flatMapLatest {
+                it ?: MutableStateFlow(emptyList())
+        }.flowOn(MainActivity.IO)
     }
 
-    fun getScriptsList(): StateFlow<Flow<List<Script>>?> {
-        return scriptsList
+    fun getScriptsList(): Flow<List<Script>> {
+        return scriptsList.flatMapLatest {
+                it?: MutableStateFlow(emptyList())
+        }.flowOn(MainActivity.IO)
     }
 
-    fun getGoalsList(): StateFlow<Flow<List<Goal>>?> {
-        return goalsList.asStateFlow()
+    fun getGoalsList(): Flow<List<Goal>> {
+        return goalsList.flatMapLatest {
+                it?:MutableStateFlow(emptyList())
+        }.flowOn(MainActivity.IO)
     }
 
     fun getEditFolder(): StateFlow<Folder?> {
@@ -215,16 +231,20 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return newEditFolder
     }
 
-    fun getNewGoal(): StateFlow<Flow<Goal?>?> {
-        return newGoal
+    fun getNewGoal(): Flow<Goal?> {
+        return newGoal.flatMapLatest {
+                it ?: flowOf(null)
+        }.flowOn(MainActivity.IO)
     }
 
     fun getEditGoal(): StateFlow<Goal?> {
         return editGoal
     }
 
-    fun getGoal(): MutableStateFlow<Flow<Goal?>?> {
-        return goal
+    fun getGoal(): Flow<Goal?> {
+        return goal.flatMapLatest {
+                it?:MutableStateFlow(null)
+        }.flowOn(MainActivity.IO)
     }
 
     fun getDirection(): MutableStateFlow<AccountableFragment?> {
@@ -332,10 +352,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
     ) {
         loadScriptsListJob?.cancel()
         loadScriptsListJob = Job()
-        CoroutineScope(Dispatchers.IO + loadScriptsListJob!!).launch {
+        CoroutineScope(MainActivity.IO + loadScriptsListJob!!).launch {
             val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
             if (id != null) {
-                withContext(Dispatchers.Main) {
+                withContext(MainActivity.Main) {
                     if (ascendingOrder) {
                         scriptsList.value = dao.getScripts(id)
                     } else {
@@ -343,7 +363,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     }
                 }
             }
-            withContext(Dispatchers.Main) { appendedUnit?.invoke() }
+            withContext(MainActivity.Main) { appendedUnit?.invoke() }
             loadScriptsListJob?.complete()
             loadScriptsListJob = null
         }
@@ -373,13 +393,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
     ) {
         loadFoldersListJob?.cancel()
         loadFoldersListJob = Job()
-        CoroutineScope(Dispatchers.IO + loadFoldersListJob!!).launch {
+        CoroutineScope(MainActivity.IO + loadFoldersListJob!!).launch {
             val id = if (folderNotAppSettings) folder.value?.folderId else INITIAL_FOLDER_ID
             val type =
                 if (folderTypeScriptsNotGoals)
                     Folder.FolderType.SCRIPTS
                 else Folder.FolderType.GOALS
-            withContext(Dispatchers.Main) {
+            withContext(MainActivity.Main) {
                 if (ascendingOrder) {
                     foldersList.value = dao.getFolders(id, type)
                 } else {
@@ -482,7 +502,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun updateAppSettings() {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 appSettings.value?.let { dao.update(it) }
             }
         }
@@ -490,7 +510,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun saveCustomAppSettingsImage(imageUri: Uri?) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 appSettings.value?.saveImage(application, imageUri)
                 // Update database
                 updateAppSettings()
@@ -500,7 +520,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun restoreDefaultCustomAppSettingsImage() {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 appSettings.value?.restoreDefaultFile(application)
                 updateAppSettings()
             }
@@ -513,7 +533,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         appendedUnit: (() -> Unit)?
     ) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 if (folder.value == null) {
                     // Save to settings table
                     appSettings.value?.scrollPosition?.requestScrollToItem(index, offset)
@@ -523,7 +543,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     folder.value?.folderScrollPosition?.requestScrollToItem(index, offset)
                     appSettings.value?.let { dao.update(it) }
                 }
-                withContext(Dispatchers.Main) {
+                withContext(MainActivity.Main) {
                     appendedUnit?.invoke()
                 }
             }
@@ -532,7 +552,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun updateFolderShowScripts(appendedUnit: (suspend () -> Unit)?) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 if (folder.value == null) {
                     // Save to settings table
                     appSettings.value?.let { dao.update(it) }
@@ -541,7 +561,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     folder.value?.let { dao.update(it) }
                 }
                 if (appendedUnit != null) {
-                    withContext(Dispatchers.Main) { appendedUnit() }
+                    withContext(MainActivity.Main) { appendedUnit() }
                 }
             }
         }
@@ -559,7 +579,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
             if (navArgs.isDrawerFragment) {
                 appSettings.value?.initialFragment = newFragment
                 repositoryScope.launch {
-                    withContext(Dispatchers.IO) {
+                    withContext(MainActivity.IO) {
                         appSettings.value?.let {
                             dao.update(
                                 it
@@ -590,10 +610,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun loadEditFolder(id: Long?) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
-                withContext(Dispatchers.Main) {
+            withContext(MainActivity.IO) {
+                withContext(MainActivity.Main) {
                     newEditFolder.update { null }
-                    editFolder.value = withContext(Dispatchers.IO) {
+                    editFolder.value = withContext(MainActivity.IO) {
                         if (id != INITIAL_FOLDER_ID) dao.getFolder(id).first()
                         else null
                     }
@@ -604,7 +624,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun deleteFolder(id: Long?) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             id?.let {
                 dao.deleteFolder(it, application)
             }
@@ -612,7 +632,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun deleteGoal(id: Long?) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             id?.let {
                 dao.deleteGoal(it, application)
             }
@@ -620,7 +640,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun deleteScript(id: Long?) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             id?.let {
                 dao.deleteScript(it, application)
             }
@@ -629,7 +649,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun setNewEditFolder(editFolder: Folder?) {
         if (newEditFolder.value != null) return
-        newEditFolder.value = withContext(Dispatchers.IO) {
+        newEditFolder.value = withContext(MainActivity.IO) {
             clearNewEditFolder(runAsync = false, resetEditFolder = false)
             val newFolder = Folder(
                 folderType = scriptsOrGoalsFolderType.value,
@@ -671,7 +691,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun setNewEditFolderImage(imageUri: Uri? = null) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             if (imageUri != null) newEditFolder.value?.saveImage(application, imageUri)
             dao.update(newEditFolder.value!!)
         }
@@ -686,7 +706,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
             if (resetEditFolder) editFolder.value = null
             null
         }
-        if (runAsync) newEditFolder.value = withContext(Dispatchers.IO) {
+        if (runAsync) newEditFolder.value = withContext(MainActivity.IO) {
             unit()
         }
         else {
@@ -704,7 +724,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 dao.delete(it)
             }
         }
-        withContext(Dispatchers.Main) {
+        withContext(MainActivity.Main) {
             editFolder.value = null
             newEditFolder.value = null
         }
@@ -712,28 +732,28 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun deleteNewEditFolderImage() {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             newEditFolder.value?.deleteFile(application)
         }
     }
 
     fun appendIntentStringToScript(scriptId: Long, activity: Activity?) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 if (scriptId != INITIAL_FOLDER_ID) {
-                    withContext(Dispatchers.Main) {
+                    withContext(MainActivity.Main) {
                         isEditingScript.value = false
-                        script.value = withContext(Dispatchers.IO) {
+                        script.value = withContext(MainActivity.IO) {
                             val tempScript = dao.getScriptNow(scriptId)
-                            withContext(Dispatchers.Main) {
-                                scriptMarkupLanguage.value = withContext(Dispatchers.IO) {
+                            withContext(MainActivity.Main) {
+                                scriptMarkupLanguage.value = withContext(MainActivity.IO) {
                                     tempScript!!.scriptMarkupLanguage.let { dao.getMarkupLanguage(it) }
                                 }
                             }
                             tempScript
                         }
                         scriptContentList.clear()
-                        scriptContentList.addAll(withContext(Dispatchers.IO) {
+                        scriptContentList.addAll(withContext(MainActivity.IO) {
                             dao.getContentList(scriptId)
                         })
                     }
@@ -757,7 +777,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             )
                         }
                     }
-                    withContext(Dispatchers.Main) {
+                    withContext(MainActivity.Main) {
                         scriptContentList.last().content.edit { append("\n$intentString") }
                     }
                     saveScript {
@@ -765,7 +785,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     }
                 }
                 intentString = null
-                withContext(Dispatchers.Main) {
+                withContext(MainActivity.Main) {
                     activity?.finishAndRemoveTask()
                 }
             }
@@ -774,12 +794,12 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun loadAndOpenGoal(goalId: Long) {
         repositoryScope.launch {
-            withContext(Dispatchers.Main) {
-                goal.value = withContext(Dispatchers.IO) {
+            withContext(MainActivity.Main) {
+                goal.value = withContext(MainActivity.IO) {
                     getGoal(goalId)
                 }
             }
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 if (goal.value == null) {
                     Toast.makeText(
                         application,
@@ -794,11 +814,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun loadAndOpenScript(scriptId: Long) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             if (scriptId == INITIAL_FOLDER_ID) {
                 val parentId = folder.value?.folderId ?: INITIAL_FOLDER_ID
                 val scripts = dao.getScripts(parentId).first()
-                withContext(Dispatchers.Main) {
+                withContext(MainActivity.Main) {
                     script.value = Script(
                         scriptParentType = Script.ScriptParentType.FOLDER,
                         scriptParent = parentId,
@@ -807,23 +827,23 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     scriptMarkupLanguage.value = null
                     isEditingScript.value = true
                     script.value!!.scriptId =
-                        withContext(Dispatchers.IO) { dao.insert(script.value!!) }
+                        withContext(MainActivity.IO) { dao.insert(script.value!!) }
                     scriptContentList.clear()
                     appendTextFieldIfNeeded()
                 }
             } else {
-                withContext(Dispatchers.Main) {
+                withContext(MainActivity.Main) {
                     isEditingScript.value = false
-                    script.value = withContext(Dispatchers.IO) {
+                    script.value = withContext(MainActivity.IO) {
                         val tempScript = dao.getScriptNow(scriptId)
-                        withContext(Dispatchers.Main) {
-                            scriptMarkupLanguage.value = withContext(Dispatchers.IO) {
+                        withContext(MainActivity.Main) {
+                            scriptMarkupLanguage.value = withContext(MainActivity.IO) {
                                 tempScript!!.scriptMarkupLanguage.let { dao.getMarkupLanguage(it) }
                             }
                         }
                         tempScript
                     }
-                    withContext(Dispatchers.IO) {
+                    withContext(MainActivity.IO) {
                         scriptContentList.clear()
                         scriptContentList.addAll(dao.getContentList(scriptId))
                         appendTextFieldIfNeeded()
@@ -861,7 +881,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun deleteScriptImage() {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 script.value?.deleteFile(application)
                 script.value?.let { dao.update(it) }
             }
@@ -871,7 +891,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun saveScriptImage(uri: Uri?) {
         if (uri != null) {
             repositoryScope.launch {
-                withContext(Dispatchers.IO) {
+                withContext(MainActivity.IO) {
                     if (script.value?.scriptId == null) script.value?.let {
                         it.scriptId = dao.insert(it)
                     }
@@ -884,7 +904,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun saveScript(loadFolder: Boolean = false, appendedUnit: (() -> Unit)? = null) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 if (script.value?.scriptId == null) script.value?.let {
                     it.scriptId = dao.insert(it)
                 }
@@ -960,7 +980,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         cursorPosition: Int?
     ) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 val inputIndex = when (contentPosition) {
                     ContentPosition.ABOVE ->
                         scriptContentList.indexOf(item)
@@ -1020,7 +1040,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     scriptContentList.add(inputIndex, newContent)
                     newContent.id = dao.insert(newContent)
                 }
-                withContext(Dispatchers.Main) {
+                withContext(MainActivity.Main) {
                     appendTextFieldIfNeeded()
                 }
             }
@@ -1029,12 +1049,12 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun deleteContent(content: Content) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 if (accountablePlayer.contains(content)) accountablePlayer.close(content)
                 scriptContentList.remove(content)
                 content.deleteFile(application)
                 dao.delete(content)
-                withContext(Dispatchers.Main) {
+                withContext(MainActivity.Main) {
                     appendTextFieldIfNeeded()
                 }
             }
@@ -1043,7 +1063,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun printScriptEntry() {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 script.value?.scriptTitle?.let { title ->
                     val outputStringBuilder = StringBuilder()
                     scriptContentList.forEach { content ->
@@ -1086,7 +1106,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun appendFileToScript(uri: Uri) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 script.value?.let {
                     appendTextFieldIfNeeded()
                     scriptContentList.last().appendFile(uri, application.contentResolver)
@@ -1115,7 +1135,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         pushNotificationUnit: AtomicReference<(() -> Unit)?>
     ) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 data?.data?.let { uri ->
                     val docFile = DocumentFile.fromTreeUri(application, uri) ?: run {
                         Toast.makeText(
@@ -1175,7 +1195,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         pushNotificationUnit
                     ) { notification ->
                         repositoryScope.launch {
-                            withContext(Dispatchers.IO) {
+                            withContext(MainActivity.IO) {
                                 copyAppMediaToExternalFolder(
                                     AppResources.ImageResource.DESTINATION_FOLDER,
                                     imageFile,
@@ -1222,7 +1242,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         pushNotificationUnit: AtomicReference<(() -> Unit)?>
     ) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 data?.data?.let { uri ->
                     val docFile = DocumentFile.fromTreeUri(application, uri) ?: run {
                         Toast.makeText(
@@ -1276,7 +1296,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         pushNotificationUnit
                     ) { notification ->
                         repositoryScope.launch {
-                            withContext(Dispatchers.IO) {
+                            withContext(MainActivity.IO) {
                                 copyAppMediaToExternalFolder(
                                     AppResources.ImageResource.DESTINATION_FOLDER,
                                     imageFile,
@@ -1337,7 +1357,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                                     .use { output ->
                                         if (output != null) {
                                             input?.copyTo(output)
-                                            withContext(Dispatchers.Main) {
+                                            withContext(MainActivity.Main) {
                                                 notification.updateNotification(
                                                     progress.incrementAndGet(),
                                                     total
@@ -1361,7 +1381,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun setAppSettingsTextSize(textSize: Int) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 if (appSettings.value != null) {
                     appSettings.value!!.textSize.update { textSize }
                     dao.update(appSettings.value!!)
@@ -1372,7 +1392,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun getMarkupLanguages() {
         markupLanguagesList.clear()
-        markupLanguagesList.addAll(withContext(Dispatchers.IO) {
+        markupLanguagesList.addAll(withContext(MainActivity.IO) {
             val arrayList = dao.getMarkupLanguages().toMutableList()
             if (script.value != null && script.value!!.scriptMarkupLanguage != null) {
                 var exist = false
@@ -1404,16 +1424,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
         markupLanguage: MarkupLanguage,
         appendedUnit: (suspend () -> Unit)? = null
     ) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             dao.delete(markupLanguage)
-            withContext(Dispatchers.Main) {
+            withContext(MainActivity.Main) {
                 appendedUnit?.invoke()
             }
         }
     }
 
     suspend fun saveMarkupLanguage(similarList: List<String>, appendedUnit: (() -> Unit)?) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             // skip the save if there are conflicting identifiers
             var isValid = false
             spansNotSimilarAndNameUnique(similarList) { isValidInput, _, _ ->
@@ -1428,7 +1448,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun setMarkupLanguageToScript(set: Boolean, appendedUnit: (suspend () -> Unit)? = null) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 script.value?.let { script ->
                     if (set) {
                         scriptMarkupLanguage.value?.name?.value.let {
@@ -1497,7 +1517,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun loadTeleprompterSettingsList() {
         teleprompterSettingsList.clear()
-        teleprompterSettingsList.addAll(withContext(Dispatchers.IO) {
+        teleprompterSettingsList.addAll(withContext(MainActivity.IO) {
             val arrayList = ArrayList<TeleprompterSettings>(dao.getTeleprompterSettings())
             if (script.value != null && script.value!!.scriptTeleprompterSettings == null) {
                 var exist = false
@@ -1589,14 +1609,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
         deleteSpecialCharacters: Boolean = true,
         operationsAfterDelete: suspend () -> Unit
     ) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             if (deleteSpecialCharacters) dao.deleteSpecialCharacters(
                 teleprompterSettings.id
             )
             dao.delete(teleprompterSettings)
         }
 
-        withContext(Dispatchers.Main) {
+        withContext(MainActivity.Main) {
             operationsAfterDelete()
         }
     }
@@ -1605,7 +1625,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         teleprompterSettings?.let { teleprompterSettings ->
             teleprompterSettings.specialCharactersList.clear()
             teleprompterSettings.specialCharactersList.addAll(
-                withContext(Dispatchers.IO) {
+                withContext(MainActivity.IO) {
                     dao.getScriptSpecialCharacters(
                         teleprompterSettings.id
                     )
@@ -1619,9 +1639,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
         operationsAfterDelete: () -> Unit
     ) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 dao.deleteSpecialCharacters(teleprompterSettings.id)
-                withContext(Dispatchers.Main) {
+                withContext(MainActivity.Main) {
                     operationsAfterDelete()
                 }
             }
@@ -1631,7 +1651,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun addSpecialCharacter() {
         scriptTeleprompterSetting.value?.let { scriptTeleprompterSetting ->
             repositoryScope.launch {
-                withContext(Dispatchers.IO) {
+                withContext(MainActivity.IO) {
                     val id = scriptTeleprompterSetting.id
                     if (id == null) saveTeleprompterSettings { savedId ->
                         val specialCharactersInput = SpecialCharacters(savedId!!)
@@ -1648,7 +1668,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun deleteSpecialCharacter(specialCharacter: SpecialCharacters) {
         repositoryScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 scriptTeleprompterSetting.value?.specialCharactersList?.removeIf { it == specialCharacter }
                 dao.delete(specialCharacter)
             }
@@ -1676,7 +1696,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
         fun init(finished: (() -> Unit)? = null): Job {
             return repositoryScope.launch {
-                /*withContext(Dispatchers.IO) {
+                /*withContext(MainActivity.IO) {
                     val contentList: List<Content> = getContentListNow(id)
                     val builder = StringBuilder("")
                     contentList.forEach { content ->
@@ -1686,16 +1706,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             }
 
                             ContentType.IMAGE -> {
-                                withContext(Dispatchers.Main) { numImages.value += 1 }
+                                withContext(MainActivity.Main) { numImages.value += 1 }
                                 if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                                 if (displayImage.value == null) {
                                     val file = File(
                                         application.filesDir.toString() + "/" + AppResources.ImageResource.DESTINATION_FOLDER,
                                         content.content.text.toString()
                                     )
-                                    withContext(Dispatchers.Main) {
+                                    withContext(MainActivity.Main) {
                                         displayImage.value = if (file.exists()) {
-                                            withContext(Dispatchers.IO) { Uri.fromFile(file) }
+                                            withContext(MainActivity.IO) { Uri.fromFile(file) }
                                         } else {
                                             null
                                         }
@@ -1704,17 +1724,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             }
 
                             ContentType.AUDIO -> {
-                                withContext(Dispatchers.Main) { numAudios.value += 1 }
+                                withContext(MainActivity.Main) { numAudios.value += 1 }
                                 if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                             }
 
                             ContentType.VIDEO -> {
-                                withContext(Dispatchers.Main) { numVideos.value += 1 }
+                                withContext(MainActivity.Main) { numVideos.value += 1 }
                                 if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                             }
 
                             ContentType.DOCUMENT -> {
-                                withContext(Dispatchers.Main) { numDocuments.value += 1 }
+                                withContext(MainActivity.Main) { numDocuments.value += 1 }
                                 if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                             }
 
@@ -1723,7 +1743,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                                     content.id?.let { it1 -> ContentPreview(it1) }
                                 if (scriptContentPreview != null) {
                                     scriptContentPreview.init()
-                                    withContext(Dispatchers.Main) {
+                                    withContext(MainActivity.Main) {
                                         numAudios.value = scriptContentPreview.numAudios.value
                                         numImages.value = scriptContentPreview.numImages.value
                                         numVideos.value = scriptContentPreview.numVideos.value
@@ -1736,11 +1756,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
                                             scriptContentPreview.displayImage.value
                                     }
                                 }
-                                withContext(Dispatchers.Main) { numScripts.value += 1 }
+                                withContext(MainActivity.Main) { numScripts.value += 1 }
                             }
                         }
                     }
-                    withContext(Dispatchers.Main) {
+                    withContext(MainActivity.Main) {
                         description.value = builder.toString()
                         finished?.invoke()
                     }
@@ -1790,7 +1810,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
         fun init(finished: (() -> Unit)? = null): Job {
             return repositoryScope.launch {
-                withContext(Dispatchers.IO) {
+                withContext(MainActivity.IO) {
                     val contentList: List<Content> = getContentListNow(id)
                     val builder = StringBuilder("")
                     contentList.forEach { content ->
@@ -1800,16 +1820,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             }
 
                             ContentType.IMAGE -> {
-                                withContext(Dispatchers.Main) { numImages.value += 1 }
+                                withContext(MainActivity.Main) { numImages.value += 1 }
                                 if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                                 if (displayImage.value == null) {
                                     val file = File(
                                         application.filesDir.toString() + "/" + AppResources.ImageResource.DESTINATION_FOLDER,
                                         content.content.text.toString()
                                     )
-                                    withContext(Dispatchers.Main) {
+                                    withContext(MainActivity.Main) {
                                         displayImage.value = if (file.exists()) {
-                                            withContext(Dispatchers.IO) { Uri.fromFile(file) }
+                                            withContext(MainActivity.IO) { Uri.fromFile(file) }
                                         } else {
                                             null
                                         }
@@ -1818,17 +1838,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             }
 
                             ContentType.AUDIO -> {
-                                withContext(Dispatchers.Main) { numAudios.value += 1 }
+                                withContext(MainActivity.Main) { numAudios.value += 1 }
                                 if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                             }
 
                             ContentType.VIDEO -> {
-                                withContext(Dispatchers.Main) { numVideos.value += 1 }
+                                withContext(MainActivity.Main) { numVideos.value += 1 }
                                 if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                             }
 
                             ContentType.DOCUMENT -> {
-                                withContext(Dispatchers.Main) { numDocuments.value += 1 }
+                                withContext(MainActivity.Main) { numDocuments.value += 1 }
                                 if (content.description.text.isNotEmpty()) builder.append(content.description.text.toString())
                             }
 
@@ -1837,7 +1857,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                                     content.id?.let { it1 -> ContentPreview(it1) }
                                 if (scriptContentPreview != null) {
                                     scriptContentPreview.init()
-                                    withContext(Dispatchers.Main) {
+                                    withContext(MainActivity.Main) {
                                         numAudios.value = scriptContentPreview.numAudios.value
                                         numImages.value = scriptContentPreview.numImages.value
                                         numVideos.value = scriptContentPreview.numVideos.value
@@ -1850,11 +1870,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
                                             scriptContentPreview.displayImage.value
                                     }
                                 }
-                                withContext(Dispatchers.Main) { numScripts.value += 1 }
+                                withContext(MainActivity.Main) { numScripts.value += 1 }
                             }
                         }
                     }
-                    withContext(Dispatchers.Main) {
+                    withContext(MainActivity.Main) {
                         description.value = builder.toString()
                         finished?.invoke()
                     }
@@ -1894,7 +1914,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun getFolderFolderNum(
         folder: Folder
     ) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             dao.getFolders(folder.folderId, folder.folderType).first().let { folders ->
                 folder.numFolders.update { folders.size }
             }
@@ -1905,7 +1925,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun getFolderScriptGoalNum(
         folder: Folder
     ) {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             when (folder.folderType) {
                 Folder.FolderType.SCRIPTS -> {
                     dao.getScripts(folder.folderId).first().let { scripts ->
@@ -1934,7 +1954,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 searchJob.value = null
                 return@launch
             }
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 val title: String
                 val id: Long = if (folder.value != null) {
                     title = folder.value!!.folderName.text.toString()
@@ -1987,8 +2007,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
         appendedUnit?.invoke()
     }
 
+    fun toggleShowScripts(){
+        showScripts.value?.value = showScripts.value?.value?.not() == true
+    }
+
+    fun toggleFolderOrder(){
+        folderOrder.value?.value = folderOrder.value?.value?.not() == true
+    }
+
     suspend fun loadGoals() {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             changeFragment(AccountableFragment.GoalsFragment)
         }
     }
@@ -2011,7 +2039,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     parent = tempEditGoal.value!!.parent
                 )
             )
-            cloneGoalTo(tempEditGoal.value, tempNewGoal)
+            cloneGoalTo(tempEditGoal.value, tempNewGoal, true)
             tempNewGoal.value?.let { newGoal ->
                 dao.update(newGoal)
             }
@@ -2051,25 +2079,21 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun addNewGoalTimeBlock() {
-        withContext(Dispatchers.IO) {
-            newGoal.value?.first()?.let { newGoal ->
-                if (newGoal.id == null) newGoal.id = dao.insert(newGoal)
+        newGoal.value?.first()?.let { newGoal ->
+            if (newGoal.id == null) newGoal.id = dao.insert(newGoal)
 
-                newGoal.id?.let {
-                    val newTime = GoalTaskDeliverableTime(
-                        parent = it,
-                        type = GoalTaskDeliverableTime.TimesType.GOAL.name
-                    )
-                    newTime.id = dao.upsert(newTime)
-                }
+            newGoal.id?.let {
+                val newTime = GoalTaskDeliverableTime(
+                    parent = it,
+                    type = GoalTaskDeliverableTime.TimesType.GOAL.name
+                )
+                newTime.id = dao.upsert(newTime)
             }
         }
     }
 
     suspend fun deleteNewGoalTimeBlock(timeBlock: GoalTaskDeliverableTime) {
-        withContext(Dispatchers.IO) {
-            dao.delete(timeBlock)
-        }
+        dao.delete(timeBlock)
     }
 
     suspend fun saveNewGoal(process: suspend () -> Unit) {
@@ -2080,10 +2104,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
             if (editGoal.value!!.id == null) {
                 editGoal.value!!.id = dao.insert(editGoal.value!!)
             }
-            cloneGoalTo(newGoal, editGoal)
+            cloneGoalTo(newGoal, editGoal, false)
             editGoal.value?.let { editGoal ->
                 dao.update(editGoal)
-                withContext(Dispatchers.Main) {
+                withContext(MainActivity.Main) {
                     process()
                 }
             }
@@ -2092,7 +2116,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun cloneGoalTo(
         from: Goal?,
-        to: MutableStateFlow<Goal?>
+        to: MutableStateFlow<Goal?>,
+        setCloneId: Boolean
     ) {
         from?.let { from ->
             to.value?.let { to ->
@@ -2117,6 +2142,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.selectedTab = from.selectedTab
                 to.tabListState = from.tabListState
 
+                if (setCloneId) to.cloneId = from.id
+
                 if (to.id == null) to.id = saveGoal(to)
 
                 to.saveImage(
@@ -2128,11 +2155,12 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     to.id,
                     from.times,
                     to.times,
-                    GoalTaskDeliverableTime.TimesType.GOAL
+                    GoalTaskDeliverableTime.TimesType.GOAL,
+                    setCloneId
                 )
 
-                from.goalDeliverables.value?.first()?.let { fromDeliverables ->
-                    to.goalDeliverables.value?.first()?.forEach { toDeliverable ->
+                from.goalDeliverables.first().let { fromDeliverables ->
+                    to.goalDeliverables.first().forEach { toDeliverable ->
                         // Delete the ones that are not in from (originally in to)
                         if (
                             !fromDeliverables.any { fromDeliverable ->
@@ -2145,16 +2173,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                     for (deliverable in fromDeliverables) {
                         to.id?.let { id ->
-                            var shouldUpdate = true
-                            var newDeliverable = to.goalDeliverables.value?.first()
-                                ?.find { toDeliverable -> toDeliverable.id == deliverable.cloneId }
+                            var newDeliverable = to.goalDeliverables.first()
+                                .find { toDeliverable -> toDeliverable.id == deliverable.cloneId }
                             if (newDeliverable == null) {
                                 newDeliverable = Deliverable(
                                     parent = id,
                                     position = deliverable.position
                                 )
                                 newDeliverable.id = saveDeliverable(newDeliverable)
-                                shouldUpdate = false
                             } else {
                                 newDeliverable.parent = id
                                 newDeliverable.position = deliverable.position
@@ -2164,15 +2190,9 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             val toMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(newDeliverable.id))
                             cloneDeliverableTo(
                                 fromMutable,
-                                toMutable
+                                toMutable,
+                                setCloneId
                             )
-
-                            toMutable.value?.first()?.let { newDeliverable ->
-                                if (!shouldUpdate) {
-                                    newDeliverable.cloneId = deliverable.id
-                                }
-                                newDeliverable.id = saveDeliverable(newDeliverable)
-                            }
                         }
                     }
                 }
@@ -2182,12 +2202,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun cloneTimesTo(
         toId: Long?,
-        fromTimes : MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>,
-        toTimes : MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>,
-        timesType : GoalTaskDeliverableTime.TimesType
+        fromTimes : Flow<List<GoalTaskDeliverableTime>>,
+        toTimes : Flow<List<GoalTaskDeliverableTime>>,
+        timesType : GoalTaskDeliverableTime.TimesType,
+        setCloneId: Boolean
     ) {
-        fromTimes.value?.first()?.let { fromTimes ->
-            toTimes.value?.first()?.forEach { toTime ->
+        fromTimes.first().let { fromTimes ->
+            toTimes.first().forEach { toTime ->
                 // Delete the ones that are not in from (originally in to)
                 if (
                     !fromTimes.any { fromTime ->
@@ -2200,15 +2221,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
             for (time in fromTimes) {
                 toId?.let { id ->
-                    var shouldUpdate = true
-                    var newTime = toTimes.value?.first()
-                        ?.find { toTime -> toTime.id == time.cloneId }
+                    var newTime = toTimes.first()
+                        .find { toTime -> toTime.id == time.cloneId }
                     if (newTime == null) {
                         newTime = GoalTaskDeliverableTime(
                             parent = id,
                             type = timesType.name
                         )
-                        shouldUpdate = false
                     } else {
                         newTime.parent = id
                         newTime.type = timesType.name
@@ -2217,7 +2236,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     newTime.timeBlockType = time.timeBlockType
                     newTime.start = time.start
                     newTime.duration = time.duration
-                    if (!shouldUpdate) {
+                    if (setCloneId) {
                         newTime.cloneId = time.id
                     }
                     newTime.id = saveGoalTaskDeliverableTime(newTime)
@@ -2227,10 +2246,10 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun clearNewGoal() {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             newGoal.value?.first()?.let {
                 it.deleteFile(application)
-                it.times.value?.let { flowList -> for (time in flowList.first()) dao.delete(time) }
+                it.times.let { flowList -> for (time in flowList.first()) dao.delete(time) }
                 dao.delete(it)
                 newGoal.value = null
             }
@@ -2239,14 +2258,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun goBackToGoalsFromEditGoal() {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             loadFolder()
             changeFragment(AccountableFragment.GoalsFragment)
         }
     }
 
     suspend fun goBackToGoalsFromTasks() {
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             loadFolder()
             changeFragment(AccountableFragment.GoalsFragment)
         }
@@ -2254,7 +2273,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun cloneTaskTo(
         from: MutableStateFlow<Flow<Task?>?>,
-        to: MutableStateFlow<Flow<Task?>?>
+        to: MutableStateFlow<Flow<Task?>?>,
+        setCloneId: Boolean
     ) {
         to.value?.first()?.let { to ->
             from.value?.first()?.let { from ->
@@ -2279,18 +2299,21 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.numDocuments = from.numDocuments
                 to.numScripts = from.numScripts
 
+                if (setCloneId) to.cloneId = from.id
+
                 if (to.id == null) to.id = saveTask(to)
                 cloneTimesTo(
                     to.id,
                     from.times,
                     to.times,
-                    GoalTaskDeliverableTime.TimesType.TASK
+                    GoalTaskDeliverableTime.TimesType.TASK,
+                    setCloneId
                 )
             }
         }
     }
 
-    suspend fun getTaskClone(taskFlow: Flow<Task?>): Flow<Task?>? {
+    suspend fun getTaskClone(taskFlow: Flow<Task?>, setCloneId: Boolean): Flow<Task?>? {
         taskFlow.first()?.let { task ->
             val mutableOriginal: MutableStateFlow<Flow<Task?>?> = MutableStateFlow(taskFlow)
             val mutableReturn: MutableStateFlow<Flow<Task?>?> = MutableStateFlow(
@@ -2305,7 +2328,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     )
                 )
             )
-            cloneTaskTo(mutableOriginal, mutableReturn)
+            cloneTaskTo(mutableOriginal, mutableReturn, setCloneId)
             return mutableReturn.value
         }
         return null
@@ -2313,7 +2336,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun cloneDeliverableTo(
         from: MutableStateFlow<Flow<Deliverable?>?>,
-        to: MutableStateFlow<Flow<Deliverable?>?>
+        to: MutableStateFlow<Flow<Deliverable?>?>,
+        setCloneId:Boolean
     ) {
         from.value?.first()?.let { from ->
             to.value?.first()?.let { to ->
@@ -2333,6 +2357,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.numDocuments = from.numDocuments
                 to.numScripts = from.numScripts
 
+                if (setCloneId) to.cloneId = from.id
+
                 if (to.id == null) to.id = saveDeliverable(to)
                 to.goalId = if (from.goalId!=null) to.id else null
 
@@ -2340,7 +2366,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     to.id,
                     from.times,
                     to.times,
-                    GoalTaskDeliverableTime.TimesType.DELIVERABLE
+                    GoalTaskDeliverableTime.TimesType.DELIVERABLE,
+                    setCloneId
                 )
 
                 saveDeliverable(to)
@@ -2348,7 +2375,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun getDeliverableClone(deliverableFlow: Flow<Deliverable?>): Flow<Deliverable?>? {
+    suspend fun getDeliverableClone(deliverableFlow: Flow<Deliverable?>, setCloneId: Boolean): Flow<Deliverable?>? {
         deliverableFlow.first()?.let { deliverable ->
             val mutableOriginal: MutableStateFlow<Flow<Deliverable?>?> =
                 MutableStateFlow(deliverableFlow)
@@ -2362,7 +2389,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     )
                 )
             )
-            cloneDeliverableTo(mutableOriginal, mutableReturn)
+            cloneDeliverableTo(mutableOriginal, mutableReturn, setCloneId)
             return mutableReturn.value
         }
         return null
@@ -2370,7 +2397,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun cloneMarkerTo(
         from: MutableStateFlow<Flow<Marker?>?>,
-        to: MutableStateFlow<Flow<Marker?>?>
+        to: MutableStateFlow<Flow<Marker?>?>,
+        setCloneId: Boolean
     ) {
         from.value?.first()?.let { from ->
             to.value?.first()?.let { to ->
@@ -2380,12 +2408,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.scrollPosition = from.scrollPosition
                 to.marker = from.marker
 
+                if (setCloneId) to.cloneId = from.id
+
                 if (to.id == null) to.id = saveMarker(to)
             }
         }
     }
 
-    suspend fun getMarkerClone(markerFlow: Flow<Marker?>): Flow<Marker?>? {
+    suspend fun getMarkerClone(markerFlow: Flow<Marker?>, setCloneId: Boolean): Flow<Marker?>? {
         markerFlow.first()?.let { marker ->
             val mutableOriginal: MutableStateFlow<Flow<Marker?>?> = MutableStateFlow(markerFlow)
             val mutableReturn: MutableStateFlow<Flow<Marker?>?> = MutableStateFlow(
@@ -2398,7 +2428,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     )
                 )
             )
-            cloneMarkerTo(mutableOriginal, mutableReturn)
+            cloneMarkerTo(mutableOriginal, mutableReturn, setCloneId)
             return mutableReturn.value
         }
         return null

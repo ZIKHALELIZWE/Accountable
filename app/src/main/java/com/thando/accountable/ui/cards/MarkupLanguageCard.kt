@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import com.thando.accountable.MainActivity
 import com.thando.accountable.SpannedString
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.MarkupLanguage.Companion.EXAMPLE_PARAGRAPH
@@ -134,7 +135,7 @@ data class MarkupLanguageCard(
         val value = tag.spanCharValue.second.text.toString()
         if (isProcessing) return
         else isProcessing = true
-        withContext(Dispatchers.IO) {
+        withContext(MainActivity.IO) {
             if (span.isNotEmpty()) {
                 if (value == "0") {
                     tag.spanCharValue.second.setTextAndPlaceCursorAtEnd("")

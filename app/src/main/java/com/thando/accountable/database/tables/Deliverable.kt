@@ -6,12 +6,15 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
+import com.thando.accountable.MainActivity
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 @Entity(tableName = "deliverable_table")
 data class Deliverable (
@@ -65,13 +68,20 @@ data class Deliverable (
 
     @ColumnInfo (name = "deliverable_num_scripts")
     var numScripts: Int = 0,
+
+    @ColumnInfo (name = "deliverable_clone_id")
+    var cloneId: Long? = null
 ) {
     enum class DeliverableEndType {
         UNDEFINED, DATE, GOAL, WORK
     }
 
     @Ignore
-    val times = MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>(null)
+    val timesState = MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val times = timesState.flatMapLatest { it?: MutableStateFlow(emptyList()) }
+        .flowOn(MainActivity.IO)
 
     @Ignore
     val deliverableTextFocusRequester = FocusRequester()
@@ -79,10 +89,7 @@ data class Deliverable (
     @Ignore
     val locationFocusRequester = FocusRequester()
 
-    @Ignore
-    var cloneId: Long? = null
-
     fun loadTimes(dao: RepositoryDao) {
-        times.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.DELIVERABLE)
+        timesState.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.DELIVERABLE)
     }
 }

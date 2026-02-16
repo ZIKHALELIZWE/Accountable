@@ -89,8 +89,12 @@ import com.thando.accountable.ui.basicDropdownMenu
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -156,7 +160,7 @@ fun ScriptView(
 
 enum class ContentPosition{ ABOVE, AT_CURSOR_POINT, BELOW }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun ScriptFragmentView(
     modifier: Modifier = Modifier.fillMaxSize(),
@@ -205,18 +209,16 @@ fun ScriptFragmentView(
 
 
         script?.let { script ->
-            val scriptUri by script.getUri(context).collectAsStateWithLifecycle(null)
-
-            var image by remember { mutableStateOf<ImageBitmap?>(null) }
-            LaunchedEffect(scriptUri) {
-                image = scriptUri?.let { imageUri ->
-                    AppResources.getBitmapFromUri(
-                        context,
-                        imageUri
-                    )
+            val image by script.getUri(context).mapLatest {
+                withContext(MainActivity.IO) {
+                    it?.let { imageUri ->
+                        AppResources.getBitmapFromUri(
+                            context,
+                            imageUri
+                        )?.asImageBitmap()
+                    }
                 }
-                    ?.asImageBitmap() ?: ImageBitmap(1, 1)
-            }
+            }.collectAsStateWithLifecycle(null)
 
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             var bottomSheet by remember { mutableStateOf<Pair<Int?,Content>?>(null) }
@@ -244,7 +246,7 @@ fun ScriptFragmentView(
                     onClick = { viewModel.editOrSaveScript() }
                 ),
                 MenuItemData(
-                    text = scriptUri?.let { stringResource(R.string.remove_image) }
+                    text = image?.let { stringResource(R.string.remove_image) }
                         ?: stringResource(R.string.choose_image),
                     onClick = {
                         viewModel.chooseTopImage { contentType ->
@@ -327,10 +329,10 @@ fun ScriptFragmentView(
                             },
                             scrollBehavior = scrollBehavior,
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = if (scriptUri!=null) Color.Transparent else
+                                containerColor = if (image!=null) Color.Transparent else
                                     MaterialTheme.colorScheme.primary,
                                 titleContentColor = Color.White,
-                                scrolledContainerColor = if (scriptUri!=null) Color.Transparent else
+                                scrolledContainerColor = if (image!=null) Color.Transparent else
                                     MaterialTheme.colorScheme.primary
                             ),
                             title = {},
@@ -357,7 +359,7 @@ fun ScriptFragmentView(
                                             val result = viewModel.shareScript(context)
                                             val hasContent = result.first
                                             val intent = result.second
-                                            withContext(Dispatchers.Main) {
+                                            withContext(MainActivity.Main) {
                                                 if (hasContent) context.startActivity(
                                                     Intent.createChooser(intent, null)
                                                 )

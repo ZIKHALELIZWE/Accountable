@@ -2,16 +2,15 @@ package com.thando.accountable.database.tables
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AppResources
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.lazy.LazyListState
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
 @Entity(tableName = "app_settings_table")
@@ -73,5 +72,5 @@ data class AppSettings(
         }
     }
 
-    fun getUri(context: Context): StateFlow<Uri?>  = imageResource.getUri(context)
+    fun getUri(context: Context): Flow<Uri?> = imageResource.getUri(context)
 }

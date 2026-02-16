@@ -11,12 +11,16 @@ import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 @Entity(tableName = "goal_table")
 data class Goal(
@@ -84,7 +88,10 @@ data class Goal(
     var selectedTab: String = GoalTab.TASKS.name,
 
     @ColumnInfo (name = "goal_tab_list_state")
-    var tabListState: Long = packInts(0,0)
+    var tabListState: Long = packInts(0,0),
+
+    @ColumnInfo (name = "goal_clone_id")
+    var cloneId: Long? = null
 
 ) {
     companion object {
@@ -109,34 +116,68 @@ data class Goal(
     }
 
     @Ignore
-    val times: MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?> = MutableStateFlow(null)
+    val timesState: MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?> = MutableStateFlow(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val times = timesState.flatMapLatest {
+            it ?: flowOf(emptyList())
+    }.flowOn(MainActivity.IO)
 
     @Ignore
-    val goalDeliverables: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    val goalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val goalDeliverables = goalDeliverablesState.flatMapLatest {
+            it ?: flowOf(emptyList())
+    }.flowOn(MainActivity.IO)
 
     @Ignore
-    val goalTasks: MutableStateFlow<Flow<List<Task>>?> = MutableStateFlow(null)
+    val goalTasksState: MutableStateFlow<Flow<List<Task>>?> = MutableStateFlow(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val goalTasks = goalTasksState.flatMapLatest { tasksListFlow ->
+            tasksListFlow?:MutableStateFlow(emptyList())
+    }.flowOn(MainActivity.IO)
 
     @Ignore
-    val goalMarkers: MutableStateFlow<Flow<List<Marker>>?> = MutableStateFlow(null)
+    val goalMarkersState: MutableStateFlow<Flow<List<Marker>>?> = MutableStateFlow(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val goalMarkers = goalMarkersState.flatMapLatest { markersListFlow ->
+            markersListFlow?:MutableStateFlow(emptyList())
+    }.flowOn(MainActivity.IO)
 
     @Ignore
-    val selectedGoalDeliverables: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    val selectedGoalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val selectedGoalDeliverables = selectedGoalDeliverablesState.flatMapLatest {
+            it ?: flowOf(emptyList())
+    }.flowOn(MainActivity.IO)
+
+    @Ignore
+    val notSelectedGoalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val notSelectedGoalDeliverables = notSelectedGoalDeliverablesState.flatMapLatest {
+            it ?: flowOf(emptyList())
+    }.flowOn(MainActivity.IO)
 
     @Ignore
     val imageResource = AppResources.ImageResource(goalPicture?:"")
 
     fun loadGoalTimes(dao: RepositoryDao){
-        times.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.GOAL)
+        timesState.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.GOAL)
     }
 
     fun loadDeliverables(dao: RepositoryDao) {
-        selectedGoalDeliverables.value = dao.getGoalDeliverables(id)
-        goalDeliverables.value = dao.getDeliverables(id)
+        selectedGoalDeliverablesState.value = dao.getGoalDeliverables(id)
+        notSelectedGoalDeliverablesState.value = dao.getNotGoalDeliverables(id)
+        goalDeliverablesState.value = dao.getDeliverables(id)
     }
 
     fun loadTasks(dao: RepositoryDao) {
-        goalTasks.value = dao.getTasks(id, Task.TaskParentType.GOAL).map { tasks ->
+        goalTasksState.value = dao.getTasks(id, Task.TaskParentType.GOAL).map { tasks ->
             tasks.forEach { task ->
                 task.loadTimes(dao)
             }
@@ -145,20 +186,20 @@ data class Goal(
     }
 
     fun loadMarkers(dao: RepositoryDao) {
-        goalMarkers.value = dao.getMarkers(id)
+        goalMarkersState.value = dao.getMarkers(id)
     }
 
     fun getGoalPicture(): String? { return goalPicture }
 
-    suspend fun saveImage(context: Context, inputUri: Uri?){
+    fun saveImage(context: Context, inputUri: Uri?){
         goalPicture = imageResource.saveFile(context, inputUri, GOAL_IMAGE_PREFIX, id)
     }
 
-    suspend fun deleteFile(context: Context) {
+    fun deleteFile(context: Context) {
         if (imageResource.deleteFile(context)) {
             goalPicture = null
         }
     }
 
-    fun getUri(context: Context): StateFlow<Uri?> = imageResource.getUri(context)
+    fun getUri(context: Context): Flow<Uri?> = imageResource.getUri(context)
 }

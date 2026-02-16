@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AccountableRepository
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Content.ContentType
@@ -138,7 +139,7 @@ class ScriptViewModel(
     }
 
     suspend fun shareScript(context: Context): Pair<Boolean,Intent>{
-        return withContext(Dispatchers.IO) {
+        return withContext(MainActivity.IO) {
             val intent = Intent()
 
             if (script.value?.scriptTitle != null
@@ -214,7 +215,7 @@ class ScriptViewModel(
     }
 
     suspend fun getShareContent(context: Context): Triple<Boolean,ArrayList<Uri>,String>{
-        return withContext(Dispatchers.IO) {
+        return withContext(MainActivity.IO) {
             var hasContent = false
             var sharedText =
                 if (script.value?.scriptTitle != null && !script.value?.scriptTitle?.text.isNullOrEmpty()) {

@@ -37,7 +37,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,7 +73,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -113,20 +111,24 @@ import com.thando.accountable.fragments.viewmodels.TaskViewModel
 import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.cards.ColourPickerDialog
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.Period
 import java.time.ZoneOffset
 import kotlin.random.Random
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun TaskView(
     viewModel: TaskViewModel,
@@ -137,8 +139,7 @@ fun TaskView(
     val lifecycleOwner = LocalLifecycleOwner.current
     val activity = context as? Activity
 
-    val goalFlow by viewModel.goal.collectAsStateWithLifecycle()
-    val goal by (goalFlow?:MutableStateFlow(null)).collectAsStateWithLifecycle(null)
+    val goal by viewModel.goal.collectAsStateWithLifecycle(null)
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val imageHeight = (
@@ -178,18 +179,18 @@ fun TaskView(
 
     AccountableTheme {
         goal?.let { goal ->
-            val goalUri by goal.getUri(context).collectAsStateWithLifecycle(null)
+            val image by goal.getUri(context).mapLatest {
+                withContext(MainActivity.IO) {
+                    it?.let { imageUri ->
+                        AppResources.getBitmapFromUri(
+                            context,
+                            imageUri
+                        )
+                    }?.asImageBitmap()
+                }
+            }.collectAsStateWithLifecycle(null)
             val goalColour by remember { mutableIntStateOf( goal.colour) }
 
-            var image by remember { mutableStateOf<ImageBitmap?>(null) }
-            LaunchedEffect(goalUri) {
-                image = goalUri?.let { imageUri ->
-                    AppResources.getBitmapFromUri(
-                        context,
-                        imageUri
-                    )
-                }?.asImageBitmap() ?: ImageBitmap(1, 1)
-            }
             Scaffold(
                 modifier = Modifier
                     .fillMaxSize()
@@ -222,10 +223,10 @@ fun TaskView(
                             },
                             scrollBehavior = scrollBehavior,
                             colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = if (goalUri!=null) Color.Transparent
+                                containerColor = if (image!=null) Color.Transparent
                                                 else Color(goalColour),
                                 titleContentColor = Color.White,
-                                scrolledContainerColor = if (goalUri!=null) Color.Transparent
+                                scrolledContainerColor = if (image!=null) Color.Transparent
                                                 else Color(goalColour)
                             ),
                             title = { Text(
@@ -283,13 +284,21 @@ fun TaskView(
                     updateDeliverable = viewModel::updateDeliverable,
                     deleteTaskClicked = viewModel::deleteTaskClicked,
                     originalTask = viewModel.originalTask,
-                    task = viewModel.task,
+                    task = viewModel.task.flatMapLatest { taskFlow ->
+                            taskFlow?: MutableStateFlow(null)
+                    },
                     deleteDeliverableClicked = viewModel::deleteDeliverableClicked,
-                    originalDeliverable = viewModel.originalDeliverable,
-                    deliverable = viewModel.deliverable,
+                    originalDeliverable = viewModel.originalDeliverable.flatMapLatest {
+                            originalDeliverableFlow -> originalDeliverableFlow?:MutableStateFlow(null)
+                    },
+                    deliverable = viewModel.deliverable.flatMapLatest {
+                            it?:MutableStateFlow(null)
+                    },
                     deleteMarkerClicked = viewModel::deleteMarkerClicked,
                     originalMarker = viewModel.originalMarker,
-                    marker = viewModel.marker,
+                    marker = viewModel.marker.flatMapLatest {
+                            it?:MutableStateFlow(null)
+                    },
                     updateTask = viewModel::updateTask,
                     updateMarker = viewModel::updateMarker
                 )
@@ -316,14 +325,14 @@ fun TaskDeliverableMarkerBottomSheet(
     updateDeliverable: suspend (Deliverable) -> Unit,
     deleteTaskClicked: (suspend () -> Unit)?=null,
     originalTask: MutableStateFlow<Flow<Task?>?>?=null,
-    task: MutableStateFlow<Flow<Task?>?>?=null,
+    task: Flow<Task?>?=null,
     deleteDeliverableClicked: (suspend () -> Unit)?=null,
-    originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
-    deliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
-    parentGoal: StateFlow<Flow<Goal?>?>,
+    originalDeliverable: Flow<Deliverable?>?=null,
+    deliverable: Flow<Deliverable?>?=null,
+    parentGoal: Flow<Goal?>,
     deleteMarkerClicked: (suspend () -> Unit)?=null,
     originalMarker: MutableStateFlow<Flow<Marker?>?>?=null,
-    marker: MutableStateFlow<Flow<Marker?>?>?=null,
+    marker: Flow<Marker?>?=null,
     updateMarker: suspend (Marker) -> Unit
 ){
     val scope = rememberCoroutineScope()
@@ -391,6 +400,7 @@ fun TaskDeliverableMarkerBottomSheet(
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @Composable
 fun TasksFragmentView(
     viewModel: TaskViewModel,
@@ -416,18 +426,9 @@ fun TasksFragmentView(
     )
     val goalColour by remember { mutableIntStateOf(goal.colour) }
 
-    val tasksListFlow by goal.goalTasks.collectAsStateWithLifecycle()
-    val tasksList by (tasksListFlow
-        ?: MutableStateFlow(emptyList()))
-        .collectAsStateWithLifecycle(emptyList())
-    val deliverablesListFlow by goal.goalDeliverables.collectAsStateWithLifecycle()
-    val deliverablesList by (deliverablesListFlow
-        ?: MutableStateFlow(emptyList()))
-        .collectAsStateWithLifecycle(emptyList())
-    val markersListFlow by goal.goalMarkers.collectAsStateWithLifecycle()
-    val markersList by (markersListFlow
-        ?: MutableStateFlow(emptyList()))
-        .collectAsStateWithLifecycle(emptyList())
+    val tasksList by goal.goalTasks.collectAsStateWithLifecycle(emptyList())
+    val deliverablesList by goal.goalDeliverables.collectAsStateWithLifecycle(emptyList())
+    val markersList by goal.goalMarkers.collectAsStateWithLifecycle(emptyList())
 
     LazyColumn(
         state = tabListState,
@@ -491,7 +492,13 @@ fun TasksFragmentView(
             }
             GoalTab.DELIVERABLES -> {
                 items(items = deliverablesList) { deliverable ->
-                    DeliverableCardView(deliverable, viewModel::editDeliverable)
+                    DeliverableCardView(
+                        deliverable,
+                        viewModel::editDeliverable,
+                        Modifier.fillMaxWidth()
+                            .padding(3.dp)
+                            .wrapContentHeight()
+                    )
                 }
             }
             GoalTab.MARKERS -> {
@@ -679,11 +686,11 @@ fun getOnlyOneQuantityText(inputString: String) : String?{
     return null
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun AddTaskView(
     originalTask: MutableStateFlow<Flow<Task?>?>,
-    taskStateFlow: MutableStateFlow<Flow<Task?>?>,
+    taskStateFlow: Flow<Task?>,
     triedToSaveInput: MutableStateFlow<Boolean>,
     colourPickerDialog: ColourPickerDialog,
     processBottomSheetAdd: suspend () -> Unit,
@@ -746,8 +753,7 @@ fun AddTaskView(
             }
         }
     }
-    val taskFlow by taskStateFlow.collectAsStateWithLifecycle()
-    val task by (taskFlow?:MutableStateFlow(null)).collectAsStateWithLifecycle(null)
+    val task by taskStateFlow.collectAsStateWithLifecycle(null)
     task?.let { task ->
         val context = LocalContext.current
 
@@ -771,8 +777,7 @@ fun AddTaskView(
         val taskTextFocusRequester = remember { task.taskTextFocusRequester }
         val location = remember { TextFieldState(task.location) }
         val locationFocusRequester = remember { task.locationFocusRequester }
-        val timesFlow by task.times.collectAsStateWithLifecycle()
-        val times by (timesFlow?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
+        val times by task.times.collectAsStateWithLifecycle(emptyList())
         val colourFocusRequester = remember { task.colourFocusRequester }
         var taskTime by remember {
             Converters().toLocalDateTime(
@@ -1263,15 +1268,13 @@ fun AddTaskView(
 @Composable
 fun DeliverableCardView(
     deliverable: Deliverable,
-    editDeliverable: suspend (Deliverable) -> Unit
+    editDeliverable: suspend (Deliverable) -> Unit,
+    modifier: Modifier
 ){
     val scope = rememberCoroutineScope()
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(3.dp)
-            .wrapContentHeight()
+        modifier = modifier
             .combinedClickable(onClick = {
                 scope.launch { editDeliverable(deliverable) }
             }),
@@ -1304,12 +1307,12 @@ fun DeliverableCardView(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun AddDeliverableView(
-    originalDeliverableStateFlow: MutableStateFlow<Flow<Deliverable?>?>,
-    deliverableStateFlow: MutableStateFlow<Flow<Deliverable?>?>,
-    parentGoal: StateFlow<Flow<Goal?>?>,
+    originalDeliverableStateFlow: Flow<Deliverable?>,
+    deliverableStateFlow: Flow<Deliverable?>,
+    parentGoal: Flow<Goal?>,
     triedToSaveInput: MutableStateFlow<Boolean>,
     processBottomSheetAdd: suspend () -> Unit,
     showErrorMessage: MutableState<Boolean>,
@@ -1321,8 +1324,7 @@ fun AddDeliverableView(
     updateDeliverable: suspend (Deliverable) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val originalDeliverableFlow by originalDeliverableStateFlow.collectAsStateWithLifecycle()
-    val originalDeliverable by (originalDeliverableFlow?:MutableStateFlow(null)).collectAsStateWithLifecycle(null)
+    val originalDeliverable by originalDeliverableStateFlow.collectAsStateWithLifecycle(null)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1373,10 +1375,8 @@ fun AddDeliverableView(
             }
         }
     }
-    val parentGoalFlow by parentGoal.collectAsStateWithLifecycle()
-    val parentGoal by (parentGoalFlow?: MutableStateFlow(null)).collectAsStateWithLifecycle(null)
-    val deliverableFlow by deliverableStateFlow.collectAsStateWithLifecycle()
-    val deliverable by (deliverableFlow?: MutableStateFlow(null)).collectAsStateWithLifecycle(null)
+    val parentGoal by parentGoal.collectAsStateWithLifecycle(null)
+    val deliverable by deliverableStateFlow.collectAsStateWithLifecycle(null)
     parentGoal?.let{ parentGoal ->
         deliverable?.let { deliverable ->
             val context = LocalContext.current
@@ -1401,8 +1401,7 @@ fun AddDeliverableView(
             val deliverableTextFocusRequester = remember { deliverable.deliverableTextFocusRequester }
             val location = remember { TextFieldState(deliverable.location) }
             val locationFocusRequester = remember { deliverable.locationFocusRequester }
-            val timesFlow by deliverable.times.collectAsStateWithLifecycle()
-            val times by (timesFlow?: MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
+            val times by deliverable.times.collectAsStateWithLifecycle(emptyList())
 
             LaunchedEffect(deliverableText.text) {
                 updateDeliverable(deliverable.copy(deliverable = deliverableText.text.toString()))
@@ -1774,11 +1773,11 @@ fun MarkerCardView(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun AddMarkerView(
     originalMarker: MutableStateFlow<Flow<Marker?>?>,
-    marker: MutableStateFlow<Flow<Marker?>?>,
+    marker: Flow<Marker?>,
     triedToSaveInput: MutableStateFlow<Boolean>,
     processBottomSheetAdd: suspend () -> Unit,
     showErrorMessage: MutableState<Boolean>,
@@ -1836,8 +1835,7 @@ fun AddMarkerView(
             }
         }
     }
-    val markerFlow by marker.collectAsStateWithLifecycle()
-    val marker by (markerFlow?:MutableStateFlow(null)).collectAsStateWithLifecycle(null)
+    val marker by marker.collectAsStateWithLifecycle(null)
     marker?.let { marker ->
         val context = LocalContext.current
 

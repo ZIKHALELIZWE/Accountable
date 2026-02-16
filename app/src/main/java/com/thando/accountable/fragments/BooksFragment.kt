@@ -1,6 +1,5 @@
 package com.thando.accountable.fragments
 
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.Image
@@ -108,24 +107,22 @@ import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 import kotlin.random.Random
 
 private val bottomBarHeightFraction = 0.14f
 private val barColor = Color(red = 255f, green = 255f, blue = 255f, alpha = 0.5f)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityViewModel) {
     mainActivityViewModel.enableDrawer()
@@ -197,13 +194,8 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
 
         val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-        val showScriptsParent by viewModel.showScripts.collectAsStateWithLifecycle()
-        val showScripts by showScriptsParent?.collectAsStateWithLifecycle() ?: MutableStateFlow(
-            false
-        ).collectAsStateWithLifecycle()
-        val orderIconParent by viewModel.folderOrder.collectAsStateWithLifecycle()
-        val orderIconAscending by orderIconParent?.collectAsStateWithLifecycle()
-            ?: MutableStateFlow(false).collectAsStateWithLifecycle()
+        val showScripts by viewModel.showScripts.collectAsStateWithLifecycle(false)
+        val orderIconAscending by viewModel.folderOrder.collectAsStateWithLifecycle(false)
 
         val imageHeight = (
                 (LocalResources.current.displayMetrics.heightPixels / 3)
@@ -213,26 +205,24 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
         val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
         val context = LocalContext.current
 
-        var result by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
+        var result by remember { mutableStateOf<Flow<ImageBitmap?>>(flowOf(null)) }
         LaunchedEffect(folder, appSettings) {
-            result = if (folder != null) folder!!.getUri(context)
+            result = (if (folder != null) folder!!.getUri(context)
             else if (appSettings != null) appSettings!!.getUri(context)
-            else MutableStateFlow(null)
-        }
-        val imageUri by result.collectAsStateWithLifecycle(null)
-
-        var image by remember { mutableStateOf<ImageBitmap?>(null) }
-        LaunchedEffect(imageUri) {
-            image = imageUri?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri) }
-                ?.asImageBitmap()
-                ?: AppResources.getBitmapFromUri(
-                    context,
-                    AppResources.getUriFromDrawable(
+            else MutableStateFlow(null)).mapLatest {
+                it?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri) }
+                    ?.asImageBitmap()
+                    ?: AppResources.getBitmapFromUri(
                         context,
-                        R.mipmap.ic_launcher
-                    )
-                )?.asImageBitmap()
+                        AppResources.getUriFromDrawable(
+                            context,
+                            R.mipmap.ic_launcher
+                        )
+                    )?.asImageBitmap()
+            }
         }
+
+        val image by result.collectAsStateWithLifecycle(null)
         Scaffold(
             floatingActionButton = if (viewModel.intentString == null) {
                 @Composable {
@@ -346,7 +336,7 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
                                   scrollBehavior: TopAppBarScrollBehavior,
@@ -380,8 +370,7 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
 
         when (listShown) {
             Folder.FolderListType.FOLDERS -> {
-                val foldersListFlow by viewModel.foldersList.collectAsStateWithLifecycle()
-                val foldersList by (foldersListFlow?:MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
+                val foldersList by viewModel.foldersList.collectAsStateWithLifecycle(emptyList())
 
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
@@ -405,8 +394,8 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
             }
 
             Folder.FolderListType.SCRIPTS -> {
-                val scriptsListFlow by viewModel.scriptsList.collectAsStateWithLifecycle()
-                val scriptsList by (scriptsListFlow?:MutableStateFlow(emptyList())).collectAsStateWithLifecycle(emptyList())
+                val scriptsList by viewModel.scriptsList.collectAsStateWithLifecycle(emptyList())
+
                 LazyColumn(
                     state = scrollStateParent,
                     contentPadding = PaddingValues(0.dp),
@@ -457,59 +446,57 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
             }
 
             Folder.FolderListType.GOALS -> {
-                val goalsListStateFlow by viewModel.goalsList.collectAsStateWithLifecycle()
-                goalsListStateFlow?.let { goalsListFlow ->
-                    val goalsList by goalsListFlow.collectAsStateWithLifecycle(emptyList())
-                    LazyColumn(
-                        state = scrollStateParent,
-                        contentPadding = PaddingValues(0.dp),
-                        modifier = modifier.fillMaxSize()
-                    ) {
-                        items(items = goalsList, key = {it.id?:Random.nextLong()}) { goal ->
-                            GoalCard(
-                                goal = goal,
-                                modifier = Modifier
-                                    .padding(2.dp)
-                                    .fillMaxWidth()
-                                    .padding(2.dp)
-                                    .onGloballyPositioned {
-                                        if (scriptHeight == 0.dp) scriptHeight =
-                                            (it.size.height / density).dp
-                                    },
-                                getGoalContentPreview = { viewModel.getGoalContentPreview(it) },
-                                onLongClick = {
-                                    if (viewModel.setOnLongClick()) {
-                                        viewModel.bottomSheetListeners.update {
-                                            BooksViewModel.BottomSheetListeners(
-                                                displayView = {
-                                                    GoalCard(
-                                                        goal,
-                                                        modifier = Modifier,
-                                                        clickable = false,
-                                                        onLongClick = {},
-                                                        onClick = {},
-                                                        getGoalContentPreview = { viewModel.getGoalContentPreview(it) }
-                                                    )
-                                                },
-                                                onEditClickListener = {
-                                                    scope.launch {
-                                                        viewModel.onGoalEdit(goal.id)
-                                                    }
-                                                },
-                                                onDeleteClickListener = {
-                                                    scope.launch {
-                                                        viewModel.onDeleteGoal(goal.id)
-                                                    }
-                                                }
-                                            )
-                                        }
-                                    }
+                val goalsList by viewModel.goalsList.collectAsStateWithLifecycle(emptyList())
+
+                LazyColumn(
+                    state = scrollStateParent,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = modifier.fillMaxSize()
+                ) {
+                    items(items = goalsList, key = {it.id?:Random.nextLong()}) { goal ->
+                        GoalCard(
+                            goal = goal,
+                            modifier = Modifier
+                                .padding(2.dp)
+                                .fillMaxWidth()
+                                .padding(2.dp)
+                                .onGloballyPositioned {
+                                    if (scriptHeight == 0.dp) scriptHeight =
+                                        (it.size.height / density).dp
                                 },
-                                onClick = {
-                                    goal.id?.let { viewModel.onGoalClick(it) }
+                            getGoalContentPreview = { viewModel.getGoalContentPreview(it) },
+                            onLongClick = {
+                                if (viewModel.setOnLongClick()) {
+                                    viewModel.bottomSheetListeners.update {
+                                        BooksViewModel.BottomSheetListeners(
+                                            displayView = {
+                                                GoalCard(
+                                                    goal,
+                                                    modifier = Modifier,
+                                                    clickable = false,
+                                                    onLongClick = {},
+                                                    onClick = {},
+                                                    getGoalContentPreview = { viewModel.getGoalContentPreview(it) }
+                                                )
+                                            },
+                                            onEditClickListener = {
+                                                scope.launch {
+                                                    viewModel.onGoalEdit(goal.id)
+                                                }
+                                            },
+                                            onDeleteClickListener = {
+                                                scope.launch {
+                                                    viewModel.onDeleteGoal(goal.id)
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
-                            )
-                        }
+                            },
+                            onClick = {
+                                goal.id?.let { viewModel.onGoalClick(it) }
+                            }
+                        )
                     }
                 }
             }
@@ -609,7 +596,7 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun FolderCard(
     folder: Folder,
@@ -620,7 +607,6 @@ fun FolderCard(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val folderName = remember { folder.folderName }
-    var folderUriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
 
     val numFolders by folder.numFolders.collectAsStateWithLifecycle(0)
     val numScripts by folder.numScripts.collectAsStateWithLifecycle(0)
@@ -629,17 +615,15 @@ fun FolderCard(
 
     LaunchedEffect(folder) {
         viewModel.getFolderContentPreview(folder)
-        folderUriStateFlow = folder.getUri(context)
     }
 
-    val folderUri by folderUriStateFlow.collectAsStateWithLifecycle()
-    var folderImage by remember { mutableStateOf(ImageBitmap(1,1)) }
+    val folderImage by folder.getUri(context).mapLatest {
+        withContext(MainActivity.IO) {
+            it?.let { AppResources.getBitmapFromUri(context, it) }
+                ?.asImageBitmap()
+        }
+    }.collectAsStateWithLifecycle(null)
 
-    LaunchedEffect(folderUri) {
-        folderImage = folderUri?.let { AppResources.getBitmapFromUri(context, it) }
-            ?.asImageBitmap()
-            ?: ImageBitmap(1, 1)
-    }
     Card(
         modifier = modifier
             .aspectRatio(0.66f)
@@ -672,12 +656,14 @@ fun FolderCard(
         shape = RoundedCornerShape(8.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Image(
-                bitmap = folderImage,
-                contentDescription = folderName.text.toString(),
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            folderImage?.let { folderImage ->
+                Image(
+                    bitmap = folderImage,
+                    contentDescription = folderName.text.toString(),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             if (folder.folderType == Folder.FolderType.SCRIPTS)
                 FolderTopBar(
                     folders = numFolders,
@@ -747,7 +733,7 @@ private fun BoxScope.BottomBar(text: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun ScriptCard(
     script: Script,
@@ -766,27 +752,28 @@ fun ScriptCard(
 
     var contentPreview by remember { mutableStateOf<AccountableRepository.ContentPreview?>(null) }
     val context = LocalContext.current
-    var uriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
 
     LaunchedEffect(script) {
-        uriStateFlow = script.getUri(context)
         contentPreview = script.scriptId?.let { getScriptContentPreview(it) }
         contentPreview?.init {
             contentPreviewAsync = null
         }
     }
-    val scriptUri by uriStateFlow.collectAsStateWithLifecycle()
 
     val scriptDateTime by remember { script.scriptDateTime }
     val title = remember { script.scriptTitle }
     val description by contentPreview?.getDescription()?.collectAsStateWithLifecycle("")
         ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    val displayImage by contentPreview?.getDisplayImage()?.collectAsStateWithLifecycle()
-        ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(scriptUri,displayImage) {
-        imageBitmap = (scriptUri?:displayImage)?.let { AppResources.getBitmapFromUri(context, it)?.asImageBitmap() }
-    }
+    val imageBitmap by combine(
+        contentPreview?.getDisplayImage()?:MutableStateFlow(null),
+        script.getUri(context)
+    ) { displayImage, scriptUri ->
+        withContext(MainActivity.IO) {
+            (scriptUri ?: displayImage)?.let {
+                AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
+            }
+        }
+    }.collectAsStateWithLifecycle(null)
 
     val numImages by contentPreview?.getNumImages()?.collectAsStateWithLifecycle(0)
         ?:MutableStateFlow(null).collectAsStateWithLifecycle()
@@ -901,7 +888,7 @@ fun ScriptCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun GoalCard(
     goal: Goal,
@@ -920,16 +907,13 @@ fun GoalCard(
 
     var contentPreview by remember { mutableStateOf<AccountableRepository.GoalContentPreview?>(null) }
     val context = LocalContext.current
-    var uriStateFlow by remember { mutableStateOf<StateFlow<Uri?>>(MutableStateFlow(null)) }
 
     LaunchedEffect(goal) {
-        uriStateFlow = goal.getUri(context)
         contentPreview = goal.id?.let { getGoalContentPreview(it) }
         contentPreview?.init {
             contentPreviewAsync = null
         }
     }
-    val scriptUri by uriStateFlow.collectAsStateWithLifecycle()
 
     val goalInitialDateTime by remember {
         Converters().toLocalDateTime(
@@ -948,10 +932,11 @@ fun GoalCard(
         ?:MutableStateFlow(null).collectAsStateWithLifecycle()
     val displayImage by contentPreview?.getDisplayImage()?.collectAsStateWithLifecycle()
         ?:MutableStateFlow(null).collectAsStateWithLifecycle()
-    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(scriptUri,displayImage) {
-        imageBitmap = (scriptUri?:displayImage)?.let { AppResources.getBitmapFromUri(context, it)?.asImageBitmap() }
-    }
+    val imageBitmap by goal.getUri(context).mapLatest { scriptUri ->
+        withContext(MainActivity.IO) {
+            (scriptUri?:displayImage)?.let { AppResources.getBitmapFromUri(context, it)?.asImageBitmap() }
+        }
+    }.collectAsStateWithLifecycle(null)
 
     val numImages by contentPreview?.getNumImages()?.collectAsStateWithLifecycle(0)
         ?:MutableStateFlow(null).collectAsStateWithLifecycle()
@@ -1055,7 +1040,7 @@ fun GoalCard(
                     numAudios?.let { numAudios -> MediaIcon(numAudios, Icons.Default.Mic,modifier) }
                     numDocuments?.let { numDocuments -> MediaIcon(numDocuments, Icons.Default.Book,modifier) }
                     numScript?.let { numScript -> MediaIcon(numScript, Icons.AutoMirrored.Filled.LibraryBooks,modifier) }
-                    goalDateOfCompletion?.let { goalDateOfCompletion ->
+                    goalDateOfCompletion.let { goalDateOfCompletion ->
                         Text(
                             text = AppResources.getFullDate(context, goalDateOfCompletion),
                             modifier = Modifier.weight(1f),

@@ -55,6 +55,7 @@ class EditGoalViewModel(
     val buttonDatePick = MutableStateFlow(false)
     val buttonTimePick = MutableStateFlow(false)
     val endTypeOptions = MutableStateFlow(listOf<MenuItemData>())
+    val selectDeliverableDialog = MutableStateFlow(false)
 
     private fun showError(
         message: Int,
@@ -79,25 +80,25 @@ class EditGoalViewModel(
     }
 
     suspend fun updateGoalString(goal: String) {
-        newGoal.value?.first()?.let{ newGoal ->
+        newGoal.first()?.let{ newGoal ->
             repository.update(newGoal.copy(goal = goal))
         }
     }
 
     suspend fun updateScrollPosition(scrollPosition: Long) {
-        newGoal.value?.first()?.let { newGoal ->
+        newGoal.first()?.let { newGoal ->
             repository.update(newGoal.copy(scrollPosition = scrollPosition))
         }
     }
 
     suspend fun updateLocation(location: String) {
-        newGoal.value?.first()?.let{ newGoal ->
+        newGoal.first()?.let{ newGoal ->
             repository.update(newGoal.copy(location = location))
         }
     }
 
     suspend fun updatePickedDate(pickedDate: LocalDateTime) {
-        newGoal.value?.first()?.let{ newGoal ->
+        newGoal.first()?.let{ newGoal ->
             repository.update(newGoal.copy(
                 endDateTime = Converters().fromLocalDateTime(pickedDate)
             ))
@@ -105,7 +106,7 @@ class EditGoalViewModel(
     }
 
     suspend fun updateEndType( endType: Goal.GoalEndType) {
-        newGoal.value?.first()?.let{ newGoal ->
+        newGoal.first()?.let{ newGoal ->
             repository.update(newGoal.copy(
                 endType = endType.name
             ))
@@ -114,7 +115,7 @@ class EditGoalViewModel(
 
     fun pickColour(originalColour: Color? = null){
         colourPickerDialog.pickColour(originalColour){ selectedColour: Int ->
-            newGoal.value?.first()?.let { goal -> repository.update(goal.copy(colour = selectedColour)) }
+            newGoal.first()?.let { goal -> repository.update(goal.copy(colour = selectedColour)) }
         }
     }
 
@@ -193,7 +194,7 @@ class EditGoalViewModel(
     suspend fun addDeliverable() {
         addDeliverableCompanionObject(
             repository = repository,
-            goal = newGoal.value?.first(),
+            goal = newGoal.first(),
             saveDeliverable = ::saveDeliverable,
             showBottomSheet = ::showBottomSheet,
             deliverable = deliverable,
@@ -203,12 +204,20 @@ class EditGoalViewModel(
         )
     }
 
-    suspend fun selectDeliverable() {
+    fun selectDeliverable() {
+        selectDeliverableDialog.value = true
+    }
 
+    fun closeSelectDeliverableDialog() {
+        selectDeliverableDialog.value = false
     }
 
     suspend fun saveDeliverable(){
         saveClickedDeliverable( repository, deliverable)
+    }
+
+    suspend fun saveDeliverable(deliverable: Deliverable) {
+        repository.saveDeliverable(deliverable)
     }
 
     suspend fun deleteDeliverable() {
@@ -260,7 +269,10 @@ class EditGoalViewModel(
             deliverable = deliverable,
             deleteDeliverable = ::deleteDeliverable,
             marker = null,
-            deleteMarker = null
+            deleteMarker = null,
+            originalTask = null,
+            originalDeliverable = originalDeliverable,
+            originalMarker = null
         )
     }
 
@@ -274,28 +286,28 @@ class EditGoalViewModel(
 
     suspend fun saveAndCloseGoal(){
         triedToSave.value = true
-        if (newGoal.value?.first()?.goal?.isEmpty() == true) {
+        if (newGoal.first()?.goal?.isEmpty() == true) {
             showError(
                 R.string.please_enter_a_goal,
                 goalFocusRequester
             )
             return
         }
-        if (newGoal.value?.first()?.location?.isEmpty() == true) {
+        if (newGoal.first()?.location?.isEmpty() == true) {
             showError(
                 R.string.please_enter_a_location,
                 locationFocusRequester
             )
             return
         }
-        if (newGoal.value?.first()?.colour == -1) {
+        if (newGoal.first()?.colour == -1) {
             showError(
                 R.string.please_select_a_colour,
                 colourFocusRequester
             )
             return
         }
-        newGoal.value?.first()?.times?.value?.first()?.forEach { time ->
+        newGoal.first()?.times?.first()?.forEach { time ->
             val duration = Converters().toLocalDateTime(
                     time.duration
                 ).value

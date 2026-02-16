@@ -131,7 +131,7 @@ class MarkupLanguageViewModel(
             _deleteButtonText.value = context.getString(R.string.delete)
             deleteButtonFunction = {
                 viewModelScope.launch {
-                    withContext(Dispatchers.IO) {
+                    withContext(MainActivity.IO) {
                         repository.setMarkupLanguageToScript(false){
                             repository.deleteMarkupLanguage(markupLanguage){
                                 viewModelScope.launch { loadMarkupLanguage() }
@@ -151,7 +151,7 @@ class MarkupLanguageViewModel(
         val similarList = spansNotSimilar(markupLanguage)
         if (index<0 || markupLanguagesList.isEmpty()) return
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 repository.saveMarkupLanguage(similarList){
                     repository.setRepositoryMarkupLanguage(markupLanguagesList[index])
                     repository.setMarkupLanguageToScript(true)

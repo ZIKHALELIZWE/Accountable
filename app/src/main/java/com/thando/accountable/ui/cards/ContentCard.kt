@@ -39,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.fromColorLong
 import androidx.compose.ui.graphics.toArgb
@@ -60,6 +59,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import com.thando.accountable.AccountableRepository.Companion.accountablePlayer
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.SpannedString
 import com.thando.accountable.database.tables.AppSettings
@@ -70,10 +70,15 @@ import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.player.Media3PlayerView
 import com.thando.accountable.player.TrackItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 @Composable
 fun GetContentCard(
@@ -280,6 +285,7 @@ fun TextCard(
     }
 }
 
+@kotlin.OptIn(ExperimentalCoroutinesApi::class)
 @Composable
 fun ImageCard(
     content: Content,
@@ -291,12 +297,12 @@ fun ImageCard(
     teleprompterSettings: TeleprompterSettings? = null
 ){
     content.getUri(LocalContext.current)?.let { getContentUri ->
-        val uri by getContentUri.collectAsStateWithLifecycle()
         val context = LocalContext.current
-        var contentImage by remember { mutableStateOf<ImageBitmap?>(null) }
-        LaunchedEffect(uri) {
-            contentImage = uri?.let { uri -> AppResources.getBitmapFromUri(context,uri)?.asImageBitmap() }
-        }
+        val contentImage by getContentUri.mapLatest { uri ->
+            withContext(MainActivity.IO) {
+                uri?.let { uri -> AppResources.getBitmapFromUri(context,uri)?.asImageBitmap() }
+            }
+        }.collectAsStateWithLifecycle(null)
 
         Column(modifier = Modifier.fillMaxWidth()) {
             contentImage?.let { contentImage ->
@@ -340,10 +346,10 @@ fun VideoCard(
         ?:MutableStateFlow(Color.Black.toArgb()).collectAsStateWithLifecycle()
 
     content.getUri(LocalContext.current)?.let { getContentUri ->
-        val uri by getContentUri.collectAsStateWithLifecycle()
+        val uri by getContentUri.collectAsStateWithLifecycle(null)
         uri?.let { uri ->
             scope.launch {
-                withContext(Dispatchers.IO){
+                withContext(MainActivity.IO){
                     content.trackItem.value =
                         content.id?.let { getVideoMetadata(it, uri, context) }
                 }
@@ -424,7 +430,7 @@ fun VideoCard(
 }
 
 suspend fun getVideoMetadata(id:Long,uri: Uri, context: Context): TrackItem{
-    return withContext(Dispatchers.IO) {
+    return withContext(MainActivity.IO) {
         val retriever = MediaMetadataRetriever()
         retriever.setDataSource(context, uri)
 
@@ -451,7 +457,7 @@ fun formatMillisToMinutesAndSeconds(millis: Long): String {
 }
 
 suspend fun getMediaMetadata(id:Long,uri: Uri, context: Context): TrackItem? {
-    return withContext(Dispatchers.IO) {
+    return withContext(MainActivity.IO) {
         if (!AppResources.uriExists(context,uri)) return@withContext null
         val retriever = MediaMetadataRetriever()
         retriever.setDataSource(context, uri)
@@ -489,10 +495,10 @@ fun AudioCard(
         ?:MutableStateFlow(Color.Black.toArgb()).collectAsStateWithLifecycle()
 
     content.getUri(LocalContext.current)?.let { getContentUri ->
-        val uri by getContentUri.collectAsStateWithLifecycle()
+        val uri by getContentUri.collectAsStateWithLifecycle(null)
         uri?.let { uri ->
             scope.launch {
-                withContext(Dispatchers.IO){
+                withContext(MainActivity.IO){
                     content.trackItem.value =
                         content.id?.let { getMediaMetadata(it, uri, context) }
                 }
@@ -598,10 +604,10 @@ fun DocumentCard(
     val trackItem by content.trackItem.collectAsStateWithLifecycle()
 
     content.getUri(LocalContext.current)?.let { getContentUri ->
-        val uri by getContentUri.collectAsStateWithLifecycle()
+        val uri by getContentUri.collectAsStateWithLifecycle(null)
         uri?.let { uri ->
             scope.launch {
-                withContext(Dispatchers.IO) {
+                withContext(MainActivity.IO) {
                     content.trackItem.value =
                         content.id?.let { getMediaMetadata(it, uri, context) }
                 }

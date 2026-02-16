@@ -28,14 +28,14 @@ data class GoalTaskDeliverableTime (
     var start: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo(name = "times_duration")
-    var duration: Long = Converters().fromLocalDateTime(LocalDateTime.now())
+    var duration: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
+
+    @ColumnInfo (name = "times_clone_id")
+    var cloneId: Long? = null
 ){
     enum class TimesType{
         GOAL, TASK, DELIVERABLE
     }
     @Ignore
     val durationPickerFocusRequester = FocusRequester()
-
-    @Ignore
-    var cloneId: Long? = null
 }

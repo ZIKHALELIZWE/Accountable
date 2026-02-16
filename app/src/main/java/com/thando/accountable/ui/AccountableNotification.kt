@@ -9,8 +9,8 @@ import android.content.pm.PackageManager
 import androidx.activity.result.ActivityResultLauncher
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicReference
 
@@ -126,7 +126,7 @@ class AccountableNotification private constructor(
                 pushNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
             else {
-                withContext(Dispatchers.Main){
+                withContext(MainActivity.Main){
                     accountableNotification.buildProgressNotification(title)
                 }
                 executeUnit.invoke(accountableNotification)

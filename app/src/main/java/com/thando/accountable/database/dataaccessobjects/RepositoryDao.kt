@@ -10,6 +10,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Deliverable
@@ -532,6 +533,9 @@ interface RepositoryDao {
     @Query("SELECT * FROM deliverable_table WHERE deliverable_goal_id = :goalId AND deliverable_parent = :goalId")
     fun getGoalDeliverables(goalId: Long?): Flow<List<Deliverable>>
 
+    @Query("SELECT * FROM deliverable_table WHERE deliverable_goal_id IS NULL AND deliverable_parent = :goalId")
+    fun getNotGoalDeliverables(goalId: Long?): Flow<List<Deliverable>>
+
     @Transaction
     suspend fun appSettings(): AppSettings {
         var appSettings = getAppSettings().first()
@@ -570,13 +574,13 @@ interface RepositoryDao {
             )
             var hasContent = false
             if (list.isNotEmpty()) {
-                list.forEach { withContext(Dispatchers.Main) { searchOccurrences.value += it.second.size } }
+                list.forEach { withContext(MainActivity.Main) { searchOccurrences.value += it.second.size } }
                 scriptSearch.addRanges(context,list)
                 hasContent = true
             }
             if (hasContent) {
                 searchScriptsList.add(scriptSearch)
-                withContext(Dispatchers.Main) { searchNumScripts.value += 1 }
+                withContext(MainActivity.Main) { searchNumScripts.value += 1 }
             }
         }
         appendedUnit?.invoke()

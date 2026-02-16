@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -70,21 +72,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -102,19 +104,31 @@ import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.time.DayOfWeek
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.temporal.TemporalAdjusters
 import kotlin.enums.EnumEntries
 import kotlin.random.Random
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Custom semantics key for background color (used in test)
+val BackgroundColorKey = SemanticsPropertyKey<Color>("BackgroundColor")
+var SemanticsPropertyReceiver.backgroundColor by BackgroundColorKey
+fun Modifier.testBackground(color: Color): Modifier =
+    this
+        .background(color)
+        .semantics { backgroundColor = color }
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun EditGoalView(
     viewModel: EditGoalViewModel,
@@ -194,7 +208,9 @@ fun EditGoalView(
                         }
                     },
                     actions = {
-                        IconButton(onClick = {
+                        IconButton(
+                            modifier = Modifier.testTag("EditGoalSaveAndCloseIconButton"),
+                            onClick = {
                             scope.launch { viewModel.saveAndCloseGoal() }
                         }) {
                             Icon(
@@ -249,8 +265,12 @@ fun EditGoalView(
                     task = null,
                     updateTask = viewModel::updateTask,
                     deleteDeliverableClicked = viewModel::deleteDeliverableClicked,
-                    originalDeliverable = viewModel.originalDeliverable,
-                    deliverable = viewModel.deliverable,
+                    originalDeliverable = viewModel.originalDeliverable.flatMapLatest {
+                        it?:flowOf(null)
+                    },
+                    deliverable = viewModel.deliverable.flatMapLatest {
+                        it?: flowOf(null)
+                    },
                     deleteMarkerClicked = null,
                     originalMarker = null,
                     marker = null,
@@ -261,72 +281,154 @@ fun EditGoalView(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun EditGoalFragmentView(
     viewModel: EditGoalViewModel,
     mainActivityViewModel: MainActivityViewModel,
     modifier: Modifier = Modifier
 ) {
-    val newGoalStateFlow by viewModel.newGoal.collectAsStateWithLifecycle()
+    val newGoal by viewModel.newGoal.collectAsStateWithLifecycle(null)
     val context = LocalContext.current
 
-    newGoalStateFlow?.let { newGoalFlow ->
-        val newGoal by newGoalFlow.collectAsStateWithLifecycle(null)
+    newGoal?.let { newGoal ->
+        val scrollState = remember {
+            Converters().fromScrollStateLazy(newGoal.scrollPosition)
+        }
+        LaunchedEffect(scrollState) {
+            snapshotFlow { scrollState.isScrollInProgress }
+                .filter { !it } // only when scrolling ends
+                .collect {
+                    viewModel.updateScrollPosition(
+                        Converters().toScrollStateLazy(scrollState)
+                    )
+                }
+        }
 
-        newGoal?.let { newGoal ->
-            val scrollState = remember {
-                Converters().fromScrollStateLazy(newGoal.scrollPosition)
+        val imageBitmap by newGoal.getUri(context).mapLatest { uri ->
+            withContext(MainActivity.IO) {
+                uri?.let { uri ->
+                    AppResources.getBitmapFromUri(context, uri)?.asImageBitmap()
+                }
             }
-            LaunchedEffect(scrollState) {
-                snapshotFlow { scrollState.isScrollInProgress }
-                    .filter { !it } // only when scrolling ends
-                    .collect {
-                        viewModel.updateScrollPosition(
-                            Converters().toScrollStateLazy(scrollState)
-                        )
+        }.collectAsStateWithLifecycle(null)
+        val goal = remember { TextFieldState(newGoal.goal) }
+        val location = remember { TextFieldState(newGoal.location) }
+
+        val scope = rememberCoroutineScope()
+
+        val selectedGoalDeliverables by newGoal.selectedGoalDeliverables.collectAsStateWithLifecycle(emptyList())
+
+        val notSelectedGoalDeliverables by newGoal.notSelectedGoalDeliverables.collectAsStateWithLifecycle(emptyList())
+
+        val times by newGoal.times.collectAsStateWithLifecycle(emptyList())
+
+        val showSelectDeliverableDialog by viewModel.selectDeliverableDialog.collectAsStateWithLifecycle()
+
+        val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
+        val goalFocusRequester = remember { viewModel.goalFocusRequester }
+        val locationFocusRequester = remember { viewModel.locationFocusRequester }
+        val colourFocusRequester = remember { viewModel.colourFocusRequester }
+
+        LaunchedEffect(goal.text) {
+            viewModel.updateGoalString(goal.text.toString())
+        }
+
+        LaunchedEffect(location.text) {
+            viewModel.updateLocation(location.text.toString())
+        }
+
+        Box(modifier = modifier.fillMaxSize()) {
+            if (showSelectDeliverableDialog){
+                Dialog(
+                    onDismissRequest = {
+                        viewModel.closeSelectDeliverableDialog()
                     }
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(),
+                            colors = CardColors(
+                                containerColor = Color.White,
+                                contentColor = Color.Black,
+                                disabledContainerColor = Color.LightGray,
+                                disabledContentColor = Color.DarkGray
+                            ),
+                            shape = RectangleShape
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    if (notSelectedGoalDeliverables.size==1)
+                                        R.string.select_deliverable
+                                    else R.string.select_deliverables
+                                ),
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(5.dp),
+                                textAlign = TextAlign.Center,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black,
+                                fontSize = 16.sp
+                            )
+                        }
+                        LazyColumn(
+                            state = rememberLazyListState(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("EditGoalSelectDeliverableDialog")
+                        ) {
+                            items(
+                                items = notSelectedGoalDeliverables,
+                                key = { it.id ?: Random.nextLong() }
+                            ) { deliverable ->
+                                Row(
+                                    modifier = Modifier
+                                        .testTag("EditGoalPickDeliverableRow-${deliverable.id}")
+                                        .height(IntrinsicSize.Min)
+                                        .fillMaxWidth()
+                                        .padding(3.dp)
+                                ) {
+                                    DeliverableCardView(
+                                        deliverable,
+                                        viewModel::editDeliverable,
+                                        Modifier
+                                            .weight(4f).fillMaxWidth()
+                                            .wrapContentHeight()
+                                    )
+                                    IconButton(
+                                        modifier = Modifier
+                                            .weight(1f).fillMaxWidth()
+                                            .testTag("EditGoalPickDeliverableButton-${deliverable.id}")
+                                            .background(color = Color.Green),
+                                        onClick = {
+                                            scope.launch {
+                                                viewModel.saveDeliverable(
+                                                    deliverable.copy(
+                                                        goalId = newGoal.id
+                                                    )
+                                                )
+                                                if (notSelectedGoalDeliverables.isEmpty()) viewModel.closeSelectDeliverableDialog()
+                                            }
+                                        }
+                                    ) {
+                                        MainActivity.Icon(
+                                            imageVector = Icons.Default.Done,
+                                            contentDescription = stringResource(R.string.pick_deliverable)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-
-            val uri by newGoal.getUri(context).collectAsStateWithLifecycle()
-            val goal = remember { TextFieldState(newGoal.goal) }
-            val location = remember { TextFieldState(newGoal.location) }
-
-            val scope = rememberCoroutineScope()
-
-            val selectedGoalDeliverablesFlow by newGoal.selectedGoalDeliverables.collectAsStateWithLifecycle()
-            val selectedGoalDeliverables by (selectedGoalDeliverablesFlow
-                ?: MutableStateFlow(emptyList()))
-                .collectAsStateWithLifecycle(emptyList())
-            val goalDeliverablesFlow by newGoal.goalDeliverables.collectAsStateWithLifecycle()
-            val goalDeliverables by (goalDeliverablesFlow
-                ?: MutableStateFlow(emptyList()))
-                .collectAsStateWithLifecycle(emptyList())
-            val timesFlow by newGoal.times.collectAsStateWithLifecycle()
-            val times by (timesFlow ?: MutableStateFlow(emptyList()))
-                .collectAsStateWithLifecycle(emptyList())
-
-            val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
-            val goalFocusRequester = remember { viewModel.goalFocusRequester }
-            val locationFocusRequester = remember { viewModel.locationFocusRequester }
-            val colourFocusRequester = remember { viewModel.colourFocusRequester }
-
-            var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-            LaunchedEffect(uri) {
-                imageBitmap = uri?.let { uri -> AppResources.getBitmapFromUri(context, uri)?.asImageBitmap() }
-            }
-
-            LaunchedEffect(goal.text) {
-                viewModel.updateGoalString(goal.text.toString())
-            }
-
-            LaunchedEffect(location.text) {
-                viewModel.updateLocation(location.text.toString())
-            }
-
             LazyColumn(
                 state = scrollState,
-                modifier = modifier
+                modifier = Modifier
+                    .testTag("EditGoalLazyColumn")
                     .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             )
@@ -335,7 +437,8 @@ fun EditGoalFragmentView(
                     OutlinedTextField(
                         state = goal,
                         label = { Text(stringResource(R.string.goal)) },
-                        modifier = Modifier.testTag("EditGoalGoal")
+                        modifier = Modifier
+                            .testTag("EditGoalGoal")
                             .fillMaxWidth()
                             .padding(horizontal = 3.dp)
                             .focusRequester(goalFocusRequester),
@@ -377,14 +480,16 @@ fun EditGoalFragmentView(
                                     AppResources.ContentType.IMAGE
                                 )
                             },
-                            modifier = Modifier.testTag("EditGoalChooseImageButton")
+                            modifier = Modifier
+                                .testTag("EditGoalChooseImageButton")
                                 .weight(1f)
                                 .padding(8.dp),
                         ) { Text(stringResource(R.string.choose_image)) }
                         imageBitmap?.let {
                             Button(
                                 onClick = { scope.launch { viewModel.removeImage() } },
-                                modifier = Modifier.testTag("EditGoalRemoveImageButton")
+                                modifier = Modifier
+                                    .testTag("EditGoalRemoveImageButton")
                                     .weight(1f)
                                     .padding(8.dp),
                                 // enabled =
@@ -399,7 +504,8 @@ fun EditGoalFragmentView(
                     OutlinedTextField(
                         state = location,
                         label = { Text(stringResource(R.string.location)) },
-                        modifier = Modifier.testTag("EditGoalLocation")
+                        modifier = Modifier
+                            .testTag("EditGoalLocation")
                             .fillMaxWidth()
                             .padding(horizontal = 3.dp)
                             .focusRequester(locationFocusRequester),
@@ -426,7 +532,8 @@ fun EditGoalFragmentView(
                     ) {
                         if (newGoal.colour != -1) {
                             Box(
-                                modifier = Modifier.testTag("EditGoalColourDisplayBox")
+                                modifier = Modifier
+                                    .testTag("EditGoalColourDisplayBox")
                                     .fillMaxWidth()
                                     .fillMaxHeight()
                                     .padding(12.dp)
@@ -443,7 +550,8 @@ fun EditGoalFragmentView(
                                     Color(newGoal.colour)
                                 )
                             },
-                            modifier = Modifier.testTag("EditGoalPickColourButton")
+                            modifier = Modifier
+                                .testTag("EditGoalPickColourButton")
                                 .fillMaxWidth()
                                 .padding(8.dp)
                                 .weight(2f)
@@ -468,7 +576,7 @@ fun EditGoalFragmentView(
                 item {
                     var pickedDate by remember {
                         Converters().toLocalDateTime(
-                        newGoal.endDateTime
+                            newGoal.endDateTime
                         )
                     }
                     val stateTime = rememberTimePickerState(
@@ -494,7 +602,8 @@ fun EditGoalFragmentView(
                     }
 
                     OutlinedButton(
-                        modifier = Modifier.testTag("EditGoalEndTypeButton")
+                        modifier = Modifier
+                            .testTag("EditGoalEndTypeButton")
                             .semantics(mergeDescendants = false) {}
                             .fillMaxWidth()
                             .padding(3.dp),
@@ -602,44 +711,80 @@ fun EditGoalFragmentView(
                         ) {
                             Button(
                                 onClick = { scope.launch { viewModel.addDeliverable() } },
-                                modifier = Modifier.testTag("EditGoalAddDeliverableButton")
+                                modifier = Modifier
+                                    .testTag("EditGoalAddDeliverableButton")
                                     .fillMaxWidth()
                                     .padding(8.dp)
                                     .weight(1f)
                             ) { Text(stringResource(R.string.add_deliverable)) }
                             Button(
                                 onClick = { scope.launch { viewModel.selectDeliverable() } },
-                                modifier = Modifier.testTag("EditGoalSelectDeliverableButton")
+                                modifier = Modifier
+                                    .testTag("EditGoalSelectDeliverableButton")
                                     .fillMaxWidth()
                                     .padding(8.dp)
                                     .weight(1f),
-                                enabled = goalDeliverables.isNotEmpty() && selectedGoalDeliverables.size < goalDeliverables.size
+                                enabled = notSelectedGoalDeliverables.isNotEmpty()
                             ) { Text(
                                 stringResource(R.string.select_deliverable) +
-                                    if (goalDeliverables.size - selectedGoalDeliverables.size!=0) {
-                                        " (${goalDeliverables.size - selectedGoalDeliverables.size})"
-                                    } else {
-                                        ""
-                                    }
+                                        if (notSelectedGoalDeliverables.isNotEmpty()) {
+                                            " (${notSelectedGoalDeliverables.size})"
+                                        } else {
+                                            ""
+                                        }
                             ) }
                         }
                     }
                     items(
                         items = selectedGoalDeliverables,
-                        key = { it.id ?: Random.nextLong() }) { deliverable ->
-                        DeliverableCardView(
-                            deliverable,
-                            viewModel::editDeliverable
-                        )
+                        key = { it.id ?: Random.nextLong() }
+                    ) { deliverable ->
+                        Row(
+                            modifier = Modifier
+                                .height(IntrinsicSize.Min)
+                                .fillMaxWidth()
+                                .padding(3.dp)
+                        ) {
+                            DeliverableCardView(
+                                deliverable,
+                                viewModel::editDeliverable,
+                                Modifier
+                                    .weight(4f).fillMaxSize()
+                                    .testTag("TasksFragmentDeliverableCard-${deliverable.id}")
+                                    .padding(3.dp)
+                                    .wrapContentHeight()
+                            )
+                            IconButton(
+                                modifier = Modifier
+                                    .weight(1f).fillMaxSize()
+                                    .testTag("EditGoalUnpickDeliverableButton-${deliverable.id}")
+                                    .background(color = Color.Red),
+                                onClick = {
+                                    scope.launch {
+                                        viewModel.saveDeliverable(
+                                            deliverable.copy(
+                                                goalId = null
+                                            )
+                                        )
+                                    }
+                                }
+                            ) {
+                                MainActivity.Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.delete_deliverable)
+                                )
+                            }
+                        }
                     }
                 }
                 item {
                     Spacer(modifier = Modifier.width(2.dp))
                 }
-                stickyHeader {
+                stickyHeader(key = "EditGoalFragmentStickyAddGoalTimeBlockButton") {
                     Button(
                         onClick = { scope.launch { viewModel.addTimeBlock() } },
                         modifier = Modifier
+                            .testTag("EditGoalAddTimeBlockButton")
                             .fillMaxWidth()
                             .padding(8.dp)
                     ) { Text(stringResource(R.string.add_time_block)) }
@@ -656,15 +801,15 @@ fun EditGoalFragmentView(
                     }
                 }
             }
-        } ?: run {
-            // New Goal not loaded yet
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Indeterminate spinner
-                CircularProgressIndicator()
-            }
+        }
+    } ?: run {
+        // New Goal not loaded yet
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Indeterminate spinner
+            CircularProgressIndicator()
         }
     }
 }
@@ -695,7 +840,8 @@ fun TimeInputView(
     val durationPickerFocusRequester = remember { time.durationPickerFocusRequester }
 
     Card(
-        modifier = Modifier.testTag("EditGoalTimeInputViewCard-${time.id}")
+        modifier = Modifier
+            .testTag("EditGoalTimeInputViewCard-${time.id}")
             .fillMaxWidth()
             .padding(4.dp),
         elevation = CardDefaults.cardElevation(4.dp)
@@ -713,7 +859,8 @@ fun TimeInputView(
                     updateGoalTaskDeliverableTime(time.copy(timeBlockType = it.name))
                 } }
                 IconButton(
-                    modifier = Modifier.testTag("EditGoalTimeInputDeleteButton-${time.id}")
+                    modifier = Modifier
+                        .testTag("EditGoalTimeInputDeleteButton-${time.id}")
                         .fillMaxSize()
                         .padding(4.dp)
                         .weight(1f)
@@ -749,7 +896,8 @@ fun TimeInputView(
                         }
                     }
                     OutlinedButton(
-                        modifier = Modifier.testTag("EditGoalTimeInputDailyTimeButton")
+                        modifier = Modifier
+                            .testTag("EditGoalTimeInputDailyTimeButton")
                             .fillMaxWidth()
                             .padding(4.dp),
                         onClick = { buttonTimePick = true }
@@ -827,7 +975,8 @@ fun TimeInputView(
                             }
                         }
                     }
-                    OutlinedButton(modifier = Modifier.testTag("EditGoalTimeInputWeeklyAndTimeButton")
+                    OutlinedButton(modifier = Modifier
+                        .testTag("EditGoalTimeInputWeeklyAndTimeButton")
                         .fillMaxWidth()
                         .padding(4.dp),
                         onClick = { buttonWeekDayPick = true }
@@ -898,7 +1047,8 @@ fun TimeInputView(
                             }
                         }
                     }
-                    OutlinedButton(modifier = Modifier.testTag("EditGoalTimeInputSelectDateAndTimeButton")
+                    OutlinedButton(modifier = Modifier
+                        .testTag("EditGoalTimeInputSelectDateAndTimeButton")
                         .fillMaxWidth()
                         .padding(4.dp),
                         onClick = { buttonDatePick = true }
@@ -987,7 +1137,8 @@ fun PickerMenu(
 
     Box(modifier = modifier) {
         // Trigger
-        OutlinedButton(modifier = Modifier.testTag("EditGoalPickerMenuButton-$testTagId")
+        OutlinedButton(modifier = Modifier
+            .testTag("EditGoalPickerMenuButton-$testTagId")
             .fillMaxWidth()
             .padding(4.dp),
             onClick = { expanded = true }) {
@@ -1115,11 +1266,6 @@ fun PickTime(state: TimePickerState, closeDialog: ()->Unit) {
     }
 }
 
-// Custom semantics key for background color (used in test)
-val BackgroundColorKey = SemanticsPropertyKey<Color>("BackgroundColor")
-var SemanticsPropertyReceiver.backgroundColor by BackgroundColorKey
-fun Modifier.testBackground(color: Color): Modifier =
-    this.background(color).semantics { backgroundColor = color }
 @Composable
 fun PickWeekday(
     selectedDay: String,
@@ -1135,7 +1281,8 @@ fun PickWeekday(
                 onDaySelected(null)
             }
         ){
-            Box(modifier = Modifier.testTag("EditGoalPickWeekdayDialog")
+            Box(modifier = Modifier
+                .testTag("EditGoalPickWeekdayDialog")
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color.White)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1148,7 +1295,8 @@ fun PickWeekday(
                         items(daysOfWeek) { day ->
                             val isSelected = day == selectedDay
                             Box(
-                                modifier = Modifier.testTag("EditGoalPickWeekdayDay-${day}")
+                                modifier = Modifier
+                                    .testTag("EditGoalPickWeekdayDay-${day}")
                                     .clip(RoundedCornerShape(16.dp))
                                     .testBackground(if (isSelected) Color.Blue else Color.LightGray)
                                     .clickable {
@@ -1187,7 +1335,8 @@ fun DurationPickerButton(
         }
     }
 
-    OutlinedButton(modifier = Modifier.testTag("EditGoalTimeInputPickDurationButton")
+    OutlinedButton(modifier = Modifier
+        .testTag("EditGoalTimeInputPickDurationButton")
         .fillMaxWidth()
         .padding(4.dp)
         .focusRequester(durationPickerFocusRequester),
@@ -1269,7 +1418,8 @@ fun TimeDurationPicker(
             }
         ) {
             Box(
-                modifier = Modifier.testTag("EditGoalTimeInputDurationPickerDialog")
+                modifier = Modifier
+                    .testTag("EditGoalTimeInputDurationPickerDialog")
                     .clip(RoundedCornerShape(16.dp))
                     .background(Color.White)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1333,9 +1483,12 @@ fun TimeDurationPicker(
                             },
                             valueRange = 0f..selectableHours.toFloat(),
                             steps = selectableHours-1, // 23 hours total
-                            modifier = Modifier.padding(start = 8.dp).setSliderRange(
-                                0f..selectableHours.toFloat()// only for testing purposes
-                            ).testTag("EditGoalDurationPickerHourSlider")
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .setSliderRange(
+                                    0f..selectableHours.toFloat()// only for testing purposes
+                                )
+                                .testTag("EditGoalDurationPickerHourSlider")
                         )
                     }
 
@@ -1362,9 +1515,12 @@ fun TimeDurationPicker(
                             },
                             valueRange = 0f..selectableMinutes.toFloat(),
                             steps = selectableMinutes-1, // 59 minutes total
-                            modifier = Modifier.padding(start = 8.dp).setSliderRange(
-                                0f..selectableMinutes.toFloat()// only for testing purposes
-                            ).testTag("EditGoalDurationPickerMinuteSlider")
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .setSliderRange(
+                                    0f..selectableMinutes.toFloat()// only for testing purposes
+                                )
+                                .testTag("EditGoalDurationPickerMinuteSlider")
                         )
                     }
                 }

@@ -30,6 +30,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -41,13 +42,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -65,7 +63,18 @@ import com.thando.accountable.AccountableNavigationController.AccountableFragmen
 import com.thando.accountable.fragments.TeleprompterController
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import java.util.concurrent.atomic.AtomicReference
 
 open class MainActivity : ComponentActivity() {
@@ -164,18 +173,34 @@ open class MainActivity : ComponentActivity() {
             Log.i("FATAL EXCEPTION",message)
         }
 
+        class MainDispatcherRule @OptIn(ExperimentalCoroutinesApi::class) constructor(
+            private val testDispatcher: TestDispatcher = UnconfinedTestDispatcher()
+        ) : TestWatcher() {
+
+            @OptIn(ExperimentalCoroutinesApi::class)
+            override fun starting(description: Description) {
+                Dispatchers.setMain(testDispatcher)
+            }
+
+            @OptIn(ExperimentalCoroutinesApi::class)
+            override fun finished(description: Description) {
+                Dispatchers.resetMain()
+            }
+        }
+
+
         // Default implementation points to Material3 Icon
-        var iconImpl: @Composable (ImageVector, String, Color) -> Unit =
+        var iconImpl: @Composable (ImageVector, String, Color?) -> Unit =
             { imageVector, contentDescription, tint ->
                 androidx.compose.material3.Icon(
                     imageVector = imageVector,
                     contentDescription = contentDescription,
-                    tint = tint
+                    tint = tint?:LocalContentColor.current
                 )
             }
 
         @Composable
-        fun Icon(imageVector: ImageVector, contentDescription: String, tint: Color) {
+        fun Icon(imageVector: ImageVector, contentDescription: String, tint: Color? = null) {
             iconImpl(imageVector, contentDescription, tint)
         }
 
@@ -211,6 +236,9 @@ open class MainActivity : ComponentActivity() {
         ){
             datePickerImpl(state,onDismiss)
         }
+        
+        var IO: CoroutineDispatcher = Dispatchers.IO
+        var Main: CoroutineDispatcher = Dispatchers.Main
 
         @OptIn(ExperimentalMaterial3Api::class)
         var modalBottomSheetImpl: @Composable (
@@ -267,7 +295,7 @@ open class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun MainActivityView(
     mainActivityViewModel: MainActivityViewModel,
@@ -320,11 +348,25 @@ fun MainActivityView(
                             .verticalScroll(rememberScrollState())
                     ) {
                         appSettings?.let { appSettings ->
-                            val imageUri by appSettings.getUri(context).collectAsStateWithLifecycle(null)
-                            var image by remember { mutableStateOf<ImageBitmap?>(null) }
-
+                            val image by appSettings.getUri(context).mapLatest { imageUri ->
+                                withContext(MainActivity.IO) {
+                                    imageUri?.let { imageUri ->
+                                        AppResources.getBitmapFromUri(context, imageUri)?.asImageBitmap()
+                                    }
+                                        ?: AppResources.getBitmapFromUri(
+                                            context,
+                                            AppResources.getUriFromDrawable(
+                                                context,
+                                                R.mipmap.ic_launcher
+                                            )
+                                        )?.asImageBitmap()
+                                }
+                            }.collectAsStateWithLifecycle(null)
+                            /*var image by remember { mutableStateOf<ImageBitmap?>(null) }
                             LaunchedEffect(imageUri) {
-                                image = imageUri?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri)?.asImageBitmap() }
+                                imageUri?.let { imageUri ->
+                                    AppResources.getBitmapFromUri(context, imageUri)?.asImageBitmap()
+                                }
                                     ?: AppResources.getBitmapFromUri(
                                         context,
                                         AppResources.getUriFromDrawable(
@@ -332,8 +374,7 @@ fun MainActivityView(
                                             R.mipmap.ic_launcher
                                         )
                                     )?.asImageBitmap()
-                            }
-
+                            }*/
                             image?.let { image ->
                                 Image(
                                     bitmap = image,

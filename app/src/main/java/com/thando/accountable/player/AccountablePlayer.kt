@@ -45,6 +45,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Content
+import kotlinx.coroutines.flow.flowOf
 
 @OptIn(UnstableApi::class)
 class AccountablePlayer : MediaSessionService() {
@@ -257,74 +258,72 @@ fun Media3PlayerView(
 
     var currentPosition = 0L
 
-    content.getUri(LocalContext.current)?.let { getContentUri ->
-        val uri by getContentUri.collectAsStateWithLifecycle()
-        uri?.let { uri ->
-            LaunchedEffect(uri) {
-                val width = thumbnail?.width?:1280
-                val height = thumbnail?.height?:720
-                val screenWidthPx = displayMetrics.widthPixels
-                val density = displayMetrics.density
+    val uri by (content.getUri(LocalContext.current)?: flowOf(null)).collectAsStateWithLifecycle(null)
+    uri?.let { uri ->
+        LaunchedEffect(uri) {
+            val width = thumbnail?.width?:1280
+            val height = thumbnail?.height?:720
+            val screenWidthPx = displayMetrics.widthPixels
+            val density = displayMetrics.density
 
-                if (width > 0) {
-                    val scaleFactor = screenWidthPx.toFloat() / width
-                    val newHeightPx = height * scaleFactor
-                    imageHeight = (newHeightPx / density).dp
-                }
+            if (width > 0) {
+                val scaleFactor = screenWidthPx.toFloat() / width
+                val newHeightPx = height * scaleFactor
+                imageHeight = (newHeightPx / density).dp
             }
+        }
 
-            DisposableEffect(Unit) {
-                onDispose {
-                    currentPosition = player.currentPosition
-                    accountablePlayer.close(content)
-                }
+        DisposableEffect(Unit) {
+            onDispose {
+                currentPosition = player.currentPosition
+                accountablePlayer.close(content)
             }
+        }
 
-            if (isPlaying) {
-                LaunchedEffect(Unit) {
-                    val mediaItem = MediaItem.fromUri(uri)
-                    player.setMediaItem(mediaItem)
-                    player.prepare()
-                    player.playWhenReady = true
-                    player.seekTo(currentPosition)
-                    player.addListener(object : Player.Listener {
-                        override fun onPlayerError(error: PlaybackException) {
-                            when (error.errorCode) {
-                                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> {
-                                    // Handle network connection error
-                                    println("Network connection error")
-                                }
+        if (isPlaying) {
+            LaunchedEffect(Unit) {
+                val mediaItem = MediaItem.fromUri(uri)
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                player.playWhenReady = true
+                player.seekTo(currentPosition)
+                player.addListener(object : Player.Listener {
+                    override fun onPlayerError(error: PlaybackException) {
+                        when (error.errorCode) {
+                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> {
+                                // Handle network connection error
+                                println("Network connection error")
+                            }
 
-                                PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> {
-                                    // Handle file not found error
-                                    println("File not found")
-                                }
+                            PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> {
+                                // Handle file not found error
+                                println("File not found")
+                            }
 
-                                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> {
-                                    // Handle decoder initialization error
-                                    println("Decoder initialization error")
-                                }
+                            PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> {
+                                // Handle decoder initialization error
+                                println("Decoder initialization error")
+                            }
 
-                                else -> {
-                                    // Handle other types of errors
-                                    println("Other error: ${error.message}")
-                                }
+                            else -> {
+                                // Handle other types of errors
+                                println("Other error: ${error.message}")
                             }
                         }
-                    })
-                }
-                Media3AndroidView(accountablePlayer, content, imageHeight)
+                    }
+                })
             }
-            else{
-                thumbnail?.let { thumbnail ->
-                    Image(
-                        bitmap = thumbnail.asImageBitmap(),
-                        contentDescription = stringResource(R.string.video),
-                        contentScale = ContentScale.FillWidth,
-                        modifier = if (isEditingScript) modifier.fillMaxWidth()
-                        else Modifier.fillMaxWidth()
-                    )
-                }
+            Media3AndroidView(accountablePlayer, content, imageHeight)
+        }
+        else{
+            thumbnail?.let { thumbnail ->
+                Image(
+                    bitmap = thumbnail.asImageBitmap(),
+                    contentDescription = stringResource(R.string.video),
+                    contentScale = ContentScale.FillWidth,
+                    modifier = if (isEditingScript) modifier.fillMaxWidth()
+                    else Modifier.fillMaxWidth()
+                )
             }
         }
     }

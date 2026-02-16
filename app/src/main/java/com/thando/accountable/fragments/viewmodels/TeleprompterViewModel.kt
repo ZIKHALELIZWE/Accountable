@@ -15,6 +15,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.AccountableRepository
+import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.SpecialCharacters
@@ -134,7 +135,7 @@ class TeleprompterViewModel(
             _deleteButtonText.value = context.getString(R.string.delete)
             deleteButtonFunction = {
                 viewModelScope.launch {
-                    withContext(Dispatchers.IO) {
+                    withContext(MainActivity.IO) {
                         repository.setTeleprompterSettingToScript(false) {
                             repository.deleteTeleprompterSetting(teleprompterSetting) {
                                 repository.deleteTeleprompterSetting(

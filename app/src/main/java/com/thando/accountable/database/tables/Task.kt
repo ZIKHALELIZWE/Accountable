@@ -6,10 +6,16 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
+import com.thando.accountable.MainActivity
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
@@ -78,6 +84,9 @@ data class Task(
     @ColumnInfo (name = "task_num_scripts")
     var numScripts: Int = 0,
 
+    @ColumnInfo (name = "task_clone_id")
+    var cloneId: Long? = null
+
 ) {
     enum class TaskParentType {
         GOAL, FOLDER
@@ -92,7 +101,12 @@ data class Task(
     }
 
     @Ignore
-    val times = MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>(null)
+    val timesState = MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val times = timesState.flatMapLatest { timesFlow ->
+            timesFlow?: MutableStateFlow(emptyList())
+    }.flowOn(MainActivity.IO)
 
     @Ignore
     val taskTextFocusRequester = FocusRequester()
@@ -104,6 +118,6 @@ data class Task(
     val colourFocusRequester = FocusRequester()
 
     fun loadTimes(dao: RepositoryDao) {
-        times.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.TASK)
+        timesState.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.TASK)
     }
 }

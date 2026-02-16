@@ -25,13 +25,10 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -39,11 +36,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.EditFolderViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,6 +110,7 @@ fun EditFolderView(
     }
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @Composable
 fun EditFolderFragmentView(
     viewModel: EditFolderViewModel,
@@ -126,13 +128,14 @@ fun EditFolderFragmentView(
     val scope = rememberCoroutineScope()
 
     if (newEditFolder != null) {
-        val uri by newEditFolder!!.getUri(context).collectAsStateWithLifecycle()
+        val folderImage by newEditFolder!!.getUri(context).mapLatest {
+            withContext(MainActivity.IO) {
+                it?.let { uri -> AppResources.getBitmapFromUri(context,uri)?.asImageBitmap() }
+            }
+        }.collectAsStateWithLifecycle(null)
         val folderName = remember { newEditFolder!!.folderName }
         val listState = rememberScrollState()
-        var folderImage by remember { mutableStateOf<ImageBitmap?>(null) }
-        LaunchedEffect(uri) {
-            folderImage = uri?.let { uri -> AppResources.getBitmapFromUri(context,uri)?.asImageBitmap() }
-        }
+
         Column(
             modifier = modifier
                 .imePadding()
@@ -168,7 +171,7 @@ fun EditFolderFragmentView(
             }
             Spacer(modifier = Modifier.width(2.dp))
             // remove image button
-            if (uri != null) {
+            if (folderImage != null) {
                 Button(
                     onClick = {
                         scope.launch {

@@ -24,9 +24,14 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.MainActivityTest.FilteredPrintStream
 import com.thando.accountable.MainActivityTest.Log
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.FixMethodOrder
@@ -59,6 +64,8 @@ abstract class AccountableComposeRobolectricTest(
         TestMainActivity
     >?=null
 ) {
+    val scope = TestScope(TestMainActivity.dispatcher)
+
     @get:Rule
     val instantTaskExecutorRule = parentParameters?.first ?: InstantTaskExecutorRule()
     @get:Rule
@@ -68,11 +75,12 @@ abstract class AccountableComposeRobolectricTest(
     @Before
     open fun setup() {
         ShadowLog.stream = FilteredPrintStream(System.out)
+        Dispatchers.setMain(TestMainActivity.dispatcher)
     }
 
     @After
     open fun cleanup() {
-
+        Dispatchers.resetMain()
     }
 
     fun getTestMainActivity(): TestMainActivity = outerGetTestMainActivity ?: innerGetTestMainActivity()
@@ -235,9 +243,12 @@ abstract class AccountableComposeRobolectricTest(
                     return getInstance(accountableRepository) as T
                 }
             }
+            IO = dispatcher
+            Main = dispatcher
         }
 
         companion object {
+            val dispatcher = StandardTestDispatcher()
             fun DatePickerState.addDays(days: Long) {
                 val currentMillis = this.selectedDateMillis ?: return
                 val currentDate = Instant.ofEpochMilli(currentMillis)

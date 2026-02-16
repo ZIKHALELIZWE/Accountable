@@ -10,6 +10,7 @@ import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -91,7 +92,7 @@ open class Folder(
         }
     }
 
-    fun getUri(context: Context): StateFlow<Uri?> {
+    fun getUri(context: Context): Flow<Uri?> {
         _progressBarVisibility.value = View.GONE
         return imageResource.getUri(context)
     }

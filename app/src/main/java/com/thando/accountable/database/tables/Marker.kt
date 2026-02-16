@@ -33,6 +33,9 @@ data class Marker(
 
     @ColumnInfo (name = "marker_marker")
     var marker : String = "",
+
+    @ColumnInfo (name = "marker_clone_id")
+    var cloneId : Long? = null
 ) {
     @Ignore
     val markerTextFocusRequester = FocusRequester()

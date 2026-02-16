@@ -4,7 +4,6 @@ import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
@@ -12,7 +11,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableRepository
-import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
@@ -21,13 +19,9 @@ import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.ui.cards.ColourPickerDialog
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
-import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
 
@@ -81,10 +75,10 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                 )
                 return false
             }
-            task.times.value?.first()?.forEach { time ->
+            task.times.first().forEach { time ->
                 val duration = Converters().toLocalDateTime(
-                        time.duration
-                    ).value
+                    time.duration
+                ).value
                 if (duration.hour == 0 && duration.minute == 0) {
                     showError(
                         R.string.please_select_a_duration,
@@ -146,7 +140,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         originalTask.value = null
         originalDeliverable.value = null
         originalMarker.value = null
-        goal.value?.first()?.let { goal ->
+        goal.first()?.let { goal ->
             task.value = repository.getTask(repository.insert(Task(
                 parent = goal.id ?:return,
                 parentType = Task.TaskParentType.GOAL.name,
@@ -166,7 +160,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     suspend fun addDeliverable(){
         addDeliverableCompanionObject(
             repository = repository,
-            goal = goal.value?.first(),
+            goal = goal.first(),
             saveDeliverable = ::saveDeliverable,
             showBottomSheet = ::showBottomSheet,
             deliverable = deliverable,
@@ -180,7 +174,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         originalTask.value = null
         originalDeliverable.value = null
         originalMarker.value = null
-        goal.value?.first()?.let { goal ->
+        goal.first()?.let { goal ->
             marker.value = repository.getMarker(repository.insert(Marker(
                 parent = goal.id ?:return,
                 position = repository.getMarkers(
@@ -197,7 +191,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             originalTask.value = repository.getTask(originalTaskInputId)
             originalDeliverable.value = null
             originalMarker.value = null
-            task.value = originalTask.value?.let { repository.getTaskClone(it)?:return }?:return
+            task.value = originalTask.value?.let { repository.getTaskClone(it, true)?:return }?:return
         }
         saveTask()
         showBottomSheet(Goal.GoalTab.TASKS)
@@ -227,7 +221,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             originalTask.value = null
             originalDeliverable.value = null
             originalMarker.value = repository.getMarker(markerId)
-            marker.value = repository.getMarkerClone(originalMarker.value?:return) ?: return
+            marker.value = repository.getMarkerClone(originalMarker.value?:return, true) ?: return
         }
         saveMarker()
         showBottomSheet(Goal.GoalTab.MARKERS)
@@ -261,7 +255,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     suspend fun saveTask() {
         task.value?.first()?.let { task ->
             task.id = repository.saveTask(task)
-            task.times.value?.first()?.forEach { saveTime(it) }
+            task.times.first().forEach { saveTime(it) }
         }
     }
 
@@ -278,7 +272,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     suspend fun deleteTask(){
         task.value?.first()?.let { task ->
             repository.deleteTask(task)
-            task.times.value?.first()?.forEach {
+            task.times.first().forEach {
                 repository.deleteGoalTaskDeliverableTime(it)
             }
         }
@@ -349,6 +343,9 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             ::deleteDeliverable,
             marker,
             ::deleteMarker,
+            originalTask,
+            originalDeliverable,
+            originalMarker
         )
     }
 
@@ -400,10 +397,10 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                         // Can have a cumulative amount for the quantity/time
                     }
                 }
-                deliverable.times.value?.first()?.forEach { time ->
+                deliverable.times.first().forEach { time ->
                     val duration = Converters().toLocalDateTime(
-                            time.duration
-                        ).value
+                        time.duration
+                    ).value
                     if (duration.hour == 0 && duration.minute == 0) {
                         showError(
                             R.string.please_select_a_duration,
@@ -441,7 +438,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             originalTask?.value = null
             originalDeliverable.value = originalDeliverableInput
             originalMarker?.value = null
-            deliverable.value = repository.getDeliverableClone(originalDeliverableInput)?:return
+            deliverable.value = repository.getDeliverableClone(originalDeliverableInput, true)?:return
             saveDeliverable()
             showBottomSheet(Goal.GoalTab.DELIVERABLES)
         }
@@ -460,7 +457,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             deliverable: MutableStateFlow<Flow<Deliverable?>?>
         ) {
             deliverable.value?.first()?.let { deliverable ->
-                deliverable.times.value?.first()?.forEach {
+                deliverable.times.first().forEach {
                     repository.deleteGoalTaskDeliverableTime(it)
                 }
                 repository.deleteDeliverable(deliverable)
@@ -489,6 +486,9 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             deleteDeliverable: (suspend () -> Unit)?=null,
             marker: MutableStateFlow<Flow<Marker?>?>?=null,
             deleteMarker: (suspend () -> Unit)?=null,
+            originalTask: MutableStateFlow<Flow<Task?>?>?=null,
+            originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+            originalMarker: MutableStateFlow<Flow<Marker?>?>?=null,
         ) {
             task?.value?.let {
                 deleteTask?.invoke()
@@ -501,6 +501,15 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             marker?.value?.let {
                 deleteMarker?.invoke()
                 marker.value = null
+            }
+            originalTask?.value?.let {
+                originalTask.value = null
+            }
+            originalDeliverable?.value?.let {
+                originalDeliverable.value = null
+            }
+            originalMarker?.value?.let {
+                originalMarker.value = null
             }
             triedToSave.value = false
             bottomSheetType.value = null
@@ -542,8 +551,8 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                     if (task?.value != null) {
                         if (!(canSaveTask?.invoke() ?: return)) return
                         if (originalTask?.value != null) {
+                            repository.cloneTaskTo(task, originalTask, false)
                             deleteTask?.invoke()
-                            repository.cloneTaskTo(task, originalTask)
                             task.value = originalTask.value
                             saveTask?.invoke()
                         } else {
@@ -561,8 +570,8 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                             )
                         ) return
                         if (originalDeliverable?.value != null) {
+                            repository.cloneDeliverableTo(deliverable, originalDeliverable, false)
                             deleteDeliverable?.invoke()
-                            repository.cloneDeliverableTo(deliverable, originalDeliverable)
                             deliverable.value = originalDeliverable.value
                             saveDeliverable?.invoke()
                         } else {
@@ -576,8 +585,8 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                     if (marker?.value != null) {
                         if (!(canSaveMarker?.invoke() ?: return)) return
                         if (originalMarker?.value != null) {
+                            repository.cloneMarkerTo(marker, originalMarker, false)
                             deleteMarker?.invoke()
-                            repository.cloneMarkerTo(marker, originalMarker)
                             marker.value = originalMarker.value
                             saveMarker?.invoke()
                         } else {

@@ -39,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -48,15 +47,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.AppResources
+import com.thando.accountable.MainActivity
 import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.fragments.viewmodels.AppSettingsViewModel
 import com.thando.accountable.ui.theme.AccountableTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAtomicApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalAtomicApi::class,
+    ExperimentalCoroutinesApi::class
+)
 @Composable
 fun AppSettingsView(
     viewModel: AppSettingsViewModel,
@@ -99,20 +106,19 @@ fun AppSettingsView(
 
         val textSize by (appSettings?.textSize?:MutableStateFlow(18)).collectAsStateWithLifecycle()
         val mainPicture by (appSettings?.mainPicture?: MutableStateFlow("app_picture")).collectAsStateWithLifecycle()
-        val imageUri by (appSettings?.getUri(context)?: MutableStateFlow(null)).collectAsStateWithLifecycle(null)
-        var image by remember { mutableStateOf<ImageBitmap?>(null) }
-
-        LaunchedEffect(imageUri) {
-            image = imageUri?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri) }
-                ?.asImageBitmap()
-                ?: AppResources.getBitmapFromUri(
-                    context,
-                    AppResources.getUriFromDrawable(
+        val image by (appSettings?.getUri(context)?: flowOf(null)).mapLatest {
+            withContext(MainActivity.IO) {
+                it?.let { imageUri -> AppResources.getBitmapFromUri(context, imageUri) }
+                    ?.asImageBitmap()
+                    ?: AppResources.getBitmapFromUri(
                         context,
-                        R.mipmap.ic_launcher
-                    )
-                )?.asImageBitmap()
-        }
+                        AppResources.getUriFromDrawable(
+                            context,
+                            R.mipmap.ic_launcher
+                        )
+                    )?.asImageBitmap()
+            }
+        }.collectAsStateWithLifecycle(null)
 
         LaunchedEffect(Unit) {
             viewModel.navigateToChooseImage.collect { chooseImage ->

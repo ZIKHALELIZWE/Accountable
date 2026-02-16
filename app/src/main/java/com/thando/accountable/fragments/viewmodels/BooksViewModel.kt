@@ -10,10 +10,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AccountableRepository
-import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.Folder
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class BooksViewModel(
@@ -134,27 +133,23 @@ class BooksViewModel(
 
     fun switchFolderScript(){
         scrollStateParent.value?.requestScrollToItem(0,0)
-        if (showScripts.value!=null){
-            showScripts.value!!.update { showScripts.value!!.value.not() }
-            updateFolderShowScripts()
-            repository.loadFolderData()
-            initialized.value = false
-        }
+        repository.toggleShowScripts()
+        updateFolderShowScripts()
+        repository.loadFolderData()
+        initialized.value = false
     }
 
-    fun switchFolderOrder(){
-        folderOrder.value?.update {
-            folderOrder.value?.value?.not() == true
-        }
+    suspend fun switchFolderOrder(){
+        repository.toggleFolderOrder()
         scrollStateParent.value?.requestScrollToItem(0,0)
-        folderOrder.value?.value?.let { repository.loadContent(it) }
+        folderOrder.first().let { repository.loadContent(it) }
         initialized.value = false
     }
 
     suspend fun addFolderScript(){
         val id = INITIAL_FOLDER_ID
-        showScripts.value?.let {
-            if (it.value) {
+        showScripts.first().let {
+            if (it) {
                 // Add a script
                 if (repository.folderIsScripts()) onScriptClick(id, null)
                 else onGoalEdit(id)

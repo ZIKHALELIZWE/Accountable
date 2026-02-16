@@ -5,7 +5,6 @@ import android.content.Context
 import android.net.Uri
 import android.util.Range
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.runtime.remember
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
@@ -16,10 +15,10 @@ import com.thando.accountable.SpannedString
 import com.thando.accountable.player.TrackItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -120,12 +119,12 @@ data class Content(
     }
 
     suspend fun saveFile(context: Context, inputUri:Uri?){
-        withContext(Dispatchers.Main) {
+        withContext(MainActivity.Main) {
             when (mediaType) {
                 AppResources.ContentType.IMAGE -> content.edit {
                     replace(
                         0, length,
-                        withContext(Dispatchers.IO) {
+                        withContext(MainActivity.IO) {
                             imageResource.saveFile(
                                 context,
                                 inputUri,
@@ -137,7 +136,7 @@ data class Content(
                 }
 
                 AppResources.ContentType.DOCUMENT -> content.edit { replace(0,length,
-                    withContext(Dispatchers.IO) {documentResource.saveFile(
+                    withContext(MainActivity.IO) {documentResource.saveFile(
                         context,
                         inputUri,
                         contentPrefix,
@@ -146,7 +145,7 @@ data class Content(
                 ) }
 
                 AppResources.ContentType.AUDIO -> content.edit { replace(0,length,
-                    withContext(Dispatchers.IO) {audioResource.saveFile(
+                    withContext(MainActivity.IO) {audioResource.saveFile(
                         context,
                         inputUri,
                         contentPrefix,
@@ -155,7 +154,7 @@ data class Content(
                 )}
 
                 AppResources.ContentType.VIDEO -> content.edit { replace(0,length,
-                    withContext(Dispatchers.IO) {videoResource.saveFile(
+                    withContext(MainActivity.IO) {videoResource.saveFile(
                         context,
                         inputUri,
                         contentPrefix,
@@ -178,7 +177,8 @@ data class Content(
         }
     }
 
-    fun getUri(context: Context): StateFlow<Uri?>? {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun getUri(context: Context): Flow<Uri?>? {
         return when(mediaType){
             AppResources.ContentType.IMAGE -> imageResource.getUri(context)
             AppResources.ContentType.DOCUMENT -> documentResource.getUri(context)
@@ -220,9 +220,9 @@ data class Content(
             replaceAsync = null
         }
 
-        // Create a CoroutineScope with Dispatchers.IO for IO-bound tasks
+        // Create a CoroutineScope with MainActivity.IO for IO-bound tasks
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(MainActivity.IO) {
                 try {
                     // Perform an asynchronous operation
                     replaceAsync = async {
@@ -250,7 +250,7 @@ data class Content(
                     val result = replaceAsync!!.await()
 
                     // Switch to the Main thread to update UI
-                    withContext(Dispatchers.Main) {
+                    withContext(MainActivity.Main) {
                         spannedString.setText(
                             result.first,
                             context,
@@ -266,7 +266,7 @@ data class Content(
                     }
                 } catch (e: Exception) {
                     // Handle any exceptions
-                    withContext(Dispatchers.Main) {
+                    withContext(MainActivity.Main) {
                         // Show error message on UI
                         println("Asynchronous Error: ${e.message}")
                     }

@@ -10,7 +10,6 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.widget.Toast
 import androidx.annotation.AnyRes
-import androidx.annotation.StringRes
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TimePickerState
 import androidx.compose.runtime.Composable
@@ -19,8 +18,12 @@ import androidx.core.content.FileProvider
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.thando.accountable.database.tables.AppSettings
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.update
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -573,11 +576,14 @@ sealed class AppResources {
             uri.value = file
         }
 
-        open fun getUri(context: Context): StateFlow<Uri?> {
-            if (notInitialized) {
-                setUri(context)
-            }
-            return uri
+        @OptIn(ExperimentalCoroutinesApi::class)
+        open fun getUri(context: Context): Flow<Uri?> {
+            return flow {
+                if (notInitialized) {
+                    setUri(context)
+                }
+                emit(uri)
+            }.flowOn(MainActivity.IO).flatMapLatest { it }
         }
 
         fun getUriFromStorage(context: Context): Uri? {

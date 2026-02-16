@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performSemanticsAction
 import com.thando.accountable.AccountableComposeRobolectricTest
 import com.thando.accountable.AppResources
@@ -17,7 +18,6 @@ import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.BackgroundColorKey
 import com.thando.accountable.fragments.SliderRangeKey
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -32,12 +32,13 @@ import java.time.temporal.TemporalAdjusters
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class TimeBlockTest(
     val addTimeBlockButtonTag: String,
-    val timeBlockList: MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>,
+    val timeBlockList: Flow<List<GoalTaskDeliverableTime>>,
     parentParameters:Triple<
             InstantTaskExecutorRule,
             ComposeContentTestRule,
             TestMainActivity
-    >?=null
+    >?=null,
+    val lazyColumnTag:String? = null
 ): AccountableComposeRobolectricTest(
     parentParameters
 ) {
@@ -53,24 +54,32 @@ class TimeBlockTest(
 
     @Test
     fun `02 Add Time Button Press`() = runTest {
-        assertNotNull(timeBlockList.value?.first())
-        assertEquals(emptyList<GoalTaskDeliverableTime>(),timeBlockList.value?.first())
+        assertNotNull(timeBlockList.first())
+        assertEquals(emptyList<GoalTaskDeliverableTime>(),timeBlockList.first())
 
         withTag(addTimeBlockButtonTag){
             performPressWithScroll()
         }
 
-        assertEquals(1,timeBlockList.value?.first()?.size)
-        assertNotNull(timeBlockList.value?.first()[0]?.id)
+        assertEquals(1, timeBlockList.first().size)
+        assertNotNull(timeBlockList.first()[0].id)
     }
 
     @Test
     fun `03 Delete Time Button Press`() = runTest {
-        assertNotNull(timeBlockList.value?.first())
-        assertEquals(1,timeBlockList.value?.first()?.size)
+        assertNotNull(timeBlockList.first())
+        assertEquals(1, timeBlockList.first().size)
 
-        val firstItemId = timeBlockList.value?.first()[0]?.id
+        val firstItemId = timeBlockList.first()[0].id
         assertNotNull(firstItemId)
+
+        lazyColumnTag?.let {
+            withTag(lazyColumnTag) {
+                assertExists()
+                assertIsDisplayed()
+                performScrollToKey(firstItemId!!)
+            }
+        }
 
         withTag("EditGoalTimeInputViewCard-$firstItemId"){
             assertExists()
@@ -82,7 +91,7 @@ class TimeBlockTest(
             performPressWithoutScroll()
         }
 
-        assertEquals(0,timeBlockList.value?.first()?.size)
+        assertEquals(0, timeBlockList.first().size)
 
         withTag("EditGoalTimeInputViewCard-$firstItemId"){
             assertDoesNotExist()
@@ -92,18 +101,26 @@ class TimeBlockTest(
     private fun pickerMenuTypeSwitchFromTo(
         from:Goal.TimeBlockType,
         to:Goal.TimeBlockType,
-        index:Int,
+        index:Int = 0,
     ) = runTest {
         assertTrue(index>-1)
-        assertTrue(timeBlockList.value?.first()?.isNotEmpty() == true)
-        assertTrue(index < (timeBlockList.value?.first()?.size ?: -1))
-        val firstItemId = timeBlockList.value?.first()[0]?.id
+        assertTrue(timeBlockList.first().isNotEmpty())
+        assertTrue(index < timeBlockList.first().size)
+        val firstItemId = timeBlockList.first()[0].id
         assertNotNull(firstItemId)
 
         assertEquals(
             from.name,
-            timeBlockList.value?.first()[0]?.timeBlockType
+            timeBlockList.first()[0].timeBlockType
         )
+
+        lazyColumnTag?.let {
+            withTag(lazyColumnTag) {
+                assertExists()
+                assertIsDisplayed()
+                performScrollToKey(firstItemId!!)
+            }
+        }
 
         withTag("EditGoalPickerMenuButton-$firstItemId"){
             performPressWithScroll()
@@ -120,7 +137,7 @@ class TimeBlockTest(
 
         assertEquals(
             to.name,
-            timeBlockList.value?.first()[0]?.timeBlockType
+            timeBlockList.first()[0].timeBlockType
         )
     }
 
@@ -142,8 +159,7 @@ class TimeBlockTest(
         listToSwitchFrom.forEach { newTimeBlockType ->
             pickerMenuTypeSwitchFromTo(
                 currentTimeBlockType,
-                newTimeBlockType,
-                0
+                newTimeBlockType
             )
             currentTimeBlockType = newTimeBlockType
         }
@@ -161,17 +177,17 @@ class TimeBlockTest(
         ).forEach { expectedTimeBlockType ->
             assertEquals(
                 previousTimeBlockType,
-                timeBlockList.value?.first()[0]?.timeBlockType
+                timeBlockList.first()[0].timeBlockType
             )
 
             DateAndTimePickerTest(
-                getTimeAsLong = { timeBlockList.value?.first()[0]?.start },
+                getTimeAsLong = { timeBlockList.first()[0].start },
                 getExpectedEndType = { expectedTimeBlockType },
-                getActualEndType = { timeBlockList.value?.first()[0]?.timeBlockType },
-                endTypeButtonTag = { "EditGoalPickerMenuButton-${timeBlockList.value?.first()[0]?.id}" },
-                dropDownMenuTag = { "EditGoalPickerMenuDropdownMenu-${timeBlockList.value?.first()[0]?.id}" },
+                getActualEndType = { timeBlockList.first()[0].timeBlockType },
+                endTypeButtonTag = { "EditGoalPickerMenuButton-${timeBlockList.first()[0].id}" },
+                dropDownMenuTag = { "EditGoalPickerMenuDropdownMenu-${timeBlockList.first()[0].id}" },
                 dropDownMenuItemTag = {
-                    "EditGoalPickerMenuItem-${timeBlockList.value?.first()[0]?.id}-${expectedTimeBlockType}"
+                    "EditGoalPickerMenuItem-${timeBlockList.first()[0].id}-${expectedTimeBlockType}"
                 },
                 selectDateAndTimeButtonTag = "EditGoalTimeInputSelectDateAndTimeButton",
                 parentParameters = Triple(
@@ -191,20 +207,19 @@ class TimeBlockTest(
 
         assertEquals(
             Goal.TimeBlockType.ONCE.name,
-            timeBlockList.value?.first()[0]?.timeBlockType
+            timeBlockList.first()[0].timeBlockType
         )
         pickerMenuTypeSwitchFromTo(
             from = Goal.TimeBlockType.ONCE,
-            to = Goal.TimeBlockType.WEEKLY,
-            index = 0
+            to = Goal.TimeBlockType.WEEKLY
         )
         assertEquals(
             Goal.TimeBlockType.WEEKLY.name,
-            timeBlockList.value?.first()[0]?.timeBlockType
+            timeBlockList.first()[0].timeBlockType
         )
 
         val startLocalDateTime = Converters().toLocalDateTime(
-            timeBlockList.value?.first()[0]?.start
+            timeBlockList.first()[0].start
         ).value
         val currentLocalDatetime = LocalDateTime.now().plusDays(6)
         assertNotNull(startLocalDateTime)
@@ -213,7 +228,7 @@ class TimeBlockTest(
             AppResources.getDayWord(activity, currentLocalDatetime),
             AppResources.getDayWord(
                 activity,
-                startLocalDateTime!!
+                startLocalDateTime
             )
         )
 
@@ -270,7 +285,7 @@ class TimeBlockTest(
             }
 
             assertNotNull(Converters().toLocalDateTime(
-                timeBlockList.value?.first()[0]?.start
+                timeBlockList.first()[0].start
             ).value)
             assertEquals(
                 // Previous test adds 6 days, 2 hours and 2 minutes to current date
@@ -283,7 +298,7 @@ class TimeBlockTest(
                 AppResources.getDayWord(
                     activity,
                     Converters().toLocalDateTime(
-                        timeBlockList.value!!.first()[0].start
+                        timeBlockList.first()[0].start
                     ).value
                 )
             )
@@ -296,29 +311,28 @@ class TimeBlockTest(
 
         assertEquals(
             Goal.TimeBlockType.WEEKLY.name,
-            timeBlockList.value?.first()[0]?.timeBlockType
+            timeBlockList.first()[0].timeBlockType
         )
         pickerMenuTypeSwitchFromTo(
             from = Goal.TimeBlockType.WEEKLY,
-            to = Goal.TimeBlockType.DAILY,
-            index = 0
+            to = Goal.TimeBlockType.DAILY
         )
         assertEquals(
             Goal.TimeBlockType.DAILY.name,
-            timeBlockList.value?.first()[0]?.timeBlockType
+            timeBlockList.first()[0].timeBlockType
         )
 
         assertNotNull(
             Converters().toLocalDateTime(
-                timeBlockList.value?.first()[0]?.start
+                timeBlockList.first()[0].start
             ).value
         )
 
         val hours = Converters().toLocalDateTime(
-            timeBlockList.value!!.first()[0].start
+            timeBlockList.first()[0].start
         ).value.hour
         val minutes = Converters().toLocalDateTime(
-            timeBlockList.value!!.first()[0].start
+            timeBlockList.first()[0].start
         ).value.minute
         activity.timeToAdd(-minutes,-hours)
         changeDailyTimeTest(
@@ -330,7 +344,7 @@ class TimeBlockTest(
     }
 
     private fun changeDailyTimeTest(
-        timeBlockList: MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>,
+        timeBlockList: Flow<List<GoalTaskDeliverableTime>>,
         expectedMinute:Int,
         expectedHour:Int
     ) = runTest {
@@ -361,20 +375,20 @@ class TimeBlockTest(
 
         assertNotNull(
             Converters().toLocalDateTime(
-                timeBlockList.value?.first()[0]?.start
+                timeBlockList.first()[0].start
             ).value
         )
 
         assertEquals(
             expectedHour,
             Converters().toLocalDateTime(
-                timeBlockList.value!!.first()[0].start
+                timeBlockList.first()[0].start
             ).value.hour
         )
         assertEquals(
             expectedMinute,
             Converters().toLocalDateTime(
-                timeBlockList.value!!.first()[0].start
+                timeBlockList.first()[0].start
             ).value.minute
         )
     }
@@ -392,12 +406,12 @@ class TimeBlockTest(
         val activity = getTestMainActivity()
         assertEquals(
             Goal.TimeBlockType.DAILY.name,
-            timeBlockList.value?.first()[0]?.timeBlockType
+            timeBlockList.first()[0].timeBlockType
         )
 
         assertNotNull(
             Converters().toLocalDateTime(
-                timeBlockList.value?.first()[0]?.start
+                timeBlockList.first()[0].start
             ).value
         )
 
