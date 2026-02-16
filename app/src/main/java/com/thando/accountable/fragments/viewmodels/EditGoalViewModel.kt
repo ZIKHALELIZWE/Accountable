@@ -29,11 +29,17 @@ import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showB
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showInputError
 import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.cards.ColourPickerDialog
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import java.time.LocalDateTime
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class EditGoalViewModel(
     private val repository: AccountableRepository
 ): ViewModel() {
@@ -46,8 +52,10 @@ class EditGoalViewModel(
     val locationFocusRequester = FocusRequester()
     val colourFocusRequester = FocusRequester()
     val colourPickerDialog = ColourPickerDialog()
-    val deliverable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(null)
-    val originalDeliverable = MutableStateFlow<Flow<Deliverable?>?>(null)
+    private val deliverableState: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(null)
+    val deliverable = deliverableState.flatMapLatest { it?:flowOf(null) }
+    private val originalDeliverableState = MutableStateFlow<Flow<Deliverable?>?>(null)
+    val originalDeliverable = originalDeliverableState.flatMapLatest { it?: flowOf(null) }
     val triedToSaveBottomSheet = MutableStateFlow(false)
     val bottomSheetType = MutableStateFlow<Goal.GoalTab?>(null)
 
@@ -142,7 +150,7 @@ class EditGoalViewModel(
             bottomSheetType = bottomSheetType,
             timeBlock = timeBlock,
             task = null,
-            deliverable = deliverable
+            deliverable = deliverableState
         )
     }
 
@@ -183,9 +191,9 @@ class EditGoalViewModel(
             originalDeliverableInput = originalDeliverableInput,
             repository = repository,
             originalTask = null,
-            originalDeliverable = originalDeliverable,
+            originalDeliverable = originalDeliverableState,
             originalMarker = null,
-            deliverable = deliverable,
+            deliverable = deliverableState,
             saveDeliverable = ::saveDeliverable,
             showBottomSheet = ::showBottomSheet
         )
@@ -197,9 +205,9 @@ class EditGoalViewModel(
             goal = newGoal.first(),
             saveDeliverable = ::saveDeliverable,
             showBottomSheet = ::showBottomSheet,
-            deliverable = deliverable,
+            deliverable = deliverableState,
             originalTask = null,
-            originalDeliverable = originalDeliverable,
+            originalDeliverable = originalDeliverableState,
             originalMarker = null
         )
     }
@@ -213,7 +221,7 @@ class EditGoalViewModel(
     }
 
     suspend fun saveDeliverable(){
-        saveClickedDeliverable( repository, deliverable)
+        saveClickedDeliverable( repository, deliverableState)
     }
 
     suspend fun saveDeliverable(deliverable: Deliverable) {
@@ -223,14 +231,14 @@ class EditGoalViewModel(
     suspend fun deleteDeliverable() {
         deleteClickedDeliverable(
             repository,
-            deliverable
+            deliverableState
         )
     }
 
     suspend fun deleteDeliverableClicked() {
         deleteDeliverableClickedCompanionObject(
-            deliverable,
-            originalDeliverable,
+            deliverableState,
+            originalDeliverableState,
             ::deleteDeliverable,
             ::dismissBottomSheet
         )
@@ -246,8 +254,8 @@ class EditGoalViewModel(
             deleteTask = null,
             canSaveTask = null,
             saveTask = null,
-            deliverable = deliverable,
-            originalDeliverable = originalDeliverable,
+            deliverable = deliverableState,
+            originalDeliverable = originalDeliverableState,
             deleteDeliverable = ::deleteDeliverable,
             saveDeliverable = ::saveDeliverable,
             marker = null,
@@ -266,12 +274,12 @@ class EditGoalViewModel(
             bottomSheetType = bottomSheetType,
             task = null,
             deleteTask = null,
-            deliverable = deliverable,
+            deliverable = deliverableState,
             deleteDeliverable = ::deleteDeliverable,
             marker = null,
             deleteMarker = null,
             originalTask = null,
-            originalDeliverable = originalDeliverable,
+            originalDeliverable = originalDeliverableState,
             originalMarker = null
         )
     }

@@ -116,7 +116,7 @@ data class Goal(
     }
 
     @Ignore
-    val timesState: MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?> = MutableStateFlow(null)
+    private val timesState: MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?> = MutableStateFlow(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val times = timesState.flatMapLatest {
@@ -124,7 +124,7 @@ data class Goal(
     }.flowOn(MainActivity.IO)
 
     @Ignore
-    val goalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    private val goalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val goalDeliverables = goalDeliverablesState.flatMapLatest {
@@ -132,7 +132,7 @@ data class Goal(
     }.flowOn(MainActivity.IO)
 
     @Ignore
-    val goalTasksState: MutableStateFlow<Flow<List<Task>>?> = MutableStateFlow(null)
+    private val goalTasksState: MutableStateFlow<Flow<List<Task>>?> = MutableStateFlow(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val goalTasks = goalTasksState.flatMapLatest { tasksListFlow ->
@@ -140,7 +140,7 @@ data class Goal(
     }.flowOn(MainActivity.IO)
 
     @Ignore
-    val goalMarkersState: MutableStateFlow<Flow<List<Marker>>?> = MutableStateFlow(null)
+    private val goalMarkersState: MutableStateFlow<Flow<List<Marker>>?> = MutableStateFlow(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val goalMarkers = goalMarkersState.flatMapLatest { markersListFlow ->
@@ -148,7 +148,7 @@ data class Goal(
     }.flowOn(MainActivity.IO)
 
     @Ignore
-    val selectedGoalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    private val selectedGoalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val selectedGoalDeliverables = selectedGoalDeliverablesState.flatMapLatest {
@@ -156,7 +156,7 @@ data class Goal(
     }.flowOn(MainActivity.IO)
 
     @Ignore
-    val notSelectedGoalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    private val notSelectedGoalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val notSelectedGoalDeliverables = notSelectedGoalDeliverablesState.flatMapLatest {

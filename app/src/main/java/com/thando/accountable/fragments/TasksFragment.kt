@@ -284,21 +284,13 @@ fun TaskView(
                     updateDeliverable = viewModel::updateDeliverable,
                     deleteTaskClicked = viewModel::deleteTaskClicked,
                     originalTask = viewModel.originalTask,
-                    task = viewModel.task.flatMapLatest { taskFlow ->
-                            taskFlow?: MutableStateFlow(null)
-                    },
+                    task = viewModel.task,
                     deleteDeliverableClicked = viewModel::deleteDeliverableClicked,
-                    originalDeliverable = viewModel.originalDeliverable.flatMapLatest {
-                            originalDeliverableFlow -> originalDeliverableFlow?:MutableStateFlow(null)
-                    },
-                    deliverable = viewModel.deliverable.flatMapLatest {
-                            it?:MutableStateFlow(null)
-                    },
+                    originalDeliverable = viewModel.originalDeliverable,
+                    deliverable = viewModel.deliverable,
                     deleteMarkerClicked = viewModel::deleteMarkerClicked,
                     originalMarker = viewModel.originalMarker,
-                    marker = viewModel.marker.flatMapLatest {
-                            it?:MutableStateFlow(null)
-                    },
+                    marker = viewModel.marker,
                     updateTask = viewModel::updateTask,
                     updateMarker = viewModel::updateMarker
                 )

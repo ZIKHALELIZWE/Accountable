@@ -44,6 +44,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowLog
+import org.robolectric.shadows.ShadowLooper
 import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
@@ -88,7 +89,7 @@ abstract class AccountableComposeRobolectricTest(
     private fun innerGetTestMainActivity(): TestMainActivity {
         val activity = Robolectric.buildActivity(TestMainActivity::class.java)
             .setup().get()
-        composeTestRule.waitForIdle()
+        finishProcesses()
         return activity
     }
 
@@ -122,8 +123,10 @@ abstract class AccountableComposeRobolectricTest(
     }
 
     fun finishProcesses() = runTest {
+        TestMainActivity.dispatcher.scheduler.advanceUntilIdle()
         advanceUntilIdle()
         composeTestRule.waitForIdle()
+        TestMainActivity.dispatcher.scheduler.advanceUntilIdle()
     }
 
     private fun getTestFunctions(): List<KFunction<*>> {

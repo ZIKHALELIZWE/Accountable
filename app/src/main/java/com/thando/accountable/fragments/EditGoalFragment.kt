@@ -265,12 +265,8 @@ fun EditGoalView(
                     task = null,
                     updateTask = viewModel::updateTask,
                     deleteDeliverableClicked = viewModel::deleteDeliverableClicked,
-                    originalDeliverable = viewModel.originalDeliverable.flatMapLatest {
-                        it?:flowOf(null)
-                    },
-                    deliverable = viewModel.deliverable.flatMapLatest {
-                        it?: flowOf(null)
-                    },
+                    originalDeliverable = viewModel.originalDeliverable,
+                    deliverable = viewModel.deliverable,
                     deleteMarkerClicked = null,
                     originalMarker = null,
                     marker = null,
@@ -340,6 +336,9 @@ fun EditGoalFragmentView(
 
         Box(modifier = modifier.fillMaxSize()) {
             if (showSelectDeliverableDialog){
+                LaunchedEffect(notSelectedGoalDeliverables.isEmpty()) {
+                    if (notSelectedGoalDeliverables.isEmpty()) viewModel.closeSelectDeliverableDialog()
+                }
                 Dialog(
                     onDismissRequest = {
                         viewModel.closeSelectDeliverableDialog()
@@ -410,7 +409,6 @@ fun EditGoalFragmentView(
                                                         goalId = newGoal.id
                                                     )
                                                 )
-                                                if (notSelectedGoalDeliverables.isEmpty()) viewModel.closeSelectDeliverableDialog()
                                             }
                                         }
                                     ) {

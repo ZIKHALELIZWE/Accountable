@@ -496,8 +496,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertNull(editGoalViewModel.originalDeliverable.value)
-        assertNotNull(editGoalViewModel.deliverable.value)
+        assertNull(editGoalViewModel.originalDeliverable.first())
+        assertNotNull(editGoalViewModel.deliverable.first())
 
         withTag(
             "TasksFragmentDeliverablesBottomSheet"
@@ -528,7 +528,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             "",
-            editGoalViewModel.deliverable.value?.first()?.deliverable
+            editGoalViewModel.deliverable.first()?.deliverable
         )
 
         withTag(
@@ -545,12 +545,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             "My Deliverable",
-            editGoalViewModel.deliverable.value?.first()?.deliverable
+            editGoalViewModel.deliverable.first()?.deliverable
         )
 
         assertEquals(
             "My New Location",
-            editGoalViewModel.deliverable.value?.first()?.location
+            editGoalViewModel.deliverable.first()?.location
         )
 
         withTag(
@@ -567,7 +567,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             "My Location",
-            editGoalViewModel.deliverable.value?.first()?.location
+            editGoalViewModel.deliverable.first()?.location
         )
 
 
@@ -581,12 +581,11 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNotNull(editGoalViewModel)
         assertNull(editGoalViewModel.editGoal.value)
 
-        assertNotNull(editGoalViewModel.deliverable.value)
-        assertNotNull(editGoalViewModel.deliverable.value?.first())
+        assertNotNull(editGoalViewModel.deliverable.first())
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
@@ -606,7 +605,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
         withTag("EditGoalFragmentDatePickerDialog") {
@@ -620,7 +619,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
@@ -640,7 +639,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
     }
 
@@ -655,7 +654,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
@@ -675,11 +674,11 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
-        assertNotNull(editGoalViewModel.deliverable.value?.first()?.endDateTime)
-        val previousEndDateTime = editGoalViewModel.deliverable.value?.first()?.endDateTime
+        assertNotNull(editGoalViewModel.deliverable.first()?.endDateTime)
+        val previousEndDateTime = editGoalViewModel.deliverable.first()?.endDateTime
 
         withTag(
             "EditGoalFragmentDatePickerDialog"
@@ -704,12 +703,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             previousEndDateTime,
-            editGoalViewModel.deliverable.value?.first()?.endDateTime
+            editGoalViewModel.deliverable.first()?.endDateTime
         )
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
@@ -729,7 +728,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
         withTag(
@@ -747,7 +746,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             previousEndDateTime,
-            editGoalViewModel.deliverable.value?.first()?.endDateTime
+            editGoalViewModel.deliverable.first()?.endDateTime
         )
 
         withTag(
@@ -773,7 +772,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             previousEndDateTime,
-            editGoalViewModel.deliverable.value?.first()?.endDateTime
+            editGoalViewModel.deliverable.first()?.endDateTime
         )
 
         activity.timeToAdd(2, 2)
@@ -813,7 +812,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
                     previousEndDateTime!!
                 ).value.plusDays(2)
             ),
-            editGoalViewModel.deliverable.value!!.first()!!.endDateTime
+            editGoalViewModel.deliverable.first()!!.endDateTime
         )
 
         withTag(
@@ -847,7 +846,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
                 endTimeDate.plusDays(2).withHour(timePickerState.hour)
                     .withMinute(timePickerState.minute)
             ),
-            editGoalViewModel.deliverable.value!!.first()!!.endDateTime
+            editGoalViewModel.deliverable.first()!!.endDateTime
         )
 
         activity.timeToAdd(0, 0)
@@ -862,12 +861,11 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNotNull(editGoalViewModel)
         assertNull(editGoalViewModel.editGoal.value)
 
-        assertNotNull(editGoalViewModel.deliverable.value)
-        assertNotNull(editGoalViewModel.deliverable.value?.first())
+        assertNotNull(editGoalViewModel.deliverable.first())
 
         assertEquals(
             Deliverable.DeliverableEndType.DATE.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
         withTag("TasksFragmentDeliverableSwitch") {
@@ -894,10 +892,10 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.GOAL.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
-        assertNull(editGoalViewModel.deliverable.value?.first()?.goalId)
+        assertNull(editGoalViewModel.deliverable.first()?.goalId)
 
         withTag("TasksFragmentDeliverableSwitch") {
             assertDoesNotExist()
@@ -920,10 +918,10 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
-        assertNull(editGoalViewModel.deliverable.value?.first()?.goalId)
+        assertNull(editGoalViewModel.deliverable.first()?.goalId)
 
         withTag("TasksFragmentDeliverableSwitch") {
             performPressWithScroll()
@@ -931,7 +929,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             editGoalViewModel.newGoal.first()?.id,
-            editGoalViewModel.deliverable.value?.first()?.goalId
+            editGoalViewModel.deliverable.first()?.goalId
         )
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
@@ -951,10 +949,10 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.GOAL.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
-        assertNull(editGoalViewModel.deliverable.value?.first()?.goalId)
+        assertNull(editGoalViewModel.deliverable.first()?.goalId)
     }
 
     /**
@@ -981,10 +979,10 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.GOAL.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
-        assertNull(editGoalViewModel.deliverable.value?.first()?.goalId)
+        assertNull(editGoalViewModel.deliverable.first()?.goalId)
 
         withTag("TasksFragmentDeliverableEndTypeButton") {
             performPressWithScroll()
@@ -1003,7 +1001,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.WORK.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
         //todo check if work views and values are present
@@ -1025,7 +1023,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
         // todo check if work views and values are gone
@@ -1041,14 +1039,14 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
-        assertNotNull(editGoalViewModel.deliverable.value?.first()?.times)
+        assertNotNull(editGoalViewModel.deliverable.first()?.times)
 
         TimeBlockTest(
             "TasksFragmentDeliverableAddTimeBlockButton",
-            editGoalViewModel.deliverable.value!!.first()!!.times,
+            editGoalViewModel.deliverable.first()!!.times,
             Triple(
                 instantTaskExecutorRule,
                 composeTestRule,
@@ -1067,11 +1065,11 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             Deliverable.DeliverableEndType.UNDEFINED.name,
-            editGoalViewModel.deliverable.value?.first()?.endType
+            editGoalViewModel.deliverable.first()?.endType
         )
 
-        assertNotNull(editGoalViewModel.deliverable.value?.first()?.times)
-        val savedDeliverable = editGoalViewModel.deliverable.value?.first()!!
+        assertNotNull(editGoalViewModel.deliverable.first()?.times)
+        val savedDeliverable = editGoalViewModel.deliverable.first()!!
 
         withTag(
             "TasksFragmentDeliverableProcessDeliverable"
@@ -1079,7 +1077,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertNull(editGoalViewModel.deliverable.value)
+        assertNull(editGoalViewModel.deliverable.first())
 
         withTag("TasksFragmentDeliverablesBottomSheet").assertDoesNotExist()
 
@@ -1235,6 +1233,10 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         databaseDeliverable = databaseDeliverableFlow!!
 
         assertNotNull(databaseDeliverable.goalId)
+        assertEquals(
+            0,
+            editGoalViewModel.newGoal.first()?.notSelectedGoalDeliverables?.first()?.size
+        )
         finishProcesses()
 
         withTag("EditGoalSelectDeliverableDialog") {
@@ -1266,6 +1268,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.newGoal.first()?.endType
         )
 
+        finishProcesses()
         withTag("EditGoalLazyColumn") {
             assertExists()
             assertIsDisplayed()
@@ -1276,18 +1279,18 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertNotNull(editGoalViewModel.originalDeliverable.value?.first())
-        assertNotNull(editGoalViewModel.deliverable.value?.first())
+        assertNotNull(editGoalViewModel.originalDeliverable.first())
+        assertNotNull(editGoalViewModel.deliverable.first())
 
         deliverablesAreEqual(
-            editGoalViewModel.originalDeliverable.value!!.first()!!,
-            editGoalViewModel.deliverable.value!!.first()!!,
+            editGoalViewModel.originalDeliverable.first()!!,
+            editGoalViewModel.deliverable.first()!!,
             false
         )
 
-        assertNotNull(editGoalViewModel.originalDeliverable.value?.first()?.times?.first()[0])
+        assertNotNull(editGoalViewModel.originalDeliverable.first()?.times?.first()[0])
 
-        val oldDeliverable = editGoalViewModel.originalDeliverable.value!!.first()!!
+        val oldDeliverable = editGoalViewModel.originalDeliverable.first()!!
 
         withTag(
             "TaskFragmentDeliverableDeliverableText"
@@ -1303,12 +1306,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             "My Deliverable (Edited)",
-            editGoalViewModel.deliverable.value?.first()?.deliverable
+            editGoalViewModel.deliverable.first()?.deliverable
         )
 
         assertEquals(
             "My Location",
-            editGoalViewModel.deliverable.value?.first()?.location
+            editGoalViewModel.deliverable.first()?.location
         )
 
         withTag(
@@ -1325,7 +1328,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(
             "My Location (Edited)",
-            editGoalViewModel.deliverable.value?.first()?.location
+            editGoalViewModel.deliverable.first()?.location
         )
 
         withTag(
@@ -1334,8 +1337,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertNull(editGoalViewModel.originalDeliverable.value?.first())
-        assertNull(editGoalViewModel.deliverable.value?.first())
+        assertNull(editGoalViewModel.originalDeliverable.first())
+        assertNull(editGoalViewModel.deliverable.first())
 
         val newDeliverable = editGoalViewModel.newGoal.first()?.goalDeliverables?.first()[0]
         assertNotNull(newDeliverable)
@@ -1362,6 +1365,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.newGoal.first()?.endType
         )
 
+        finishProcesses()
         withTag("EditGoalLazyColumn") {
             assertExists()
             assertIsDisplayed()
@@ -1372,20 +1376,21 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertNotNull(editGoalViewModel.originalDeliverable.value?.first())
-        assertNotNull(editGoalViewModel.deliverable.value?.first())
+        assertNotNull(editGoalViewModel.originalDeliverable.first())
+        assertNotNull(editGoalViewModel.deliverable.first())
 
         deliverablesAreEqual(
-            editGoalViewModel.originalDeliverable.value!!.first()!!,
-            editGoalViewModel.deliverable.value!!.first()!!,
+            editGoalViewModel.originalDeliverable.first()!!,
+            editGoalViewModel.deliverable.first()!!,
             false
         )
 
-        assertNotNull(editGoalViewModel.deliverable.value?.first()?.times?.first()[0])
+        assertNotNull(editGoalViewModel.deliverable.first()?.times?.first()[0])
 
-        val oldTime = editGoalViewModel.deliverable.value!!.first()!!.times.first()[0]
+        val oldTime = editGoalViewModel.deliverable.first()!!.times.first()[0]
         assertNotNull(oldTime.id)
 
+        finishProcesses()
         withTag("EditGoalTimeInputViewCard-${oldTime.id}"){
             assertExists()
             performScrollTo()
@@ -1418,7 +1423,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        val timeBlockList = editGoalViewModel.deliverable.value!!.first()!!.times
+        val timeBlockList = editGoalViewModel.deliverable.first()!!.times
         assertNotNull(
             Converters().toLocalDateTime(
                 timeBlockList.first()[0].start
@@ -1445,8 +1450,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertNull(editGoalViewModel.originalDeliverable.value?.first())
-        assertNull(editGoalViewModel.deliverable.value?.first())
+        assertNull(editGoalViewModel.originalDeliverable.first())
+        assertNull(editGoalViewModel.deliverable.first())
 
         databaseDeliverableFlow = activity.viewModel.repository.getDeliverable(1L).first()
         assertNotNull(databaseDeliverableFlow)
@@ -1477,6 +1482,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.newGoal.first()?.endType
         )
 
+        finishProcesses()
         withTag("EditGoalLazyColumn") {
             assertExists()
             assertIsDisplayed()
@@ -1487,22 +1493,22 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertNotNull(editGoalViewModel.originalDeliverable.value?.first())
-        assertNotNull(editGoalViewModel.deliverable.value?.first())
+        assertNotNull(editGoalViewModel.originalDeliverable.first())
+        assertNotNull(editGoalViewModel.deliverable.first())
 
         deliverablesAreEqual(
-            editGoalViewModel.originalDeliverable.value!!.first()!!,
-            editGoalViewModel.deliverable.value!!.first()!!,
+            editGoalViewModel.originalDeliverable.first()!!,
+            editGoalViewModel.deliverable.first()!!,
             false
         )
 
-        assertNotNull(editGoalViewModel.deliverable.value!!.first()!!.goalId)
+        assertNotNull(editGoalViewModel.deliverable.first()!!.goalId)
 
         withTag("TasksFragmentDeliverableSwitch"){
             performPressWithScroll()
         }
 
-        assertNull(editGoalViewModel.deliverable.value!!.first()!!.goalId)
+        assertNull(editGoalViewModel.deliverable.first()!!.goalId)
 
         withTag(
             "TasksFragmentDeliverableProcessDeliverable"
@@ -1510,8 +1516,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertNull(editGoalViewModel.originalDeliverable.value?.first())
-        assertNull(editGoalViewModel.deliverable.value?.first())
+        assertNull(editGoalViewModel.originalDeliverable.first())
+        assertNull(editGoalViewModel.deliverable.first())
 
         databaseDeliverableFlow = activity.viewModel.repository.getDeliverable(1L).first()
         assertNotNull(databaseDeliverableFlow)
@@ -1536,6 +1542,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNotNull(databaseDeliverableFlow)
         var databaseDeliverable = databaseDeliverableFlow!!
 
+        finishProcesses()
         withTag("EditGoalSelectDeliverableButton") {
             performPressWithScroll()
         }
@@ -1599,6 +1606,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     @Test
     fun `24 Add Goal Time Block`() = runTest(TestMainActivity.dispatcher) {
         val activity = getTestMainActivity()
+        finishProcesses()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
         assertNotNull(editGoalViewModel)

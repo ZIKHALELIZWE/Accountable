@@ -43,6 +43,7 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     @Test
     fun `1 coreClassesNotNull`() = runTest {
         val activity = getTestMainActivity()
+        finishProcesses()
         assertNotNull(activity)
         assertNotNull(activity.viewModel)
         assertNotNull(activity.viewModel.repository)
@@ -51,6 +52,7 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     @Test
     fun `2 currentFragmentIsHomeFragment`() = runTest {
         val activity = getTestMainActivity()
+        finishProcesses()
         assertNotNull(activity.viewModel.currentFragment.value)
         assertEquals(
             AccountableFragment.HomeFragment,
@@ -65,12 +67,14 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     @Test
     fun `3 directionIsNull`() = runTest {
         val activity = getTestMainActivity()
+        finishProcesses()
         assertNull(activity.viewModel.direction.value)
     }
 
     @Test
     fun `4 Main Activity Initialized`() = runTest {
         val activity = getTestMainActivity()
+        finishProcesses()
         assertNotNull(activity.viewModel.appSettings.value)
         assertNotNull(activity.viewModel.direction)
         assertNotNull(activity.viewModel.accountableNavigationController)
@@ -85,6 +89,7 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     @Test
     fun `5 Switch Fragments`() = runTest {
         val activity = getTestMainActivity()
+        finishProcesses()
         assertNull(activity.viewModel.direction.value)
         assertNotNull(activity.viewModel.currentFragment.value)
         assertEquals(
@@ -198,6 +203,7 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     @Test
     fun `6 Folders And Scripts Books Test`() = runTest {
         val activity = getTestMainActivity()
+        finishProcesses()
 
         switchToNavigationDrawer(activity, AccountableFragment.BooksFragment)
 
@@ -217,11 +223,11 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
         assertEquals(false,booksViewModel.showScripts.first())
         booksViewModel.switchFolderScript()
         finishProcesses()
-        assertNotNull(booksViewModel.scriptsList.first())
+        assertTrue(booksViewModel.scriptsList.first().isEmpty())
         assertEquals(true, booksViewModel.showScripts.first())
         booksViewModel.switchFolderScript()
         finishProcesses()
-        assertNull(booksViewModel.goalsList.first())
+        assertTrue(booksViewModel.goalsList.first().isEmpty())
         /*areEqual(-1L,
             repository.getScriptsOrGoalsFolderId().value,
             "Repository Folder ID")
