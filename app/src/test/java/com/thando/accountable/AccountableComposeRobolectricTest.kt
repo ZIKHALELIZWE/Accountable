@@ -1,12 +1,16 @@
 package com.thando.accountable
 
+import android.app.Application
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
@@ -14,6 +18,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.util.packInts
 import androidx.compose.ui.util.unpackInt1
 import androidx.compose.ui.util.unpackInt2
@@ -21,18 +26,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.CreationExtras
+import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.MainActivityTest.FilteredPrintStream
 import com.thando.accountable.MainActivityTest.Log
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.FixMethodOrder
 import org.junit.Rule
@@ -44,7 +50,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowLog
-import org.robolectric.shadows.ShadowLooper
 import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
@@ -55,7 +60,7 @@ import kotlin.reflect.full.findAnnotation
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34] ) // Force Robolectric to use API 34
+@Config(sdk = [34], application = TestApplication::class) // Force Robolectric to use API 34
 @LooperMode(LooperMode.Mode.LEGACY)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 abstract class AccountableComposeRobolectricTest(
@@ -65,8 +70,6 @@ abstract class AccountableComposeRobolectricTest(
         TestMainActivity
     >?=null
 ) {
-    val scope = TestScope(TestMainActivity.dispatcher)
-
     @get:Rule
     val instantTaskExecutorRule = parentParameters?.first ?: InstantTaskExecutorRule()
     @get:Rule
@@ -84,11 +87,16 @@ abstract class AccountableComposeRobolectricTest(
         Dispatchers.resetMain()
     }
 
-    fun getTestMainActivity(): TestMainActivity = outerGetTestMainActivity ?: innerGetTestMainActivity()
+    fun getTestMainActivity(): TestMainActivity {
+        val activity = outerGetTestMainActivity ?: innerGetTestMainActivity()
+        finishProcesses()
+        return activity
+    }
 
     private fun innerGetTestMainActivity(): TestMainActivity {
-        val activity = Robolectric.buildActivity(TestMainActivity::class.java)
-            .setup().get()
+        val activity = Robolectric.buildActivity(
+            TestMainActivity::class.java
+        ).setup().get()
         finishProcesses()
         return activity
     }
@@ -122,6 +130,14 @@ abstract class AccountableComposeRobolectricTest(
         finishProcesses()
     }
 
+    fun SemanticsNodeInteraction.performLongPressWithoutScroll(){
+        assertExists()
+        assertIsDisplayed()
+        assert(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick))
+        performSemanticsAction(SemanticsActions.OnLongClick)
+        finishProcesses()
+    }
+
     fun finishProcesses() = runTest {
         TestMainActivity.dispatcher.scheduler.advanceUntilIdle()
         advanceUntilIdle()
@@ -129,12 +145,25 @@ abstract class AccountableComposeRobolectricTest(
         TestMainActivity.dispatcher.scheduler.advanceUntilIdle()
     }
 
+    fun checkFragmentIs(
+        activity: MainActivity,
+        expectedFragment: AccountableFragment,
+        expectedViewModel: String
+    ) {
+        finishProcesses()
+        assertEquals(
+            expectedFragment,
+            activity.viewModel.currentFragment.value
+        )
+        assertEquals(
+            expectedViewModel,
+            activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+        )
+    }
+
     private fun getTestFunctions(): List<KFunction<*>> {
         return this::class.declaredMemberFunctions
             .filter { it.findAnnotation<Test>() != null}
-            .map {
-                it
-            }
     }
 
     object LogTest {
@@ -181,12 +210,16 @@ abstract class AccountableComposeRobolectricTest(
 
     @OptIn(ExperimentalMaterial3Api::class)
     class TestMainActivity : MainActivity() {
-        val jvmTempDir = File(System.getProperty("java.io.tmpdir"), "robolectricFiles")
         private var daysToAdd = 0L
         private var timeToAdd = packInts(0,0)
 
         override fun getFilesDir(): File {
-            return jvmTempDir
+            return try {
+                (application as TestApplication).jvmTempDir
+            } catch (e: Exception){
+                LogTest.e("Files Dir Change Failed", e.message?:"")
+                super.getFilesDir()
+            }
         }
 
         fun daysToAdd (input: Long) {
@@ -270,22 +303,14 @@ abstract class AccountableComposeRobolectricTest(
                 this.hour = if ((totalMinutes/60)>23) 23 else (totalMinutes / 60) % 24
                 this.minute = if ((totalMinutes/60)>23) 59 else totalMinutes % 60
             }
-
-            /*fun logDirectoryContents(dir: File) {
-                if (!dir.exists() || !dir.isDirectory) {
-                    LogTest.i("DirLogger", "Invalid directory: ${dir.absolutePath}")
-                    return
-                }
-                fun walk(file: File, indent: String = "") {
-                    LogTest.i("DirLogger", "$indent${file.name}: Children = ${file.listFiles()?.size}")
-                    if (file.isDirectory) {
-                        file.listFiles()?.forEach { child ->
-                            walk(child, "$indent ")
-                        }
-                    }
-                }
-                walk(dir)
-            }*/
         }
+    }
+}
+
+class TestApplication : Application() {
+    var jvmTempDir = File(System.getProperty("java.io.tmpdir"), "robolectricFiles")
+
+    override fun getFilesDir(): File {
+        return jvmTempDir
     }
 }

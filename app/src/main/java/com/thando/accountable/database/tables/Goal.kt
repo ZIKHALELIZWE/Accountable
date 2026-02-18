@@ -31,9 +31,6 @@ data class Goal(
     @ColumnInfo (name = "goal_parent")
     var parent: Long,
 
-    @ColumnInfo (name = "goal_category")
-    var goalCategory: String = "",
-
     @ColumnInfo (name = "goal_date_time")
     var initialDateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
@@ -203,7 +200,9 @@ data class Goal(
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun getUri(context: Context): Flow<ImageBitmap?> = imageResource.getUri(context).mapLatest { scriptUri ->
-        scriptUri?.let { AppResources.getBitmapFromUri(context, it)?.asImageBitmap() }
+    fun getImageBitmap(context: Context): Flow<ImageBitmap?> = imageResource.getUri(context).mapLatest { scriptUri ->
+        scriptUri?.let {
+            AppResources.getBitmapFromUri(context, it)?.asImageBitmap()
+        }
     }.flowOn(MainActivity.IO)
 }

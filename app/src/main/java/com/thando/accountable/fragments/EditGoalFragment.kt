@@ -192,7 +192,7 @@ fun EditGoalView(
                     )) },
                     navigationIcon = {
                         IconButton(
-                            modifier = Modifier,
+                            modifier = Modifier.testTag("EditGoalCloseGoalButton"),
                             onClick = { scope.launch { viewModel.closeGoal() } }
                         )
                         {
@@ -296,7 +296,7 @@ fun EditGoalFragmentView(
                 }
         }
 
-        val imageBitmap by newGoal.getUri(context).collectAsStateWithLifecycle(null)
+        val imageBitmap by newGoal.getImageBitmap(context).collectAsStateWithLifecycle(null)
         val goal = remember { TextFieldState(newGoal.goal) }
         val location = remember { TextFieldState(newGoal.location) }
 

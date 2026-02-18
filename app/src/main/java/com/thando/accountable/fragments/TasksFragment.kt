@@ -74,7 +74,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -111,17 +110,13 @@ import com.thando.accountable.fragments.viewmodels.TaskViewModel
 import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.cards.ColourPickerDialog
 import com.thando.accountable.ui.theme.AccountableTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.Period
@@ -179,7 +174,7 @@ fun TaskView(
 
     AccountableTheme {
         goal?.let { goal ->
-            val image by goal.getUri(context).collectAsStateWithLifecycle(null)
+            val image by goal.getImageBitmap(context).collectAsStateWithLifecycle(null)
             val goalColour by remember { mutableIntStateOf( goal.colour) }
 
             Scaffold(
@@ -193,7 +188,7 @@ fun TaskView(
                                 bitmap = image,
                                 contentDescription = stringResource(R.string.goal_display_image),
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.matchParentSize()
+                                modifier = Modifier.matchParentSize().testTag("TasksImage")
                             )
                         }
 

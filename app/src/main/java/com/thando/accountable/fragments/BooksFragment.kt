@@ -536,7 +536,7 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
                     Row {
                         bottomSheet.onEditClickListener?.let {
                             Button(
-                                modifier = Modifier
+                                modifier = Modifier.testTag("BooksFragmentBottomSheetEditButton")
                                     .weight(1f)
                                     .fillMaxWidth(),
                                 shape = RectangleShape,
@@ -551,7 +551,7 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
                                     viewModel.bottomSheetListeners.update { null }
                                 }
                             ) {
-                                Icon(
+                                MainActivity.Icon(
                                     imageVector = Icons.Default.Edit,
                                     contentDescription = stringResource(R.string.bottom_sheet_edit_button)
                                 )
@@ -573,7 +573,7 @@ fun FoldersAndScriptsFragmentView(modifier: Modifier = Modifier,
                                 viewModel.bottomSheetListeners.update { null }
                             }
                         ) {
-                            Icon(
+                            MainActivity.Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = stringResource(R.string.bottom_sheet_delete_button)
                             )
@@ -940,7 +940,7 @@ fun GoalCard(
         val location = remember { TextFieldState(goal.location) }
         val goalColour by remember { mutableIntStateOf(goal.colour) }
         val imageBitmap by combine(
-            goal.getUri(context),
+            goal.getImageBitmap(context),
             contentPreview.getDisplayImage(context)
         ) { goalImage, displayImage ->
             goalImage?:displayImage
@@ -952,7 +952,7 @@ fun GoalCard(
         val numDocuments by contentPreview.getNumDocuments().collectAsStateWithLifecycle(0)
         val numScript by contentPreview.getNumScripts().collectAsStateWithLifecycle(0)
         Card(
-            modifier = modifier
+            modifier = modifier.testTag("BooksFragmentGoalCard-${goal.id}")
                 .fillMaxWidth()
                 .wrapContentHeight()
                 .combinedClickable(

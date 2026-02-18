@@ -35,7 +35,7 @@ import java.time.ZoneOffset
     Task::class,
     Deliverable::class,
     Marker::class
-], version = 11, exportSchema = false)
+], version = 12, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AccountableDatabase: RoomDatabase() {
     abstract val repositoryDao : RepositoryDao
@@ -160,6 +160,9 @@ abstract class AccountableDatabase: RoomDatabase() {
                             db.execSQL("ALTER TABLE times_table ADD times_clone_id INTEGER DEFAULT ${null} NULL")
                             db.execSQL("ALTER TABLE task_table ADD task_clone_id INTEGER DEFAULT ${null} NULL")
                             db.execSQL("ALTER TABLE marker_table ADD marker_clone_id INTEGER DEFAULT ${null} NULL")
+                        },
+                        Migration(11,12){ db ->
+                            db.execSQL("ALTER TABLE goal_table DROP COLUMN goal_category")
                         }
                     )
                     .build()

@@ -68,12 +68,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.TestDispatcher
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
-import org.junit.rules.TestWatcher
-import org.junit.runner.Description
+import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 
 open class MainActivity : ComponentActivity() {
@@ -172,21 +167,21 @@ open class MainActivity : ComponentActivity() {
             Log.i("FATAL EXCEPTION",message)
         }
 
-        class MainDispatcherRule @OptIn(ExperimentalCoroutinesApi::class) constructor(
-            private val testDispatcher: TestDispatcher = UnconfinedTestDispatcher()
-        ) : TestWatcher() {
-
-            @OptIn(ExperimentalCoroutinesApi::class)
-            override fun starting(description: Description) {
-                Dispatchers.setMain(testDispatcher)
+        fun logDirectoryContents(dir: File) {
+            if (!dir.exists() || !dir.isDirectory) {
+                log("DirLogger: Invalid directory: ${dir.absolutePath}")
+                return
             }
-
-            @OptIn(ExperimentalCoroutinesApi::class)
-            override fun finished(description: Description) {
-                Dispatchers.resetMain()
+            fun walk(file: File, indent: String = "") {
+                log("DirLogger: $indent${file.name}: Children = ${file.listFiles()?.size}")
+                if (file.isDirectory) {
+                    file.listFiles()?.forEach { child ->
+                        walk(child, "$indent ")
+                    }
+                }
             }
+            walk(dir)
         }
-
 
         // Default implementation points to Material3 Icon
         var iconImpl: @Composable (ImageVector, String, Color?) -> Unit =

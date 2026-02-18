@@ -16,6 +16,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
@@ -24,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import com.thando.accountable.AccountableComposeRobolectricTest
 import com.thando.accountable.AccountableComposeRobolectricTest.TestMainActivity.Companion.addTime
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
-import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
@@ -69,26 +69,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             AccountableFragment.HomeFragment,
             activity.viewModel.currentFragment.value
         )
-        assertEquals(
-            AccountableFragment.HomeFragment,
-            activity.viewModel.currentFragment.value
-        )
-    }
-
-    fun checkFragmentIs(
-        activity: MainActivity,
-        expectedFragment: AccountableFragment,
-        expectedViewModel: String
-    ) {
-        composeTestRule.waitForIdle()
-        assertEquals(
-            expectedFragment,
-            activity.viewModel.currentFragment.value
-        )
-        assertEquals(
-            expectedViewModel,
-            activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
-        )
     }
 
     @Test
@@ -107,7 +87,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         }
 
         checkFragmentIs(
-            activity, AccountableFragment.GoalsFragment,
+            activity,
+            AccountableFragment.GoalsFragment,
             BooksViewModel::class.java.name
         )
     }
@@ -115,17 +96,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     @Test
     fun `04 Is In AppSettings Base, Set To Goals And Is Empty`() = runTest(TestMainActivity.dispatcher) {
         val activity = getTestMainActivity()
-        assertEquals(
+        checkFragmentIs(
+            activity,
             AccountableFragment.GoalsFragment,
-            activity.viewModel.currentFragment.value
+            BooksViewModel::class.java.name
         )
-        assertEquals(
-            BooksViewModel::class.java.name,
-            activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
-        )
-        val booksViewModel: BooksViewModel =
-            activity.viewModel.accountableNavigationController.fragmentViewModel.value!! as BooksViewModel
-
+        val booksViewModel: BooksViewModel = getViewModel(activity)
         assertNull(booksViewModel.folder.value)
         assertNotNull(booksViewModel.appSettings.value)
         assertNotNull(booksViewModel.showScripts.first())
@@ -219,7 +195,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertNull(editGoalViewModel.newGoal.first()?.getGoalPicture())
 
-        assertNull(editGoalViewModel.newGoal.first()?.getUri(activity)?.first())
+        assertNull(editGoalViewModel.newGoal.first()?.getImageBitmap(activity)?.first())
 
         withTag("EditGoalImage") {
             assertDoesNotExist()
@@ -245,7 +221,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         finishProcesses()
 
         assertNotNull(editGoalViewModel.newGoal.first()?.getGoalPicture())
-        assertNotNull(editGoalViewModel.newGoal.first()?.getUri(activity)?.first())
+        assertNotNull(editGoalViewModel.newGoal.first()?.getImageBitmap(activity)?.first())
 
         withTag("EditGoalImage") {
             assertExists()
@@ -265,7 +241,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         finishProcesses()
 
         assertNull(editGoalViewModel.newGoal.first()?.getGoalPicture())
-        assertNull(editGoalViewModel.newGoal.first()?.getUri(activity)?.first())
+        assertNull(editGoalViewModel.newGoal.first()?.getImageBitmap(activity)?.first())
 
         withTag("EditGoalImage") {
             assertDoesNotExist()
@@ -364,7 +340,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.newGoal.first()?.endType
         )
 
-        finishProcesses()
         withTag("EditGoalEndTypeButton") {
             performPressWithScroll()
         }
@@ -418,7 +393,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             Goal.GoalEndType.UNDEFINED.name,
             editGoalViewModel.newGoal.first()?.endType
         )
-        finishProcesses()
 
         DateAndTimePickerTest(
             getTimeAsLong = { editGoalViewModel.newGoal.first()?.endDateTime },
@@ -447,7 +421,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             Goal.GoalEndType.DATE.name,
             editGoalViewModel.newGoal.first()?.endType
         )
-        finishProcesses()
 
         withTag("EditGoalEndTypeButton") {
             performPressWithScroll()
@@ -1109,7 +1082,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     private fun deliverablesAreEqual(
         deliverableOne:Deliverable,
         deliverableTwo:Deliverable,
-        idsEqual:Boolean = true
+        idsEqual:Boolean = true,
+        parentsEqual:Boolean = true
     ) = runTest(TestMainActivity.dispatcher) {
         val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
             {objectA, objectB -> assertEquals(objectA,objectB)}
@@ -1145,16 +1119,17 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             deliverableOne.endType,
             deliverableTwo.endType
         )
-        assertEquals(
-            deliverableOne.parent,
-            deliverableTwo.parent
-        )
+        if (parentsEqual) assertEquals(
+                deliverableOne.parent,
+                deliverableTwo.parent
+            )
+        else assertNotEquals(deliverableOne.parent,deliverableTwo.parent)
         assertEquals(
             deliverableOne.times.first().size,
             deliverableTwo.times.first().size
         )
 
-        if (!idsEqual) {
+        if (!idsEqual && parentsEqual) {
             assertEquals(deliverableOne.id,deliverableTwo.cloneId)
         }
 
@@ -1164,7 +1139,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             timesAreEqual(
                 timeOne,
                 timeTwo,
-                idsEqual = idsEqual
+                idsEqual = idsEqual,
+                parentsEqual = parentsEqual
             )
         }
     }
@@ -1172,7 +1148,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     private fun timesAreEqual(
         timeOne: GoalTaskDeliverableTime,
         timeTwo: GoalTaskDeliverableTime,
-        idsEqual:Boolean = true
+        idsEqual:Boolean = true,
+        parentsEqual: Boolean = true
     ) = runTest(TestMainActivity.dispatcher) {
         val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
             {objectA, objectB -> assertEquals(objectA,objectB)}
@@ -1180,7 +1157,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertionFunction(timeOne.id, timeTwo.id)
 
-        assertionFunction(timeOne.parent,timeTwo.parent)
+        if (parentsEqual) assertionFunction(timeOne.parent,timeTwo.parent)
+        else assertNotEquals(timeOne.parent,timeTwo.parent)
 
         assertEquals(timeOne.type,timeTwo.type)
 
@@ -1190,7 +1168,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertEquals(timeOne.duration,timeTwo.duration)
 
-        if (!idsEqual) {
+        if (!idsEqual && parentsEqual) {
             assertEquals(timeOne.id,timeTwo.cloneId)
         }
     }
@@ -1206,7 +1184,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         var databaseDeliverableFlow = activity.viewModel.repository.getDeliverable(1L).first()
         assertNotNull(databaseDeliverableFlow)
         var databaseDeliverable = databaseDeliverableFlow!!
-        finishProcesses()
 
         withTag("EditGoalSelectDeliverableButton") {
             performPressWithScroll()
@@ -1268,7 +1245,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.newGoal.first()?.endType
         )
 
-        finishProcesses()
         withTag("EditGoalLazyColumn") {
             assertExists()
             assertIsDisplayed()
@@ -1365,7 +1341,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.newGoal.first()?.endType
         )
 
-        finishProcesses()
         withTag("EditGoalLazyColumn") {
             assertExists()
             assertIsDisplayed()
@@ -1482,7 +1457,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.newGoal.first()?.endType
         )
 
-        finishProcesses()
         withTag("EditGoalLazyColumn") {
             assertExists()
             assertIsDisplayed()
@@ -1542,7 +1516,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNotNull(databaseDeliverableFlow)
         var databaseDeliverable = databaseDeliverableFlow!!
 
-        finishProcesses()
         withTag("EditGoalSelectDeliverableButton") {
             performPressWithScroll()
         }
@@ -1606,7 +1579,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     @Test
     fun `24 Add Goal Time Block`() = runTest(TestMainActivity.dispatcher) {
         val activity = getTestMainActivity()
-        finishProcesses()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
         assertNotNull(editGoalViewModel)
@@ -1630,5 +1602,319 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             ),
             lazyColumnTag = "EditGoalLazyColumn"
         ).runTests(this@EditGoalTests::class)
+    }
+
+    private fun goalsAreEqual(
+        goalOne:Goal,
+        goalTwo:Goal,
+        idsEqual:Boolean = true,
+        timesAndDeliverables:Pair<List<GoalTaskDeliverableTime>, List<Deliverable>>? = null
+    ) = runTest(TestMainActivity.dispatcher) {
+        val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
+            {objectA, objectB -> assertEquals(objectA,objectB)}
+        else {objectA, objectB -> assertNotEquals(objectA,objectB)}
+
+        assertionFunction(
+            goalOne.id,
+            goalTwo.id
+        )
+
+        assertEquals(
+            goalOne.parent,
+            goalTwo.parent
+        )
+
+        assertEquals(
+            goalOne.initialDateTime,
+            goalTwo.initialDateTime
+        )
+        assertEquals(
+            goalOne.position,
+            goalTwo.position
+        )
+        assertEquals(
+            goalOne.scrollPosition,
+            goalTwo.scrollPosition
+        )
+        assertEquals(
+            goalOne.goal,
+            goalTwo.goal
+        )
+        assertEquals(
+            goalOne.dateOfCompletion,
+            goalTwo.dateOfCompletion
+        )
+        assertEquals(
+            goalOne.endDateTime,
+            goalTwo.endDateTime
+        )
+        assertEquals(
+            goalOne.endType,
+            goalTwo.endType
+        )
+        assertionFunction(
+            goalOne.getGoalPicture(),
+            goalTwo.getGoalPicture()
+        )
+        assertEquals(
+            goalOne.status,
+            goalTwo.status
+        )
+        assertEquals(
+            goalOne.colour,
+            goalTwo.colour
+        )
+        assertEquals(
+            goalOne.location,
+            goalTwo.location
+        )
+        assertEquals(
+            goalOne.selectedTab,
+            goalTwo.selectedTab
+        )
+        assertEquals(
+            goalOne.tabListState,
+            goalTwo.tabListState
+        )
+
+        assertEquals(
+            (timesAndDeliverables?.first?:goalOne.times.first()).size,
+            goalTwo.times.first().size
+        )
+
+        assertEquals(
+            (timesAndDeliverables?.second?:goalOne.goalDeliverables.first()).size,
+            goalTwo.goalDeliverables.first().size
+        )
+
+        if (!idsEqual && timesAndDeliverables == null) {
+            assertEquals(goalOne.id, goalTwo.cloneId)
+        }
+
+        val deliverablesTwoList = goalTwo.goalDeliverables.first()
+        (timesAndDeliverables?.second?:goalOne.goalDeliverables.first()).forEachIndexed { index, deliverableOne ->
+            val deliverableTwo = deliverablesTwoList[index]
+            deliverablesAreEqual(
+                deliverableOne,
+                deliverableTwo,
+                idsEqual = idsEqual,
+                parentsEqual = idsEqual
+            )
+        }
+
+        val timesTwoList = goalTwo.times.first()
+        (timesAndDeliverables?.first?:goalOne.times.first()).forEachIndexed { index, timeOne ->
+            val timeTwo = timesTwoList[index]
+            timesAreEqual(
+                timeOne,
+                timeTwo,
+                idsEqual = idsEqual,
+                parentsEqual = idsEqual
+            )
+        }
+    }
+
+    @Test
+    fun `25 Save Goal`() = runTest(TestMainActivity.dispatcher) {
+        val activity = getTestMainActivity()
+
+        val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
+        assertNotNull(editGoalViewModel)
+        assertNull(editGoalViewModel.editGoal.value)
+
+        val databaseDeliverableFlow = activity.viewModel.repository.getDeliverable(1L).first()
+        assertNotNull(databaseDeliverableFlow)
+        val databaseDeliverable = databaseDeliverableFlow!!
+
+        withTag("EditGoalSelectDeliverableButton") {
+            performPressWithScroll()
+        }
+
+        withTag("EditGoalSelectDeliverableDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("EditGoalPickDeliverableRow-${databaseDeliverable.id}") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("EditGoalPickDeliverableButton-${databaseDeliverable.id}") {
+            performPressWithScroll()
+        }
+
+        val goal = editGoalViewModel.newGoal.first()
+        val deliverables = goal?.goalDeliverables?.first()
+        val times = goal?.times?.first()
+
+        withTag("EditGoalSaveAndCloseIconButton") {
+            performPressWithoutScroll()
+        }
+
+        assertEquals(
+            AccountableFragment.GoalsFragment,
+            activity.viewModel.currentFragment.value
+        )
+        assertEquals(
+            BooksViewModel::class.java.name,
+            activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
+        )
+        val booksViewModel: BooksViewModel = getViewModel(activity)
+        assertNull(booksViewModel.folder.value)
+        assertNotNull(booksViewModel.appSettings.value)
+        assertNotNull(booksViewModel.showScripts.first())
+
+        assertTrue(booksViewModel.showScripts.first())
+        assertTrue(booksViewModel.goalsList.first().isNotEmpty())
+        assertTrue(booksViewModel.foldersList.first().isEmpty())
+        assertTrue(booksViewModel.scriptsList.first().isEmpty())
+
+        assertEquals(1, booksViewModel.goalsList.first().size)
+
+        assertNotNull(goal)
+        assertNotNull(times)
+        assertNotNull(deliverables)
+
+        goalsAreEqual(
+            goal!!,
+            booksViewModel.goalsList.first()[0],
+            false,
+            Pair(times!!,deliverables!!)
+        )
+    }
+
+    @Test
+    fun `26 Edit Goal`() = runTest(TestMainActivity.dispatcher) {
+        val activity = getTestMainActivity()
+        var booksViewModel: BooksViewModel = getViewModel(activity)
+        assertTrue(booksViewModel.goalsList.first().isNotEmpty())
+        assertNotNull(booksViewModel.goalsList.first()[0].id)
+        val goal = activity.viewModel.repository.getGoal(booksViewModel.goalsList.first()[0].id).first()
+        assertNotNull(goal)
+        withTag("BooksFragmentGoalCard-${goal!!.id}"){
+            performLongPressWithoutScroll()
+        }
+
+        withTag("BooksFragmentBottomSheetEditButton") {
+            performPressWithoutScroll()
+        }
+
+        var editGoalViewModel: EditGoalViewModel = getViewModel(activity)
+        assertNotNull(editGoalViewModel)
+        assertNotNull(editGoalViewModel.editGoal.value)
+        assertNotNull(editGoalViewModel.newGoal.first())
+
+        goalsAreEqual(goal,editGoalViewModel.editGoal.value!!)
+        goalsAreEqual(
+            editGoalViewModel.editGoal.value!!,
+            editGoalViewModel.newGoal.first()!!,
+            idsEqual = false
+        )
+
+        withTag("EditGoalSaveAndCloseIconButton") {
+            performPressWithoutScroll()
+        }
+
+        booksViewModel = getViewModel(activity)
+
+        assertEquals(1, booksViewModel.goalsList.first().size)
+        assertNotNull(booksViewModel.goalsList.first()[0].id)
+        assertNotNull(activity.viewModel.repository.getGoal(booksViewModel.goalsList.first()[0].id).first())
+        goalsAreEqual(
+            goal,
+            activity.viewModel.repository.getGoal(booksViewModel.goalsList.first()[0].id).first()!!
+        )
+
+        withTag("BooksFragmentGoalCard-${goal.id}"){
+            performLongPressWithoutScroll()
+        }
+
+        withTag("BooksFragmentBottomSheetEditButton") {
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalCloseGoalButton") {
+            performPressWithoutScroll()
+        }
+
+        booksViewModel = getViewModel(activity)
+
+        assertEquals(1, booksViewModel.goalsList.first().size)
+        assertNotNull(booksViewModel.goalsList.first()[0].id)
+        assertNotNull(activity.viewModel.repository.getGoal(booksViewModel.goalsList.first()[0].id).first())
+        goalsAreEqual(
+            goal,
+            activity.viewModel.repository.getGoal(booksViewModel.goalsList.first()[0].id).first()!!
+        )
+
+        // Changing the values now
+        withTag("BooksFragmentGoalCard-${goal.id}"){
+            performLongPressWithoutScroll()
+        }
+
+        withTag("BooksFragmentBottomSheetEditButton") {
+            performPressWithoutScroll()
+        }
+
+        editGoalViewModel = getViewModel(activity)
+        assertNotNull(editGoalViewModel)
+        assertNotNull(editGoalViewModel.editGoal.value)
+        assertNotNull(editGoalViewModel.newGoal.first())
+
+        checkFragmentIs(
+            activity,
+            AccountableFragment.EditGoalFragment,
+            EditGoalViewModel::class.java.name
+        )
+
+        withTag("EditGoalTitle") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextEquals(activity.getString(R.string.edit_goal))
+        }
+
+        withTag("EditGoalLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToIndex(0)
+        }
+
+        withTag("EditGoalGoal") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains("My New Goal")
+            performTextReplacement("Edited Goal")
+            assertTextContains("Edited Goal")
+        }
+        finishProcesses()
+
+        withTag("EditGoalLocation") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains("My New Location")
+            performTextReplacement("Edited Location")
+            assertTextContains("Edited Location")
+        }
+        finishProcesses()
+
+        withTag("EditGoalSaveAndCloseIconButton") {
+            performPressWithoutScroll()
+        }
+
+        booksViewModel = getViewModel(activity)
+
+        assertEquals(1, booksViewModel.goalsList.first().size)
+        assertNotNull(booksViewModel.goalsList.first()[0].id)
+        assertNotNull(activity.viewModel.repository.getGoal(booksViewModel.goalsList.first()[0].id).first())
+        val editedGoal = activity.viewModel.repository.getGoal(booksViewModel.goalsList.first()[0].id).first()!!
+        assertNotEquals(
+            goal.goal,editedGoal.goal
+        )
+        assertNotEquals(
+            goal.location,editedGoal.goal
+        )
     }
 }

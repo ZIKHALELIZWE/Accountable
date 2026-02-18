@@ -2132,7 +2132,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
         from?.let { from ->
             to.value?.let { to ->
                 to.parent = from.parent
-                to.goalCategory = from.goalCategory
                 to.initialDateTime = from.initialDateTime
                 to.position = from.position
                 to.scrollPosition = from.scrollPosition
@@ -2201,7 +2200,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             cloneDeliverableTo(
                                 fromMutable,
                                 toMutable,
-                                setCloneId
+                                setCloneId,
+                                false
                             )
                         }
                     }
@@ -2347,11 +2347,12 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun cloneDeliverableTo(
         from: MutableStateFlow<Flow<Deliverable?>?>,
         to: MutableStateFlow<Flow<Deliverable?>?>,
-        setCloneId:Boolean
+        setCloneId:Boolean,
+        cloneParent:Boolean = true
     ) {
         from.value?.first()?.let { from ->
             to.value?.first()?.let { to ->
-                to.parent = from.parent
+                if (cloneParent) to.parent = from.parent
                 to.position = from.position
                 to.initialDateTime = from.initialDateTime
                 to.endDateTime = from.endDateTime
