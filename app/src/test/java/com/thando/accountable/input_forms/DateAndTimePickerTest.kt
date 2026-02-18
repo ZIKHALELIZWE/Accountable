@@ -20,11 +20,11 @@ import org.junit.runners.MethodSorters
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class DateAndTimePickerTest(
     val getTimeAsLong: suspend ()->Long?,
-    val getExpectedEndType:()->String,
-    val getActualEndType: suspend ()->String?,
-    val endTypeButtonTag: suspend ()->String,
-    val dropDownMenuTag: suspend ()->String,
-    val dropDownMenuItemTag: suspend ()->String,
+    val getExpectedEndType:(()->String)?,
+    val getActualEndType: (suspend ()->String?)?,
+    val endTypeButtonTag: (suspend ()->String)?,
+    val dropDownMenuTag: (suspend ()->String)?,
+    val dropDownMenuItemTag: (suspend ()->String)?,
     val selectDateAndTimeButtonTag: String? = null,
     parentParameters:Triple<
             InstantTaskExecutorRule,
@@ -35,24 +35,34 @@ class DateAndTimePickerTest(
     parentParameters
 ) {
     @Test
-    fun `01 Can Cancel Date Picker Test`() = runTest {
-        withTag(endTypeButtonTag()) {
-            performPressWithScroll()
+    fun `01 Can Cancel Date Picker Test`() = runTest(TestMainActivity.dispatcher) {
+        endTypeButtonTag?.let {
+            withTag(endTypeButtonTag()) {
+                performPressWithScroll()
+            }
         }
 
-        withTag(dropDownMenuTag()) {
-            assertExists()
-            assertIsDisplayed()
+        dropDownMenuTag?.let {
+            withTag(dropDownMenuTag()) {
+                assertExists()
+                assertIsDisplayed()
+            }
         }
 
-        withTag(dropDownMenuItemTag()) {
-            performPressWithoutScroll()
+        dropDownMenuItemTag?.let {
+            withTag(dropDownMenuItemTag()) {
+                performPressWithoutScroll()
+            }
         }
 
-        assertEquals(
-            getExpectedEndType(),
-            getActualEndType()
-        )
+        getExpectedEndType?.let {
+            getActualEndType?.let {
+                assertEquals(
+                    getExpectedEndType(),
+                    getActualEndType()
+                )
+            }
+        }
 
         val previousEndDateTime = getTimeAsLong()
         assertNotNull(previousEndDateTime)
@@ -89,35 +99,49 @@ class DateAndTimePickerTest(
             getTimeAsLong()
         )
 
-        assertEquals(
-            getExpectedEndType(),
-            getActualEndType()
-        )
+        getExpectedEndType?.let {
+            getActualEndType?.let {
+                assertEquals(
+                    getExpectedEndType(),
+                    getActualEndType()
+                )
+            }
+        }
     }
 
     @Test
-    fun `02 Select Same Date Test`() = runTest {
+    fun `02 Select Same Date Test`() = runTest(TestMainActivity.dispatcher) {
         val previousEndDateTime = getTimeAsLong()
         assertNotNull(previousEndDateTime)
-        withTag(endTypeButtonTag()) {
-            performPressWithScroll()
+        endTypeButtonTag?.let {
+            withTag(endTypeButtonTag()) {
+                performPressWithScroll()
+            }
         }
 
-        withTag(dropDownMenuTag()) {
-            assertExists()
-            assertIsDisplayed()
+        dropDownMenuTag?.let {
+            withTag(dropDownMenuTag()) {
+                assertExists()
+                assertIsDisplayed()
+            }
         }
 
-        withTag(
-            dropDownMenuItemTag()
-        ) {
-            performPressWithoutScroll()
+        dropDownMenuItemTag?.let {
+            withTag(
+                dropDownMenuItemTag()
+            ) {
+                performPressWithoutScroll()
+            }
         }
 
-        assertEquals(
-            getExpectedEndType(),
-            getActualEndType()
-        )
+        getExpectedEndType?.let {
+            getActualEndType?.let {
+                assertEquals(
+                    getExpectedEndType(),
+                    getActualEndType()
+                )
+            }
+        }
 
         selectDateAndTimeButtonTag?.let {
             withTag(it) {
@@ -171,26 +195,32 @@ class DateAndTimePickerTest(
     }
 
     @Test
-    fun `03 Select Different Date And Time Test`() = runTest {
+    fun `03 Select Different Date And Time Test`() = runTest(TestMainActivity.dispatcher) {
         val activity = getTestMainActivity()
         val previousEndDateTime = getTimeAsLong()
 
         activity.timeToAdd(2, 2)
         activity.daysToAdd(2)
 
-        withTag(endTypeButtonTag()) {
-            performPressWithScroll()
+        endTypeButtonTag?.let {
+            withTag(endTypeButtonTag()) {
+                performPressWithScroll()
+            }
         }
 
-        withTag(dropDownMenuTag()) {
-            assertExists()
-            assertIsDisplayed()
+        dropDownMenuTag?.let {
+            withTag(dropDownMenuTag()) {
+                assertExists()
+                assertIsDisplayed()
+            }
         }
 
-        withTag(
-            dropDownMenuItemTag()
-        ) {
-            performPressWithoutScroll()
+        dropDownMenuItemTag?.let {
+            withTag(
+                dropDownMenuItemTag()
+            ) {
+                performPressWithoutScroll()
+            }
         }
 
         selectDateAndTimeButtonTag?.let {

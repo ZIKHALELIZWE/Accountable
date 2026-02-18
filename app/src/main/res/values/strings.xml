@@ -314,4 +314,10 @@
     <string name="select_deliverables">Select Deliverables</string>
     <string name="delete_deliverable">Delete Deliverable</string>
     <string name="image_not_found">Image Not Found</string>
+    <string name="once">Once</string>
+    <string name="daily">Daily</string>
+    <string name="weekly">Weekly</string>
+    <string name="monthly">Monthly</string>
+    <string name="yearly">Yearly</string>
+    <string name="back_button">Back Button</string>
 </resources>

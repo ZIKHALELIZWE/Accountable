@@ -1,5 +1,6 @@
 package com.thando.accountable.fragments
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -37,6 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -87,6 +89,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -186,7 +189,9 @@ fun TaskView(
                                 bitmap = image,
                                 contentDescription = stringResource(R.string.goal_display_image),
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.matchParentSize().testTag("TasksImage")
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .testTag("TasksFragmentImage")
                             )
                         }
 
@@ -195,10 +200,10 @@ fun TaskView(
                             expandedHeight = imageHeight,
                             navigationIcon = {
                                 IconButton(
-                                    modifier = Modifier,
+                                    modifier = Modifier.testTag("TasksFragmentNavigateBackIcon"),
                                     onClick = { scope.launch { viewModel.closeTasks() }}
                                 ) {
-                                    Icon(
+                                    MainActivity.Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = stringResource(R.string.tasks_navigate_back_button),
                                         tint = Color(goalColour)
@@ -219,6 +224,7 @@ fun TaskView(
                             ) },
                             actions = {
                                 TextButton(
+                                    modifier = Modifier.testTag("TasksFragmentAddTextButton"),
                                     onClick = {
                                         when (GoalTab.valueOf(goal.selectedTab)) {
                                             GoalTab.TASKS -> scope.launch {
@@ -235,9 +241,9 @@ fun TaskView(
                                 ) {
                                     Text(
                                         text = when (GoalTab.valueOf(goal.selectedTab)){
-                                            GoalTab.TASKS -> stringResource(R.string.add_task)
-                                            GoalTab.DELIVERABLES -> stringResource(R.string.add_deliverable)
-                                            GoalTab.MARKERS -> stringResource(R.string.add_marker)
+                                            GoalTab.TASKS -> stringResource(GoalTab.TASKS.addStringRes)
+                                            GoalTab.DELIVERABLES -> stringResource(GoalTab.DELIVERABLES.addStringRes)
+                                            GoalTab.MARKERS -> stringResource(GoalTab.MARKERS.addStringRes)
                                         },
                                         color = Color(goalColour)
                                     )
@@ -368,7 +374,8 @@ fun TaskDeliverableMarkerBottomSheet(
                             showErrorMessage = showErrorMessage,
                             errorMessage = errorMessage,
                             deleteMarkerClicked = deleteMarkerClicked,
-                            updateMarker = updateMarker
+                            updateMarker = updateMarker,
+                            dismissBottomSheet = dismissBottomSheet
                         )
                 }
             }
@@ -395,11 +402,7 @@ fun TasksFragmentView(
             }
     }
     val goalTitle = remember { TextFieldState(goal.goal) }
-    val tabs = listOf(
-        stringResource(R.string.tasks),
-        stringResource(R.string.deliverables),
-        stringResource(R.string.markers)
-    )
+    val tabs = GoalTab.entries.map { stringResource(it.stringRes) }
     val goalColour by remember { mutableIntStateOf(goal.colour) }
 
     val tasksList by goal.goalTasks.collectAsStateWithLifecycle(emptyList())
@@ -455,7 +458,9 @@ fun TasksFragmentView(
                         text = { Text(title) },
                         selectedContentColor = Color(goalColour),
                         unselectedContentColor = Color.Black,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("TasksFragmentGoalTab-${index}")
                     )
                 }
             }
@@ -471,7 +476,8 @@ fun TasksFragmentView(
                     DeliverableCardView(
                         deliverable,
                         viewModel::editDeliverable,
-                        Modifier.fillMaxWidth()
+                        Modifier
+                            .fillMaxWidth()
                             .padding(3.dp)
                             .wrapContentHeight()
                     )
@@ -1632,7 +1638,8 @@ fun AddDeliverableView(
                     stickyHeader {
                         Button(
                             onClick = { scope.launch { addTimeBlock() } },
-                            modifier = Modifier.testTag("TasksFragmentDeliverableAddTimeBlockButton")
+                            modifier = Modifier
+                                .testTag("TasksFragmentDeliverableAddTimeBlockButton")
                                 .fillMaxWidth()
                                 .padding(8.dp)
                         ) { Text(stringResource(R.string.add_time_block)) }
@@ -1749,6 +1756,36 @@ fun MarkerCardView(
     }
 }
 
+@SuppressLint("UnrememberedMutableState")
+@Preview(showBackground = true)
+@Composable
+fun AddMarkerViewPreview() {
+    // Fake state flows for preview
+    val originalMarker = MutableStateFlow<Flow<Marker?>?>(null)
+    val markerFlow = MutableStateFlow<Marker?>(Marker(
+        id = 0,
+        parent = 1,
+        position = 1
+    ))
+
+    val triedToSaveInput = MutableStateFlow(false)
+    val showErrorMessage = mutableStateOf(false)
+    val errorMessage = mutableIntStateOf(0)
+
+    AddMarkerView(
+        originalMarker = originalMarker,
+        marker = markerFlow,
+        triedToSaveInput = triedToSaveInput,
+        processBottomSheetAdd = {},
+        showErrorMessage = showErrorMessage,
+        errorMessage = errorMessage,
+        deleteMarkerClicked = {},
+        updateMarker = {},
+        dismissBottomSheet = {}
+    )
+}
+
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun AddMarkerView(
@@ -1759,58 +1796,12 @@ fun AddMarkerView(
     showErrorMessage: MutableState<Boolean>,
     errorMessage: MutableIntState,
     deleteMarkerClicked: suspend () -> Unit,
-    updateMarker: suspend (Marker) -> Unit
+    updateMarker: suspend (Marker) -> Unit,
+    dismissBottomSheet: suspend () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val originalMarker by originalMarker.collectAsStateWithLifecycle()
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight(),
-        elevation = CardDefaults.cardElevation(),
-        colors = CardColors(
-            containerColor = Color.White,
-            contentColor = Color.Black,
-            disabledContainerColor = Color.LightGray,
-            disabledContentColor = Color.DarkGray
-        ),
-        shape = RectangleShape
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-        ) {
-            Text(
-                text = originalMarker?.let {
-                    stringResource(
-                        R.string.edit_with_arg,
-                        stringResource(R.string.marker)
-                    ) }?: stringResource(
-                    R.string.add,stringResource(R.string.marker)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 15.dp, horizontal = 5.dp),
-                textAlign = TextAlign.Center,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            IconButton(
-                modifier = Modifier
-                    .padding(horizontal = 5.dp)
-                    .align(Alignment.CenterEnd),
-                onClick = { scope.launch { processBottomSheetAdd() } }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Done,
-                    contentDescription = stringResource(R.string.add_task_deliverable_or_marker),
-                    tint = Color.Green
-                )
-            }
-        }
-    }
+
     val marker by marker.collectAsStateWithLifecycle(null)
     marker?.let { marker ->
         val context = LocalContext.current
@@ -1863,107 +1854,161 @@ fun AddMarkerView(
                     )
                 }
             }
-            LazyColumn(
-                state = bottomSheetLazyListState,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                item {
-                    OutlinedTextField(
-                        state = markerText,
-                        label = { Text(stringResource(R.string.marker)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 3.dp)
-                            .focusRequester(markerTextFocusRequester),
-                        trailingIcon = {
-                            if (triedToSave && markerText.text.isEmpty()){
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = stringResource(R.string.empty_field),
-                                    tint = Color.Red
+            Scaffold(
+                modifier = Modifier
+                    .testTag("TasksFragmentAddMarkerView")
+                    .fillMaxSize(),
+                topBar = {
+                    CenterAlignedTopAppBar(
+                        title = { Text(
+                            text = originalMarker?.let {
+                                stringResource(
+                                    R.string.edit_with_arg,
+                                    stringResource(R.string.marker)
+                                ) }?: stringResource(
+                                R.string.add,stringResource(R.string.marker)
+                            ),
+                            modifier = Modifier
+                                .testTag("TasksFragmentMarkerTitle")
+                                .fillMaxWidth()
+                                .padding(vertical = 15.dp, horizontal = 5.dp),
+                            textAlign = TextAlign.Center,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        ) },
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                scope.launch { dismissBottomSheet() }
+                            }) {
+                                MainActivity.Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.back_button)
+                                )
+                            }
+                        },
+                        actions = {
+                            IconButton(
+                                modifier = Modifier
+                                    .testTag("TasksFragmentMarkerSaveButton")
+                                    .padding(horizontal = 5.dp),
+                                onClick = { scope.launch { processBottomSheetAdd() } }
+                            ) {
+                                MainActivity.Icon(
+                                    imageVector = Icons.Default.Done,
+                                    contentDescription = stringResource(R.string.add_task_deliverable_or_marker),
+                                    tint = Color.Green
                                 )
                             }
                         }
                     )
                 }
-                item {
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                item {
-                    var pickedDate by remember {
-                        Converters().toLocalDateTime(
-                            marker.dateTime
+            ) { innerPadding ->
+                LazyColumn(
+                    state = bottomSheetLazyListState,
+                    modifier = Modifier.fillMaxSize().padding(innerPadding)
+                ) {
+                    item {
+                        OutlinedTextField(
+                            state = markerText,
+                            label = { Text(stringResource(R.string.marker)) },
+                            modifier = Modifier
+                                .testTag("TasksFragmentMarkerMarkerText")
+                                .fillMaxWidth()
+                                .padding(horizontal = 3.dp)
+                                .focusRequester(markerTextFocusRequester),
+                            trailingIcon = {
+                                if (triedToSave && markerText.text.isEmpty()){
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = stringResource(R.string.empty_field),
+                                        tint = Color.Red
+                                    )
+                                }
+                            }
                         )
                     }
-                    val stateTime = rememberTimePickerState(
-                        pickedDate.hour,
-                        pickedDate.minute,
-                        true
-                    )
-                    val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = Converters().fromLocalDateTime(pickedDate)
-                    )
-                    var buttonDatePick by remember { mutableStateOf(false) }
-                    var buttonTimePick by remember { mutableStateOf(false) }
-                    if (buttonDatePick) {
-                        PickDate(stateDate){ pickTime ->
-                            buttonDatePick = false
-                            buttonTimePick = pickTime
-                        }
-                    }
-                    if (buttonTimePick) {
-                        PickTime(stateTime){
-                            buttonTimePick = false
-                            pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
-                            scope.launch {
-                                updateMarker(
-                                    marker.copy(dateTime = Converters().fromLocalDateTime(pickedDate))
-                                )
-                            }
-                        }
-                    }
-                    OutlinedButton(modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-                        onClick = { buttonDatePick = true }
-                    ) {
-                        stateDate.getSelectedDate()?.let { localDate ->
-                            pickedDate = LocalDateTime.of(
-                                localDate,
-                                LocalTime.of(stateTime.hour,stateTime.minute)
-                            )
-                            scope.launch {
-                                updateMarker(
-                                    marker.copy(dateTime = Converters().fromLocalDateTime(pickedDate))
-                                )
-                            }
-                            Text(
-                                stringResource(
-                                    R.string.start_time_and_date,
-                                    getTime(pickedDate),
-                                    getStandardDate(context, pickedDate)
-                                ))
-                        }?: run {
-                            Text(stringResource(R.string.pick_a_date))
-                        }
-                    }
-                }
-                originalMarker?.let {
                     item {
                         Spacer(modifier = Modifier.width(2.dp))
                     }
                     item {
-                        IconButton(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(4.dp)
-                                .background(color = Color.Red),
-                            onClick = { scope.launch { deleteMarkerClicked() } }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.delete_marker)
+                        var pickedDate by remember {
+                            Converters().toLocalDateTime(
+                                marker.dateTime
                             )
+                        }
+                        val stateTime = rememberTimePickerState(
+                            pickedDate.hour,
+                            pickedDate.minute,
+                            true
+                        )
+                        val stateDate = rememberDatePickerState(
+                            initialSelectedDateMillis = Converters().fromLocalDateTime(pickedDate)
+                        )
+                        var buttonDatePick by remember { mutableStateOf(false) }
+                        var buttonTimePick by remember { mutableStateOf(false) }
+                        if (buttonDatePick) {
+                            PickDate(stateDate){ pickTime ->
+                                buttonDatePick = false
+                                buttonTimePick = pickTime
+                            }
+                        }
+                        if (buttonTimePick) {
+                            PickTime(stateTime){
+                                buttonTimePick = false
+                                pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+                                scope.launch {
+                                    updateMarker(
+                                        marker.copy(dateTime = Converters().fromLocalDateTime(pickedDate))
+                                    )
+                                }
+                            }
+                        }
+                        OutlinedButton(
+                            modifier = Modifier
+                                .testTag("TasksFragmentMarkerPickTimeButton")
+                                .fillMaxWidth()
+                                .padding(4.dp),
+                            onClick = { buttonDatePick = true }
+                        ) {
+                            stateDate.getSelectedDate()?.let { localDate ->
+                                pickedDate = LocalDateTime.of(
+                                    localDate,
+                                    LocalTime.of(stateTime.hour,stateTime.minute)
+                                )
+                                scope.launch {
+                                    updateMarker(
+                                        marker.copy(dateTime = Converters().fromLocalDateTime(pickedDate))
+                                    )
+                                }
+                                Text(
+                                    stringResource(
+                                        R.string.start_time_and_date,
+                                        getTime(pickedDate),
+                                        getStandardDate(context, pickedDate)
+                                    ))
+                            }?: run {
+                                Text(stringResource(R.string.pick_a_date))
+                            }
+                        }
+                    }
+                    originalMarker?.let {
+                        item {
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
+                        item {
+                            IconButton(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(4.dp)
+                                    .background(color = Color.Red),
+                                onClick = { scope.launch { deleteMarkerClicked() } }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.delete_marker)
+                                )
+                            }
                         }
                     }
                 }

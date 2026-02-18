@@ -2,14 +2,20 @@ package com.thando.accountable.fragments
 
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelectable
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import com.thando.accountable.AccountableComposeRobolectricTest
@@ -20,6 +26,7 @@ import com.thando.accountable.fragments.viewmodels.BooksViewModel
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import com.thando.accountable.fragments.viewmodels.HomeViewModel
 import com.thando.accountable.fragments.viewmodels.TaskViewModel
+import com.thando.accountable.input_forms.DateAndTimePickerTest
 import com.thando.accountable.input_forms.TimeBlockTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -266,11 +273,197 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         assertNotNull(taskViewModel.goal.first())
         assertNotNull(taskViewModel.goal.first()!!.getGoalPicture())
         assertNotNull(taskViewModel.goal.first()!!.getImageBitmap(activity).first())
-        withTag("TasksImage"){
+        withTag("TasksFragmentImage"){
             assertExists()
             assertIsDisplayed()
             assertWidthIsAtLeast(2.dp)
             assertHeightIsAtLeast(2.dp)
         }
+    }
+
+    @Test
+    fun `03 Can Navigate Back`() = runTest(TestMainActivity.dispatcher) {
+        val activity = getTestMainActivity()
+        withTag("TasksFragmentNavigateBackIcon"){
+            performPressWithoutScroll()
+        }
+
+        checkFragmentIs(
+            activity,
+            AccountableFragment.GoalsFragment,
+            BooksViewModel::class.java.name
+        )
+
+        val booksViewModel: BooksViewModel = getViewModel(activity)
+        assertTrue(booksViewModel.goalsList.first().isNotEmpty())
+        assertNotNull(booksViewModel.goalsList.first()[0].id)
+        val goal = activity.viewModel.repository.getGoal(booksViewModel.goalsList.first()[0].id).first()
+        assertNotNull(goal)
+
+        withTag("BooksFragmentGoalCard-${goal!!.id}"){
+            performPressWithScroll()
+        }
+
+        checkFragmentIs(
+            activity,
+            AccountableFragment.TaskFragment,
+            TaskViewModel::class.java.name
+        )
+    }
+
+    private fun getGoalTab(name:String): Goal.GoalTab {
+        return try{
+            Goal.GoalTab.valueOf(name)
+        }catch (e: Exception){
+            LogTest.e("Failed to get tab",e.message?:"")
+            Goal.GoalTab.TASKS
+        }
+    }
+
+    private fun switchToTab(tab: Goal.GoalTab, taskViewModel: TaskViewModel, activity: TestMainActivity) = runTest(TestMainActivity.dispatcher){
+        assertNotNull(taskViewModel.goal.first())
+        var goal = taskViewModel.goal.first()!!
+        val previousTab = getGoalTab(goal.selectedTab)
+        val tabsAreTheSame = previousTab == tab
+
+        withTag("TasksFragmentGoalTab-${previousTab.ordinal}"){
+            assertExists()
+            assertIsDisplayed()
+            assertIsSelectable()
+            assertIsSelected()
+            assertTextContains(activity.getString(previousTab.stringRes))
+            assertHasClickAction()
+        }
+
+        withTag("TasksFragmentAddTextButton"){
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertTextContains(activity.getString(previousTab.addStringRes))
+        }
+
+        withTag("TasksFragmentGoalTab-${tab.ordinal}"){
+            assertExists()
+            assertIsDisplayed()
+            assertIsSelectable()
+            assertIsNotSelected()
+            assertTextContains(activity.getString(tab.stringRes))
+            assertHasClickAction()
+            performClick()
+            finishProcesses()
+            assertIsSelected()
+        }
+
+        withTag("TasksFragmentGoalTab-${previousTab.ordinal}") {
+            assertExists()
+            assertIsDisplayed()
+            assertIsSelectable()
+            assertTextContains(activity.getString(previousTab.stringRes))
+            assertIsNotSelected()
+        }
+
+        goal = taskViewModel.goal.first()!!
+        val currentTab = getGoalTab(goal.selectedTab)
+
+        withTag("TasksFragmentAddTextButton"){
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertTextContains(activity.getString(currentTab.addStringRes))
+        }
+
+        if (tabsAreTheSame){
+            assertEquals(previousTab,currentTab)
+        }
+        else{
+            assertNotEquals(previousTab,currentTab)
+        }
+        assertEquals(tab,currentTab)
+    }
+
+    @Test
+    fun `04 Tab Switching`() = runTest(TestMainActivity.dispatcher) {
+        val activity = getTestMainActivity()
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        val goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.TASKS,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        listOf(
+            Goal.GoalTab.DELIVERABLES,
+            Goal.GoalTab.MARKERS,
+            Goal.GoalTab.DELIVERABLES,
+            Goal.GoalTab.TASKS,
+            Goal.GoalTab.MARKERS
+        ).forEach {
+            switchToTab(it,taskViewModel, activity)
+        }
+    }
+
+    @Test
+    fun `05 Adding Marker`() = runTest(TestMainActivity.dispatcher) {
+        val activity = getTestMainActivity()
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        val goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.MARKERS,getGoalTab(goal.selectedTab))
+        withTag("TasksFragmentAddTextButton"){
+            assertExists()
+            assertTextContains(activity.getString(Goal.GoalTab.MARKERS.addStringRes))
+            performPressWithoutScroll()
+        }
+
+        assertEquals(Goal.GoalTab.MARKERS,taskViewModel.bottomSheetType.value)
+        withTag("TasksFragmentAddMarkerView"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        assertNull(taskViewModel.originalMarker.value)
+        withTag("TasksFragmentMarkerTitle"){
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(activity.getString(R.string.add,activity.getString(R.string.marker)))
+        }
+
+        withTag("TasksFragmentMarkerSaveButton"){
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+        }
+
+        assertNotNull(taskViewModel.marker.first())
+
+        withTag("TasksFragmentMarkerMarkerText"){
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains("")
+            performTextReplacement("February Ends")
+            assertTextContains("February Ends")
+        }
+
+        withTag("TasksFragmentMarkerPickTimeButton"){
+            performPressWithScroll()
+        }
+
+        DateAndTimePickerTest(
+            getTimeAsLong = { taskViewModel.marker.first()?.dateTime },
+            getExpectedEndType = null,
+            getActualEndType = null,
+            endTypeButtonTag = null,
+            dropDownMenuTag = null,
+            dropDownMenuItemTag = null,
+            selectDateAndTimeButtonTag = "TasksFragmentMarkerPickTimeButton",
+            parentParameters = Triple(
+                instantTaskExecutorRule,
+                composeTestRule,
+                activity
+            )
+        ).runTests(this@TasksFragmentTests::class)
     }
 }

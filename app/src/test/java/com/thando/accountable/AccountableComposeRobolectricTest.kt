@@ -1,6 +1,8 @@
 package com.thando.accountable
 
 import android.app.Application
+import android.os.Bundle
+import android.os.PersistableBundle
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -213,13 +215,18 @@ abstract class AccountableComposeRobolectricTest(
         private var daysToAdd = 0L
         private var timeToAdd = packInts(0,0)
 
+        var jvmTempDir:File = File(
+            System.getProperty("java.io.tmpdir"),
+            "robolectricFiles"
+        )
+
         override fun getFilesDir(): File {
-            return try {
-                (application as TestApplication).jvmTempDir
-            } catch (e: Exception){
-                LogTest.e("Files Dir Change Failed", e.message?:"")
-                super.getFilesDir()
-            }
+            return jvmTempDir
+        }
+
+        override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
+            (this.application as TestApplication).jvmTempDir = jvmTempDir
+            super.onCreate(savedInstanceState, persistentState)
         }
 
         fun daysToAdd (input: Long) {
@@ -308,7 +315,11 @@ abstract class AccountableComposeRobolectricTest(
 }
 
 class TestApplication : Application() {
-    var jvmTempDir = File(System.getProperty("java.io.tmpdir"), "robolectricFiles")
+
+    var jvmTempDir:File = File(
+        System.getProperty("java.io.tmpdir"),
+        "robolectricFiles"
+    )
 
     override fun getFilesDir(): File {
         return jvmTempDir

@@ -615,9 +615,8 @@ sealed class AppResources {
         }
 
         private fun deleteFile(context: Context,destFileName: String):Boolean{
-            val destinationDir = context.filesDir.toString()+ File.separator + destinationFolder
-            val destination = destinationDir + File.separator + destFileName
-            val file = File(destination)
+            val destinationDir = File(context.filesDir,destinationFolder)
+            val file = File(destinationDir,destFileName)
             return if (file.exists()) {
                 file.delete()
             } else {

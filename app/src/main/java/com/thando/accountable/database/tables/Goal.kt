@@ -11,6 +11,7 @@ import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
+import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -101,16 +102,22 @@ data class Goal(
         UNDEFINED, DATE, DELIVERABLE
     }
 
-    enum class GoalTab{
-        TASKS, DELIVERABLES, MARKERS
+    enum class GoalTab(val stringRes:Int, val addStringRes:Int) {
+        TASKS(R.string.tasks, R.string.add_task),
+        DELIVERABLES(R.string.deliverables, R.string.add_deliverable),
+        MARKERS(R.string.markers, R.string.add_marker)
     }
 
     enum class Status{
         OVERDUE, PENDING, PAUSED, BREAK, COMPLETED, FAILED, FUTURE
     }
 
-    enum class TimeBlockType{
-        ONCE, DAILY, WEEKLY, MONTHLY, YEARLY
+    enum class TimeBlockType(val stringRes:Int){
+        ONCE(R.string.once),
+        DAILY(R.string.daily),
+        WEEKLY(R.string.weekly),
+        MONTHLY(R.string.monthly),
+        YEARLY(R.string.yearly)
     }
 
     @Ignore

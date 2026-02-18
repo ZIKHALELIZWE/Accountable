@@ -1145,7 +1145,7 @@ fun PickerMenu(
             options.forEach { option ->
                 DropdownMenuItem(
                     modifier = Modifier.testTag("EditGoalPickerMenuItem-$testTagId-${option.name}"),
-                    text = { Text(option.name) },
+                    text = { Text(stringResource(option.stringRes)) },
                     onClick = {
                         onOptionSelected(option)
                         expanded = false
