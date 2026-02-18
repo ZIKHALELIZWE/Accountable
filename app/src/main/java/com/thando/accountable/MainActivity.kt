@@ -167,7 +167,7 @@ open class MainActivity : ComponentActivity() {
             Log.i("FATAL EXCEPTION",message)
         }
 
-        fun logDirectoryContents(dir: File) {
+        /*fun logDirectoryContents(dir: File) {
             if (!dir.exists() || !dir.isDirectory) {
                 log("DirLogger: Invalid directory: ${dir.absolutePath}")
                 return
@@ -181,7 +181,7 @@ open class MainActivity : ComponentActivity() {
                 }
             }
             walk(dir)
-        }
+        }*/
 
         // Default implementation points to Material3 Icon
         var iconImpl: @Composable (ImageVector, String, Color?) -> Unit =

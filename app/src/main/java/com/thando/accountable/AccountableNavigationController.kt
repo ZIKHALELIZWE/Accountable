@@ -297,7 +297,7 @@ class AccountableNavigationController(
                     composable(AccountableFragment.TaskFragment.name) {
                         val viewModel = viewModel<TaskViewModel>(factory = TaskViewModel.Factory)
                         fragmentViewModel.update { viewModel }
-                        TaskView(viewModel, mainActivityViewModel)
+                        TaskView(viewModel)
                     }
                     composable(AccountableFragment.MarkupLanguageFragment.name) {
                         val viewModel =

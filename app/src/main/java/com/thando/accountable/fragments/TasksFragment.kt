@@ -97,7 +97,6 @@ import com.thando.accountable.AppResources
 import com.thando.accountable.AppResources.Companion.getStandardDate
 import com.thando.accountable.AppResources.Companion.getTime
 import com.thando.accountable.MainActivity
-import com.thando.accountable.MainActivityViewModel
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
@@ -126,8 +125,7 @@ import kotlin.random.Random
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun TaskView(
-    viewModel: TaskViewModel,
-    mainActivityViewModel: MainActivityViewModel
+    viewModel: TaskViewModel
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current

@@ -14,7 +14,6 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import com.thando.accountable.AccountableComposeRobolectricTest
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
-import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.fragments.viewmodels.BooksViewModel

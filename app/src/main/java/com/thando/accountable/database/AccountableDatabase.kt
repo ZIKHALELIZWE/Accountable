@@ -20,7 +20,6 @@ import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.database.tables.TeleprompterSettings
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 @Database(entities = [
     Folder::class,
