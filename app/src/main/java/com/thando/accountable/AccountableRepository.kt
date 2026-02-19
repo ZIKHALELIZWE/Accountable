@@ -2319,6 +2319,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     GoalTaskDeliverableTime.TimesType.TASK,
                     setCloneId
                 )
+
+                to.id = saveTask(to)
             }
         }
     }
@@ -2421,7 +2423,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                 if (setCloneId) to.cloneId = from.id
 
-                if (to.id == null) to.id = saveMarker(to)
+                to.id = saveMarker(to)
             }
         }
     }

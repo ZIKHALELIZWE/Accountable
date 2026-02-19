@@ -73,6 +73,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -118,9 +119,9 @@ import kotlin.random.Random
 // Custom semantics key for background color (used in test)
 val BackgroundColorKey = SemanticsPropertyKey<Color>("BackgroundColor")
 var SemanticsPropertyReceiver.backgroundColor by BackgroundColorKey
-fun Modifier.testBackground(color: Color): Modifier =
+fun Modifier.testBackground(color: Color, shape: Shape = RectangleShape): Modifier =
     this
-        .background(color)
+        .background(color, shape = shape)
         .semantics { backgroundColor = color }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)

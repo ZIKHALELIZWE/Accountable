@@ -199,7 +199,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             originalTask.value = repository.getTask(originalTaskInputId)
             originalDeliverableState.value = null
             originalMarker.value = null
-            taskState.value = originalTask.value?.let { repository.getTaskClone(it, true)?:return }?:return
+            taskState.value = repository.getTaskClone(originalTask.value?:return, true)?:return
         }
         saveTask()
         showBottomSheet(Goal.GoalTab.TASKS)

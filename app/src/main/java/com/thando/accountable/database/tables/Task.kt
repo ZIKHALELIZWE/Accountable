@@ -7,17 +7,15 @@ import androidx.room.Entity
 import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.thando.accountable.MainActivity
+import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 @Entity(tableName = "task_table")
 data class Task(
@@ -96,8 +94,10 @@ data class Task(
         DATE, DELIVERABLE, GOAL, UNDEFINED, MARKER
     }
 
-    enum class TaskType {
-        NORMAL, QUANTITY, TIME,
+    enum class TaskType(val stringRes:Int) {
+        NORMAL(R.string.normal),
+        QUANTITY(R.string.quantity),
+        TIME(R.string.time)
     }
 
     @Ignore

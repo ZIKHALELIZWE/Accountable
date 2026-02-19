@@ -9,7 +9,6 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import com.thando.accountable.AccountableComposeRobolectricTest
 import com.thando.accountable.AccountableComposeRobolectricTest.TestMainActivity.Companion.addTime
 import com.thando.accountable.database.Converters
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.FixMethodOrder
@@ -35,7 +34,7 @@ class DateAndTimePickerTest(
     parentParameters
 ) {
     @Test
-    fun `01 Can Cancel Date Picker Test`() = runTest(TestMainActivity.dispatcher) {
+    fun `01 Can Cancel Date Picker Test`() = runMainTest {
         endTypeButtonTag?.let {
             withTag(endTypeButtonTag()) {
                 performPressWithScroll()
@@ -110,7 +109,7 @@ class DateAndTimePickerTest(
     }
 
     @Test
-    fun `02 Select Same Date Test`() = runTest(TestMainActivity.dispatcher) {
+    fun `02 Select Same Date Test`() = runMainTest {
         val previousEndDateTime = getTimeAsLong()
         assertNotNull(previousEndDateTime)
         endTypeButtonTag?.let {
@@ -195,7 +194,7 @@ class DateAndTimePickerTest(
     }
 
     @Test
-    fun `03 Select Different Date And Time Test`() = runTest(TestMainActivity.dispatcher) {
+    fun `03 Select Different Date And Time Test`() = runMainTest {
         val activity = getTestMainActivity()
         val previousEndDateTime = getTimeAsLong()
 

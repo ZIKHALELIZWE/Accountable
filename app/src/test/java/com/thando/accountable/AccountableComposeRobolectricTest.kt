@@ -1,14 +1,12 @@
 package com.thando.accountable
 
-import android.app.Application
-import android.os.Bundle
-import android.os.PersistableBundle
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.compose.material3.DatePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.setSelectedDate
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -31,16 +29,19 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.MainActivityTest.FilteredPrintStream
 import com.thando.accountable.MainActivityTest.Log
+import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Before
 import org.junit.FixMethodOrder
 import org.junit.Rule
@@ -54,6 +55,7 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowLog
 import java.io.File
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneOffset
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -62,7 +64,7 @@ import kotlin.reflect.full.findAnnotation
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], application = TestApplication::class) // Force Robolectric to use API 34
+@Config(sdk = [34]) // Force Robolectric to use API 34
 @LooperMode(LooperMode.Mode.LEGACY)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 abstract class AccountableComposeRobolectricTest(
@@ -107,6 +109,11 @@ abstract class AccountableComposeRobolectricTest(
         return activity.viewModel.accountableNavigationController.fragmentViewModel.value!! as T
     }
 
+    protected fun runMainTest(block: suspend TestScope.() -> Unit) = runTest (
+        context = TestMainActivity.dispatcher,
+        testBody = block
+    )
+
     fun withTag(tag:String, block: SemanticsNodeInteraction.() -> Unit){
         composeTestRule.onNodeWithTag(tag).apply(block)
     }
@@ -140,7 +147,16 @@ abstract class AccountableComposeRobolectricTest(
         finishProcesses()
     }
 
-    fun finishProcesses() = runTest {
+    fun SemanticsNodeInteraction.performLongPressWithScroll(){
+        assertExists()
+        performScrollTo()
+        assertIsDisplayed()
+        assert(SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick))
+        performSemanticsAction(SemanticsActions.OnLongClick)
+        finishProcesses()
+    }
+
+    fun finishProcesses() = runMainTest {
         TestMainActivity.dispatcher.scheduler.advanceUntilIdle()
         advanceUntilIdle()
         composeTestRule.waitForIdle()
@@ -161,6 +177,34 @@ abstract class AccountableComposeRobolectricTest(
             expectedViewModel,
             activity.viewModel.accountableNavigationController.fragmentViewModel.value?.javaClass?.name
         )
+    }
+
+    fun timesAreEqual(
+        timeOne: GoalTaskDeliverableTime,
+        timeTwo: GoalTaskDeliverableTime,
+        idsEqual:Boolean = true,
+        parentsEqual: Boolean = true
+    ) = runMainTest {
+        val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
+            {objectA, objectB -> assertEquals(objectA,objectB)}
+        else {objectA, objectB -> assertNotEquals(objectA,objectB)}
+
+        assertionFunction(timeOne.id, timeTwo.id)
+
+        if (parentsEqual) assertionFunction(timeOne.parent,timeTwo.parent)
+        else assertNotEquals(timeOne.parent,timeTwo.parent)
+
+        assertEquals(timeOne.type,timeTwo.type)
+
+        assertEquals(timeOne.timeBlockType,timeTwo.timeBlockType)
+
+        assertEquals(timeOne.start,timeTwo.start)
+
+        assertEquals(timeOne.duration,timeTwo.duration)
+
+        if (!idsEqual && parentsEqual) {
+            assertEquals(timeOne.id,timeTwo.cloneId)
+        }
     }
 
     private fun getTestFunctions(): List<KFunction<*>> {
@@ -215,7 +259,9 @@ abstract class AccountableComposeRobolectricTest(
         private var daysToAdd = 0L
         private var timeToAdd = packInts(0,0)
 
-        var jvmTempDir:File = File(
+        private var dateToSet: LocalDateTime? = null
+
+        val jvmTempDir:File = File(
             System.getProperty("java.io.tmpdir"),
             "robolectricFiles"
         )
@@ -224,17 +270,16 @@ abstract class AccountableComposeRobolectricTest(
             return jvmTempDir
         }
 
-        override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
-            (this.application as TestApplication).jvmTempDir = jvmTempDir
-            super.onCreate(savedInstanceState, persistentState)
-        }
-
         fun daysToAdd (input: Long) {
             daysToAdd = input
         }
 
         fun timeToAdd(minutes:Int,hours:Int){
             timeToAdd = packInts(minutes,hours)
+        }
+
+        fun setDate(date: LocalDateTime?){
+            dateToSet = date
         }
 
         @Volatile
@@ -252,13 +297,24 @@ abstract class AccountableComposeRobolectricTest(
         init {
             datePickerImpl = { state, onDismiss ->
                 onDismiss.invoke {
-                    state.addDays(daysToAdd)
+                    dateToSet?.let { state.setSelectedDate(
+                        it.toLocalDate()
+                    ) }
+                        ?:run {
+                            state.addDays(daysToAdd)
+                        }
                 }
             }
             timePickerImpl = { state, onDismiss ->
                 androidx.compose.material3.TimePicker(state)
                 onDismiss.invoke {
-                    state.addTime(unpackInt2(timeToAdd),unpackInt1(timeToAdd))
+                    dateToSet?.let {
+                        state.hour = it.hour
+                        state.minute = it.minute
+                    }
+                        ?:run {
+                            state.addTime(unpackInt2(timeToAdd),unpackInt1(timeToAdd))
+                        }
                 }
             }
             iconImpl = { _, _, _ ->
@@ -311,17 +367,5 @@ abstract class AccountableComposeRobolectricTest(
                 this.minute = if ((totalMinutes/60)>23) 59 else totalMinutes % 60
             }
         }
-    }
-}
-
-class TestApplication : Application() {
-
-    var jvmTempDir:File = File(
-        System.getProperty("java.io.tmpdir"),
-        "robolectricFiles"
-    )
-
-    override fun getFilesDir(): File {
-        return jvmTempDir
     }
 }

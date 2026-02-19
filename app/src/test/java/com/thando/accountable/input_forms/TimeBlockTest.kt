@@ -43,7 +43,7 @@ class TimeBlockTest(
     parentParameters
 ) {
     @Test
-    fun `01 Add Time Button Exists`() = runTest {
+    fun `01 Add Time Button Exists`() = runMainTest {
         withTag(addTimeBlockButtonTag){
             assertExists()
             performScrollTo()
@@ -53,7 +53,7 @@ class TimeBlockTest(
     }
 
     @Test
-    fun `02 Add Time Button Press`() = runTest {
+    fun `02 Add Time Button Press`() = runMainTest {
         assertNotNull(timeBlockList.first())
         assertEquals(emptyList<GoalTaskDeliverableTime>(),timeBlockList.first())
 
@@ -66,7 +66,7 @@ class TimeBlockTest(
     }
 
     @Test
-    fun `03 Delete Time Button Press`() = runTest {
+    fun `03 Delete Time Button Press`() = runMainTest {
         assertNotNull(timeBlockList.first())
         assertEquals(1, timeBlockList.first().size)
 
@@ -102,7 +102,7 @@ class TimeBlockTest(
         from:Goal.TimeBlockType,
         to:Goal.TimeBlockType,
         index:Int = 0,
-    ) = runTest {
+    ) = runMainTest {
         assertTrue(index>-1)
         assertTrue(timeBlockList.first().isNotEmpty())
         assertTrue(index < timeBlockList.first().size)
@@ -142,7 +142,7 @@ class TimeBlockTest(
     }
 
     @Test
-    fun `04 Picker Menu Type Switching`() = runTest {
+    fun `04 Picker Menu Type Switching`() = runMainTest {
         `02 Add Time Button Press`()
 
         var currentTimeBlockType = Goal.TimeBlockType.ONCE
@@ -166,7 +166,7 @@ class TimeBlockTest(
     }
 
     @Test
-    fun `05 Picker Menu Once Monthly Yearly`() = runTest {
+    fun `05 Picker Menu Once Monthly Yearly`() = runMainTest {
         val activity = getTestMainActivity()
 
         var previousTimeBlockType = Goal.TimeBlockType.ONCE.name
@@ -202,7 +202,7 @@ class TimeBlockTest(
     }
 
     @Test
-    fun `06 Picker Menu Weekly Switching Days`() = runTest {
+    fun `06 Picker Menu Weekly Switching Days`() = runMainTest {
         val activity = getTestMainActivity()
 
         assertEquals(
@@ -306,7 +306,7 @@ class TimeBlockTest(
     }
 
     @Test
-    fun `07 Picker Menu Daily`() = runTest {
+    fun `07 Picker Menu Daily`() = runMainTest {
         val activity = getTestMainActivity()
 
         assertEquals(
@@ -347,7 +347,7 @@ class TimeBlockTest(
         timeBlockList: Flow<List<GoalTaskDeliverableTime>>,
         expectedMinute:Int,
         expectedHour:Int
-    ) = runTest {
+    ) = runMainTest {
         withTag("EditGoalTimeInputDailyTimeButton"){
             performPressWithScroll()
         }
@@ -402,7 +402,7 @@ class TimeBlockTest(
     }
 
     @Test
-    fun `08 Picker Menu Duration Picker`() = runTest {
+    fun `08 Picker Menu Duration Picker`() = runMainTest {
         val activity = getTestMainActivity()
         assertEquals(
             Goal.TimeBlockType.DAILY.name,

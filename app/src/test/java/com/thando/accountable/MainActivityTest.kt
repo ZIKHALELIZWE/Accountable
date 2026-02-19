@@ -41,7 +41,7 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `1 coreClassesNotNull`() = runTest {
+    fun `1 coreClassesNotNull`() = runMainTest {
         val activity = getTestMainActivity()
         finishProcesses()
         assertNotNull(activity)
@@ -50,7 +50,7 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `2 currentFragmentIsHomeFragment`() = runTest {
+    fun `2 currentFragmentIsHomeFragment`() = runMainTest {
         val activity = getTestMainActivity()
         finishProcesses()
         assertNotNull(activity.viewModel.currentFragment.value)
@@ -65,14 +65,14 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `3 directionIsNull`() = runTest {
+    fun `3 directionIsNull`() = runMainTest {
         val activity = getTestMainActivity()
         finishProcesses()
         assertNull(activity.viewModel.direction.value)
     }
 
     @Test
-    fun `4 Main Activity Initialized`() = runTest {
+    fun `4 Main Activity Initialized`() = runMainTest {
         val activity = getTestMainActivity()
         finishProcesses()
         assertNotNull(activity.viewModel.appSettings.value)
@@ -87,7 +87,7 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `5 Switch Fragments`() = runTest {
+    fun `5 Switch Fragments`() = runMainTest {
         val activity = getTestMainActivity()
         finishProcesses()
         assertNull(activity.viewModel.direction.value)
@@ -201,7 +201,7 @@ class MainActivityTest: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `6 Folders And Scripts Books Test`() = runTest {
+    fun `6 Folders And Scripts Books Test`() = runMainTest {
         val activity = getTestMainActivity()
         finishProcesses()
 

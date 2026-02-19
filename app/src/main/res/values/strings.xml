@@ -120,7 +120,6 @@
     <string name="books">Books</string>
     <string name="support">Support</string>
     <string name="help">Help</string>
-    <string name="time">23:52:14</string>
     <string name="hundred_percent">100%</string>
     <string name="choose_category">Choose Category</string>
     <string name="show_all">Show All</string>
@@ -304,7 +303,7 @@
     <string name="and_with_spaces">" and "</string>
     <string name="minute_pre_arg">%1$d Minute</string>
     <string name="minutes_pre_arg">%1$d Minutes</string>
-    <string name="time_string">Time</string>
+    <string name="time">Time</string>
     <string name="please_enter_a_quantity">Please Enter A Quantity</string>
     <string name="task_with_time">Task With Time</string>
     <string name="select_deliverable">Select Deliverable</string>

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -76,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -122,7 +125,6 @@ import kotlinx.coroutines.runBlocking
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.Period
-import java.time.ZoneOffset
 import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
@@ -344,7 +346,8 @@ fun TaskDeliverableMarkerBottomSheet(
                         deleteTimeBlock = deleteTimeBlock,
                         updateTimeBlock = updateTimeBlock,
                         deleteTaskClicked = deleteTaskClicked,
-                        updateTask = updateTask
+                        updateTask = updateTask,
+                        dismissBottomSheet = dismissBottomSheet
                     )
                 }
                 GoalTab.DELIVERABLES -> {
@@ -411,7 +414,7 @@ fun TasksFragmentView(
 
     LazyColumn(
         state = tabListState,
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize().testTag("TasksFragmentViewLazyColumn")
     ) {
         item( key = "The Top") {
             Card(
@@ -468,7 +471,7 @@ fun TasksFragmentView(
         when (GoalTab.valueOf(goal.selectedTab)) {
             GoalTab.TASKS -> {
                 items(items = tasksList){ task ->
-                    TaskCardView(task, viewModel)
+                    TaskCardView(task, viewModel::editTask)
                 }
             }
             GoalTab.DELIVERABLES -> {
@@ -484,8 +487,8 @@ fun TasksFragmentView(
                 }
             }
             GoalTab.MARKERS -> {
-                items(items = markersList) { marker ->
-                    MarkerCardView(marker, viewModel)
+                items(items = markersList, key = {it.id?: Random.nextLong()}) { marker ->
+                    MarkerCardView(marker, viewModel::editMarker)
                 }
             }
         }
@@ -501,10 +504,31 @@ fun Color.darker(factor: Float = 0.5f): Color{
     )
 }
 
+@SuppressLint("ViewModelConstructorInComposable")
+@Preview(showBackground = true)
+@Composable
+fun TaskCardViewPreview() {
+    TaskCardView(
+        Task(
+            id = 1,
+            parent = -1,
+            parentType = Task.TaskParentType.GOAL.name,
+            position = 0,
+            endDateTime = Converters().fromLocalDateTime(LocalDateTime.now().plusDays(5)),
+            endType = Task.TaskEndType.DATE.name,
+            task = "My Normal Date Task",
+            type = Task.TaskType.NORMAL.name,
+            colour = Color.Red.toArgb(),
+            location = "My Normal Date Location"
+        ),
+        editTask = {}
+    )
+}
+
 @Composable
 fun TaskCardView(
     task: Task,
-    viewModel: TaskViewModel
+    editTask: suspend (Task) -> Unit
 ){
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -522,13 +546,17 @@ fun TaskCardView(
     val location = remember { TextFieldState(task.location) }
 
     Card(
-        modifier = Modifier
+        modifier = Modifier.testTag("TasksFragmentTaskCardView-${task.id}")
             .fillMaxWidth()
             .padding(3.dp)
             .wrapContentHeight()
-            .combinedClickable(onClick = {
-                scope.launch { viewModel.editTask(task) }
-            }),
+            .combinedClickable(
+                onClick = {
+
+                },
+                onLongClick = {
+                    scope.launch { editTask(task) }
+                }),
         elevation = CardDefaults.cardElevation(),
         colors = CardColors(
             containerColor = Color.White,
@@ -668,6 +696,43 @@ fun getOnlyOneQuantityText(inputString: String) : String?{
     return null
 }
 
+@SuppressLint("UnrememberedMutableState")
+@Preview(showBackground = true)
+@Composable
+fun AddTaskViewPreview() {
+    // Fake state flows for preview
+    val originalTask = MutableStateFlow<Flow<Task?>?>(null)
+    val taskFlow = MutableStateFlow<Task?>(Task(
+        id = 0,
+        parent = 1,
+        parentType = Task.TaskParentType.GOAL.name,
+        position = 1,
+        type = Task.TaskType.NORMAL.name
+    ))
+    val colourPickerDialog = ColourPickerDialog()
+
+    val triedToSaveInput = MutableStateFlow(false)
+    val showErrorMessage = mutableStateOf(false)
+    val errorMessage = mutableIntStateOf(0)
+
+    AddTaskView(
+        originalTask = originalTask,
+        taskStateFlow = taskFlow,
+        triedToSaveInput = triedToSaveInput,
+        colourPickerDialog = colourPickerDialog,
+        processBottomSheetAdd = {},
+        showErrorMessage = showErrorMessage,
+        errorMessage = errorMessage,
+        pickColour = {},
+        updateTask = {},
+        addTimeBlock = {},
+        deleteTimeBlock = {},
+        updateTimeBlock = {},
+        deleteTaskClicked = {},
+        dismissBottomSheet = {}
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun AddTaskView(
@@ -683,58 +748,12 @@ fun AddTaskView(
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
-    deleteTaskClicked: suspend () -> Unit
+    deleteTaskClicked: suspend () -> Unit,
+    dismissBottomSheet: suspend () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val originalTask by originalTask.collectAsStateWithLifecycle()
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight(),
-        elevation = CardDefaults.cardElevation(),
-        colors = CardColors(
-            containerColor = Color.White,
-            contentColor = Color.Black,
-            disabledContainerColor = Color.LightGray,
-            disabledContentColor = Color.DarkGray
-        ),
-        shape = RectangleShape
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-        ) {
-            Text(
-                text = originalTask?.let {
-                    stringResource(
-                        R.string.edit_with_arg,
-                        stringResource(R.string.task)
-                    ) }?: stringResource(
-                    R.string.add,stringResource(R.string.task)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 15.dp, horizontal = 5.dp),
-                textAlign = TextAlign.Center,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            IconButton(
-                modifier = Modifier
-                    .padding(horizontal = 5.dp)
-                    .align(Alignment.CenterEnd),
-                onClick = { scope.launch { processBottomSheetAdd() } }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Done,
-                    contentDescription = stringResource(R.string.add_task_deliverable_or_marker),
-                    tint = Color.Green
-                )
-            }
-        }
-    }
+
     val task by taskStateFlow.collectAsStateWithLifecycle(null)
     task?.let { task ->
         val context = LocalContext.current
@@ -756,6 +775,7 @@ fun AddTaskView(
                 }
         }
         val taskText = remember { TextFieldState(task.task) }
+        MainActivity.log("taskText:${taskText.text.toString()} task.task:${task.task}")
         val taskTextFocusRequester = remember { task.taskTextFocusRequester }
         val location = remember { TextFieldState(task.location) }
         val locationFocusRequester = remember { task.locationFocusRequester }
@@ -792,257 +812,261 @@ fun AddTaskView(
                     )
                 }
             }
-            LazyColumn(
-                state = bottomSheetLazyListState,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(3.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Task.TaskType.entries.forEach { boxType ->
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
-                                    .height(TopAppBarDefaults.MediumAppBarCollapsedHeight) // makes it a big square
-                                    .background(
-                                        if (Task.TaskType.valueOf(task.type) == boxType) Color.Blue else Color.LightGray,
-                                        shape = RectangleShape
+            Scaffold(
+                modifier = Modifier
+                    .testTag("TasksFragmentAddTaskView")
+                    .fillMaxSize(),
+                topBar = {
+                    CenterAlignedTopAppBar(
+                        title = {
+                            Text(
+                                text = originalTask?.let {
+                                    stringResource(
+                                        R.string.edit_with_arg,
+                                        stringResource(R.string.task)
                                     )
-                                    .clickable { scope.launch { updateTask(task.copy(type = boxType.name)) } },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = stringResource(when(boxType){
-                                        Task.TaskType.NORMAL -> R.string.normal
-                                        Task.TaskType.QUANTITY -> R.string.quantity
-                                        Task.TaskType.TIME -> R.string.time_string
-                                    }),
-                                    color = Color.White,
-                                    fontSize = 16.sp
-                                )
-                            }
-                        }
-                    }
-                }
-                item {
-                    LaunchedEffect(taskText.text) {
-                        updateTask(task.copy(task = taskText.text.toString()))
-                    }
-                    when(Task.TaskType.valueOf(task.type)){
-                        Task.TaskType.QUANTITY,
-                        Task.TaskType.NORMAL -> {
-                            var styledText by remember { mutableStateOf<AnnotatedString?>(null) }
-                            if (Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY){
-                                LaunchedEffect(Unit) {
-                                    getOnlyOneQuantityText(taskText.text.toString())?.let{
-                                        if (it != task.task) updateTask(task.copy(task = it))
-                                    }
-                                }
-                                LaunchedEffect(taskText.text) {
-                                    updateTask(task.copy(quantity =
-                                        Regex("\\d+").find(taskText.text)?.value?.toLongOrNull()?:0
-                                    ))
-                                }
-                                styledText = buildAnnotatedString {
-                                    val regex = Regex("\\d+")
-                                    val match = regex.find(taskText.text)
-                                    if (match != null) {
-                                        val start = match.range.first
-                                        val end = match.range.last + 1
-                                        // Text before number
-                                        append(taskText.text.substring(0, start))
-                                        // Highlighted number
-                                        withStyle(
-                                            SpanStyle(
-                                                color = Color.Red,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        ) {
-                                            append(taskText.text.substring(start, end))
-                                        }
-                                        // Text after number
-                                        append(taskText.text.substring(end))
-                                    } else {
-                                        append(stringResource(R.string.please_enter_a_quantity))
-                                    }
-                                }
-                            } else styledText = null
-
-                            OutlinedTextField(
-                                state = taskText,
-                                supportingText = {styledText?.let { styledText -> Text(styledText)}},
-                                label = { Text(stringResource(
-                                    if (Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY) R.string.task_with_quantity
-                                        else R.string.task
-                                )) },
+                                } ?: stringResource(
+                                    R.string.add, stringResource(R.string.task)
+                                ),
                                 modifier = Modifier
+                                    .testTag("TasksFragmentTaskTitle")
                                     .fillMaxWidth()
-                                    .padding(3.dp)
-                                    .focusRequester(taskTextFocusRequester),
-                                trailingIcon = {
-                                    if (triedToSave && taskText.text.isEmpty()){
-                                        Icon(
-                                            imageVector = Icons.Default.Warning,
-                                            contentDescription = stringResource(R.string.empty_field),
-                                            tint = Color.Red
-                                        )
-                                    }
-                                },
-                                inputTransformation = InputTransformation {
-                                    if(Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY) {
-                                        val cleaned = getOnlyOneQuantityText(toString())
-                                        cleaned?.let { cleaned ->
-                                            val start = selection.start.coerceIn(0, cleaned.length)
-                                            val end = selection.end.coerceIn(0, cleaned.length)
-
-                                            replace(0, length, cleaned)
-                                            // Fix cursor if out of bounds
-                                            selection = TextRange(
-                                                start - 1,
-                                                end - 1
-                                            )
-                                        }
-                                    }
-                                }
+                                    .padding(vertical = 15.dp, horizontal = 5.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
                             )
-                        }
-                        Task.TaskType.TIME -> {
-                            val firstText = rememberTextFieldState("")
-                            val secondText = rememberTextFieldState("")
-
-                            LaunchedEffect(Unit) {
-                                val initialTime = AppResources.getDurationString(context, taskTime)
-                                val index = taskText.text.toString().indexOf(initialTime)
-                                if (index != -1) {
-                                    val before = taskText.text.toString().substring(0, index)
-                                    val after = taskText.text.toString().substring(index + initialTime.length)
-                                    firstText.setTextAndPlaceCursorAtEnd(before.trim())
-                                    secondText.setTextAndPlaceCursorAtEnd(after.trim())
-                                }
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                scope.launch { dismissBottomSheet() }
+                            }) {
+                                MainActivity.Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.back_button)
+                                )
                             }
-
-                            val datePicked = LocalDateTime.now().withHour(0).withMinute(0)
-                            val context = LocalContext.current
-
-                            LaunchedEffect(firstText.text, taskTime, secondText.text) {
-                                taskText.edit {
-                                    replace(0, length,
-                                        "${firstText.text.trim()} ${
-                                            AppResources.getDurationString(context, taskTime)
-                                        } ${secondText.text.trim()}")
-                                }
-                            }
-
-                            val buttonDurationPick = remember { mutableStateOf(false) }
-                            if (buttonDurationPick.value) {
-                                TimeDurationPicker(datePicked, taskTime) { hours, minutes ->
-                                    taskTime = taskTime.withHour(hours).withMinute(minutes)
-                                    scope.launch {
-                                        updateTask(task.copy(time = Converters().fromLocalDateTime(taskTime)))
-                                    }
-                                    buttonDurationPick.value = false
-                                }
-                            }
-                            FlowRow(
+                        },
+                        actions = {
+                            IconButton(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(3.dp),
-                                maxItemsInEachRow = Int.MAX_VALUE // allow natural wrapping
+                                    .testTag("TasksFragmentTaskSaveButton")
+                                    .padding(horizontal = 5.dp),
+                                onClick = { scope.launch { processBottomSheetAdd() } }
                             ) {
-                                OutlinedTextField(
-                                    state = firstText,
-                                    label = { Text(stringResource(R.string.task_with_time)) },
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                OutlinedButton(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onClick = { buttonDurationPick.value = true },
-                                    shape = RectangleShape,
-                                    border = BorderStroke(1.dp,Color.DarkGray)
-                                ) {
-                                    Text(
-                                        text = AppResources.getDurationString(taskTime),
-                                        modifier = Modifier
-                                    )
-                                }
-                                OutlinedTextField(
-                                    state = secondText,
-                                    placeholder = { Text("Second part") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    supportingText = {Text(taskText.text.toString())}
-                                )
-                            }
-                        }
-                    }
-                }
-                item {
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                item {
-                    LaunchedEffect(location.text) {
-                        updateTask(task.copy(location = location.text.toString()))
-                    }
-                    OutlinedTextField(
-                        state = location,
-                        label = { Text(stringResource(R.string.location)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(3.dp)
-                            .focusRequester(locationFocusRequester),
-                        trailingIcon = {
-                            if (triedToSave && location.text.isEmpty()){
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = stringResource(R.string.empty_field),
-                                    tint = Color.Red
+                                MainActivity.Icon(
+                                    imageVector = Icons.Default.Done,
+                                    contentDescription = stringResource(R.string.add_task_deliverable_or_marker),
+                                    tint = Color.Green
                                 )
                             }
                         }
                     )
                 }
-                item {
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(3.dp)
-                            .height(IntrinsicSize.Min),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (task.colour != -1) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .fillMaxHeight()
-                                    .padding(end = 3.dp)
-                                    .background(
-                                        Color(task.colour),
-                                        shape = RectangleShape
-                                    )
-                                    .weight(1f)
-                            )
-                        }
-                        Button(
-                            onClick = { pickColour(
-                                Color(task.colour)
-                            ) },
+            ) { innerPadding ->
+                LazyColumn(
+                    state = bottomSheetLazyListState,
+                    modifier = Modifier.testTag("TasksFragmentAddTaskViewLazyColumn")
+                        .fillMaxSize().padding(innerPadding)
+                ) {
+                    item {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .fillMaxHeight()
-                                .weight(2f)
-                                .focusRequester(colourFocusRequester),
-                            shape = RectangleShape
+                                .padding(3.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            Row {
-                                Text(stringResource(R.string.pick_colour))
-                                if (triedToSave && task.colour==-1){
+                            Task.TaskType.entries.forEach { boxType ->
+                                Box(
+                                    modifier = Modifier.testTag("TasksFragmentAddTaskViewTaskTypeButton-${boxType.name}")
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                        .height(TopAppBarDefaults.MediumAppBarCollapsedHeight) // makes it a big square
+                                        .testBackground(
+                                            if (Task.TaskType.valueOf(task.type) == boxType) Color.Blue
+                                            else Color.LightGray,
+                                            shape = RectangleShape
+                                        )
+                                        .clickable { scope.launch { updateTask(task.copy(type = boxType.name)) } },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = stringResource(boxType.stringRes),
+                                        color = Color.White,
+                                        fontSize = 16.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        LaunchedEffect(taskText.text) {
+                            updateTask(task.copy(task = taskText.text.toString()))
+                        }
+                        when(Task.TaskType.valueOf(task.type)){
+                            Task.TaskType.QUANTITY,
+                            Task.TaskType.NORMAL -> {
+                                var styledText by remember { mutableStateOf<AnnotatedString?>(null) }
+                                if (Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY){
+                                    LaunchedEffect(Unit) {
+                                        getOnlyOneQuantityText(taskText.text.toString())?.let{
+                                            if (it != task.task) updateTask(task.copy(task = it))
+                                        }
+                                    }
+                                    LaunchedEffect(taskText.text) {
+                                        updateTask(task.copy(quantity =
+                                            Regex("\\d+").find(taskText.text)?.value?.toLongOrNull()?:0
+                                        ))
+                                    }
+                                    styledText = buildAnnotatedString {
+                                        val regex = Regex("\\d+")
+                                        val match = regex.find(taskText.text)
+                                        if (match != null) {
+                                            val start = match.range.first
+                                            val end = match.range.last + 1
+                                            // Text before number
+                                            append(taskText.text.substring(0, start))
+                                            // Highlighted number
+                                            withStyle(
+                                                SpanStyle(
+                                                    color = Color.Red,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            ) {
+                                                append(taskText.text.substring(start, end))
+                                            }
+                                            // Text after number
+                                            append(taskText.text.substring(end))
+                                        } else {
+                                            append(stringResource(R.string.please_enter_a_quantity))
+                                        }
+                                    }
+                                } else styledText = null
+
+                                OutlinedTextField(
+                                    state = taskText,
+                                    supportingText = {styledText?.let { styledText -> Text(styledText)}},
+                                    label = { Text(stringResource(
+                                        if (Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY) R.string.task_with_quantity
+                                        else R.string.task
+                                    )) },
+                                    modifier = Modifier.testTag("TasksFragmentAddTaskNormalQuantityTextField")
+                                        .fillMaxWidth()
+                                        .padding(3.dp)
+                                        .focusRequester(taskTextFocusRequester),
+                                    trailingIcon = {
+                                        if (triedToSave && taskText.text.isEmpty()){
+                                            Icon(
+                                                imageVector = Icons.Default.Warning,
+                                                contentDescription = stringResource(R.string.empty_field),
+                                                tint = Color.Red
+                                            )
+                                        }
+                                    },
+                                    inputTransformation = InputTransformation {
+                                        if(Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY) {
+                                            val cleaned = getOnlyOneQuantityText(toString())
+                                            cleaned?.let { cleaned ->
+                                                val start = selection.start.coerceIn(0, cleaned.length)
+                                                val end = selection.end.coerceIn(0, cleaned.length)
+
+                                                replace(0, length, cleaned)
+                                                // Fix cursor if out of bounds
+                                                selection = TextRange(
+                                                    start - 1,
+                                                    end - 1
+                                                )
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                            Task.TaskType.TIME -> {
+                                val firstText = rememberTextFieldState("")
+                                val secondText = rememberTextFieldState("")
+
+                                LaunchedEffect(Unit) {
+                                    val initialTime = AppResources.getDurationString(context, taskTime)
+                                    val index = taskText.text.toString().indexOf(initialTime)
+                                    if (index != -1) {
+                                        val before = taskText.text.toString().substring(0, index)
+                                        val after = taskText.text.toString().substring(index + initialTime.length)
+                                        firstText.setTextAndPlaceCursorAtEnd(before.trim())
+                                        secondText.setTextAndPlaceCursorAtEnd(after.trim())
+                                    }
+                                }
+
+                                val datePicked = LocalDateTime.now().withHour(0).withMinute(0)
+                                val context = LocalContext.current
+
+                                LaunchedEffect(firstText.text, taskTime, secondText.text) {
+                                    taskText.edit {
+                                        replace(0, length,
+                                            "${firstText.text.trim()} ${
+                                                AppResources.getDurationString(context, taskTime)
+                                            } ${secondText.text.trim()}")
+                                    }
+                                }
+
+                                val buttonDurationPick = remember { mutableStateOf(false) }
+                                if (buttonDurationPick.value) {
+                                    TimeDurationPicker(datePicked, taskTime) { hours, minutes ->
+                                        taskTime = taskTime.withHour(hours).withMinute(minutes)
+                                        scope.launch {
+                                            updateTask(task.copy(time = Converters().fromLocalDateTime(taskTime)))
+                                        }
+                                        buttonDurationPick.value = false
+                                    }
+                                }
+                                FlowRow(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(3.dp),
+                                    maxItemsInEachRow = Int.MAX_VALUE // allow natural wrapping
+                                ) {
+                                    OutlinedTextField(
+                                        state = firstText,
+                                        label = { Text(stringResource(R.string.task_with_time)) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedButton(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        onClick = { buttonDurationPick.value = true },
+                                        shape = RectangleShape,
+                                        border = BorderStroke(1.dp,Color.DarkGray)
+                                    ) {
+                                        Text(
+                                            text = AppResources.getDurationString(taskTime),
+                                            modifier = Modifier
+                                        )
+                                    }
+                                    OutlinedTextField(
+                                        state = secondText,
+                                        placeholder = { Text("Second part") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        supportingText = {Text(taskText.text.toString())}
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                    item(key = "TasksFragmentAddTaskLocationTextField") {
+                        LaunchedEffect(location.text) {
+                            updateTask(task.copy(location = location.text.toString()))
+                        }
+                        OutlinedTextField(
+                            state = location,
+                            label = { Text(stringResource(R.string.location)) },
+                            modifier = Modifier.testTag("TasksFragmentAddTaskLocationTextField")
+                                .fillMaxWidth()
+                                .padding(3.dp)
+                                .focusRequester(locationFocusRequester),
+                            trailingIcon = {
+                                if (triedToSave && location.text.isEmpty()){
                                     Icon(
                                         imageVector = Icons.Default.Warning,
                                         contentDescription = stringResource(R.string.empty_field),
@@ -1050,195 +1074,257 @@ fun AddTaskView(
                                     )
                                 }
                             }
-                        }
+                        )
                     }
-                }
-                item {
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                item {
-                    var pickedDate by remember { mutableStateOf(
-                        LocalDateTime.ofEpochSecond(task.endDateTime/1000,0,
-                        ZoneOffset.UTC)) }
-                    val stateTime = rememberTimePickerState(
-                        pickedDate.hour,
-                        pickedDate.minute,
-                        true
-                    )
-                    val stateDate = rememberDatePickerState(
-                        initialSelectedDateMillis = Converters().fromLocalDateTime(pickedDate)
-                    )
-                    var buttonDatePick by remember { mutableStateOf(false) }
-                    var buttonTimePick by remember { mutableStateOf(false) }
-                    if (buttonDatePick) {
-                        PickDate(stateDate){ pickTime ->
-                            buttonDatePick = false
-                            buttonTimePick = pickTime
-                        }
-                    }
-                    if (buttonTimePick) {
-                        PickTime(stateTime){
-                            buttonTimePick = false
-                            pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
-                        }
-                    }
-                    var showEndTypeOptions by remember { mutableStateOf(false) }
-                    var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>())}
-                    OutlinedButton(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(3.dp),
-                        onClick = {
-                            endTypeOptions = listOf(
-                                MenuItemData(Task.TaskEndType.UNDEFINED.name){
-                                    scope.launch {
-                                        updateTask(task.copy(endType = Task.TaskEndType.UNDEFINED.name))
-                                    }
-                                },
-                                MenuItemData(Task.TaskEndType.DATE.name){
-                                    scope.launch {
-                                        updateTask(task.copy(endType = Task.TaskEndType.DATE.name))
-                                    }
-                                    buttonDatePick = true
-                                },
-                                MenuItemData(Task.TaskEndType.GOAL.name){
-                                    scope.launch {
-                                        updateTask(task.copy(endType = Task.TaskEndType.GOAL.name))
-                                    }
-                                },
-                                MenuItemData(Task.TaskEndType.DELIVERABLE.name){
-                                    scope.launch {
-                                        updateTask(task.copy(endType = Task.TaskEndType.DELIVERABLE.name))
-                                    }
-                                },
-                                MenuItemData(Task.TaskEndType.MARKER.name){
-                                    scope.launch {
-                                        updateTask(task.copy(endType = Task.TaskEndType.MARKER.name))
-                                    }
-                                }
-                            )
-                            showEndTypeOptions = true
-                        },
-                        shape = RectangleShape,
-                        border = BorderStroke(1.dp,Color.DarkGray)
-                    ) {
-                        if (showEndTypeOptions) {
-                            DropdownMenu(
-                                expanded = true,
-                                onDismissRequest = { showEndTypeOptions = false }
-                            ) {
-                                endTypeOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option.text) },
-                                        onClick = {
-                                            option.onClick.invoke()
-                                            showEndTypeOptions = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        when (Task.TaskEndType.valueOf(task.endType)) {
-                            Task.TaskEndType.UNDEFINED -> {
-                                Text(
-                                    modifier = Modifier,
-                                    text = stringResource(
-                                        R.string.end_type,
-                                        stringResource(R.string.undefined),
-                                        ""
-                                    ).trim()
-                                )
-                            }
-                            Task.TaskEndType.DATE -> {
-                                stateDate.getSelectedDate()?.let { localDate ->
-                                    pickedDate = LocalDateTime.of(
-                                        localDate,
-                                        LocalTime.of(stateTime.hour,stateTime.minute)
-                                    )
-                                    Text(
-                                        stringResource(
-                                            R.string.end_type,
-                                            stringResource(R.string.date),
-                                            stringResource(
-                                                R.string.end_time_and_date,
-                                                getTime(pickedDate),
-                                                getStandardDate(context, pickedDate)
-                                            )
-                                        )
-                                    )
-                                }?: run {
-                                    Text(stringResource(R.string.pick_a_date))
-                                }
-                            }
-                            Task.TaskEndType.GOAL -> {
-                                Text(
-                                    stringResource(
-                                        R.string.end_type,
-                                        stringResource(R.string.goal),
-                                        ""
-                                    ).trim()
-                                )
-                            }
-                            Task.TaskEndType.DELIVERABLE -> {
-                                Text(
-                                    stringResource(
-                                        R.string.end_type,
-                                        stringResource(R.string.deliverable),
-                                        ""
-                                    ).trim()
-                                )
-                            }
-                            Task.TaskEndType.MARKER -> {
-                                Text(
-                                    stringResource(
-                                        R.string.end_type,
-                                        stringResource(R.string.marker),
-                                        ""
-                                    ).trim()
-                                )
-                            }
-                        }
-                    }
-                }
-                item {
-                    Spacer(modifier = Modifier.width(2.dp))
-                }
-                stickyHeader {
-                    Button(
-                        onClick = { scope.launch { addTimeBlock() } },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(3.dp),
-                        shape = RectangleShape
-                    ) { Text(stringResource(R.string.add_time_block)) }
-                }
-                items(items = times, key = { it.id?:Random.nextLong() }) { item ->
-                    TimeInputView(
-                        item,
-                        triedToSaveInput,
-                        deleteTimeBlock,
-                        updateTimeBlock
-                    )
-                    if (times.indexOf(item) != times.lastIndex) {
-                        Spacer(modifier = Modifier.width(2.dp))
-                    }
-                }
-                originalTask?.let {
                     item {
                         Spacer(modifier = Modifier.width(2.dp))
                     }
                     item {
-                        IconButton(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(3.dp)
-                                .background(color = Color.Red),
-                            onClick = { scope.launch { deleteTaskClicked() } }
+                                .height(IntrinsicSize.Min),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.delete_marker)
-                            )
+                            if (task.colour != -1) {
+                                Box(
+                                    modifier = Modifier.testTag("TasksFragmentAddTaskColourBox")
+                                        .fillMaxWidth()
+                                        .fillMaxHeight()
+                                        .padding(end = 3.dp)
+                                        .testBackground(
+                                            Color(task.colour),
+                                            shape = RectangleShape
+                                        )
+                                        .weight(1f)
+                                )
+                            }
+                            Button(
+                                onClick = { pickColour(
+                                    Color(task.colour)
+                                ) },
+                                modifier = Modifier.testTag("TasksFragmentAddTaskColourButton")
+                                    .fillMaxWidth()
+                                    .fillMaxHeight()
+                                    .weight(2f)
+                                    .focusRequester(colourFocusRequester),
+                                shape = RectangleShape
+                            ) {
+                                Row {
+                                    Text(stringResource(R.string.pick_colour))
+                                    if (triedToSave && task.colour==-1){
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = stringResource(R.string.empty_field),
+                                            tint = Color.Red
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                    item {
+                        var pickedDate by remember { Converters().toLocalDateTime(task.endDateTime) }
+                        val stateTime = rememberTimePickerState(
+                            pickedDate.hour,
+                            pickedDate.minute,
+                            true
+                        )
+                        val stateDate = rememberDatePickerState(
+                            initialSelectedDateMillis = Converters().fromLocalDateTime(pickedDate)
+                        )
+                        var buttonDatePick by remember { mutableStateOf(false) }
+                        var buttonTimePick by remember { mutableStateOf(false) }
+                        if (buttonDatePick) {
+                            PickDate(stateDate){ pickTime ->
+                                buttonDatePick = false
+                                buttonTimePick = pickTime
+                            }
+                        }
+                        if (buttonTimePick) {
+                            PickTime(stateTime){
+                                buttonTimePick = false
+                                pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
+                                scope.launch {
+                                    updateTask(
+                                        task.copy(
+                                            endDateTime = Converters().fromLocalDateTime(pickedDate)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        var showEndTypeOptions by remember { mutableStateOf(false) }
+                        var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>())}
+                        OutlinedButton(
+                            modifier = Modifier.testTag("TasksFragmentAddTaskEndTypeButton")
+                                .fillMaxWidth()
+                                .padding(3.dp),
+                            onClick = {
+                                endTypeOptions = listOf(
+                                    MenuItemData(Task.TaskEndType.UNDEFINED.name){
+                                        scope.launch {
+                                            updateTask(task.copy(endType = Task.TaskEndType.UNDEFINED.name))
+                                        }
+                                    },
+                                    MenuItemData(Task.TaskEndType.DATE.name){
+                                        scope.launch {
+                                            updateTask(task.copy(endType = Task.TaskEndType.DATE.name))
+                                        }
+                                        buttonDatePick = true
+                                    },
+                                    MenuItemData(Task.TaskEndType.GOAL.name){
+                                        scope.launch {
+                                            updateTask(task.copy(endType = Task.TaskEndType.GOAL.name))
+                                        }
+                                    },
+                                    MenuItemData(Task.TaskEndType.DELIVERABLE.name){
+                                        scope.launch {
+                                            updateTask(task.copy(endType = Task.TaskEndType.DELIVERABLE.name))
+                                        }
+                                    },
+                                    MenuItemData(Task.TaskEndType.MARKER.name){
+                                        scope.launch {
+                                            updateTask(task.copy(endType = Task.TaskEndType.MARKER.name))
+                                        }
+                                    }
+                                )
+                                showEndTypeOptions = true
+                            },
+                            shape = RectangleShape,
+                            border = BorderStroke(1.dp,Color.DarkGray)
+                        ) {
+                            if (showEndTypeOptions) {
+                                DropdownMenu(
+                                    modifier = Modifier.testTag("TasksFragmentAddViewDropdownMenu"),
+                                    expanded = true,
+                                    onDismissRequest = { showEndTypeOptions = false }
+                                ) {
+                                    endTypeOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            modifier = Modifier.testTag("TasksFragmentAddViewDropdownMenuItem-${option.text}"),
+                                            text = { Text(option.text) },
+                                            onClick = {
+                                                option.onClick.invoke()
+                                                showEndTypeOptions = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            when (Task.TaskEndType.valueOf(task.endType)) {
+                                Task.TaskEndType.UNDEFINED -> {
+                                    Text(
+                                        modifier = Modifier,
+                                        text = stringResource(
+                                            R.string.end_type,
+                                            stringResource(R.string.undefined),
+                                            ""
+                                        ).trim()
+                                    )
+                                }
+                                Task.TaskEndType.DATE -> {
+                                    stateDate.getSelectedDate()?.let { localDate ->
+                                        pickedDate = LocalDateTime.of(
+                                            localDate,
+                                            LocalTime.of(stateTime.hour,stateTime.minute)
+                                        )
+                                        scope.launch {
+                                            updateTask(
+                                                task.copy(
+                                                    endDateTime = Converters().fromLocalDateTime(pickedDate)
+                                                )
+                                            )
+                                        }
+                                        Text(
+                                            stringResource(
+                                                R.string.end_type,
+                                                stringResource(R.string.date),
+                                                stringResource(
+                                                    R.string.end_time_and_date,
+                                                    getTime(pickedDate),
+                                                    getStandardDate(context, pickedDate)
+                                                )
+                                            )
+                                        )
+                                    }?: run {
+                                        Text(stringResource(R.string.pick_a_date))
+                                    }
+                                }
+                                Task.TaskEndType.GOAL -> {
+                                    Text(
+                                        stringResource(
+                                            R.string.end_type,
+                                            stringResource(R.string.goal),
+                                            ""
+                                        ).trim()
+                                    )
+                                }
+                                Task.TaskEndType.DELIVERABLE -> {
+                                    Text(
+                                        stringResource(
+                                            R.string.end_type,
+                                            stringResource(R.string.deliverable),
+                                            ""
+                                        ).trim()
+                                    )
+                                }
+                                Task.TaskEndType.MARKER -> {
+                                    Text(
+                                        stringResource(
+                                            R.string.end_type,
+                                            stringResource(R.string.marker),
+                                            ""
+                                        ).trim()
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                    stickyHeader(key = "TasksFragmentAddTaskAddTimeBlockButton") {
+                        Button(
+                            onClick = { scope.launch { addTimeBlock() } },
+                            modifier = Modifier.testTag("TasksFragmentAddTaskAddTimeBlockButton")
+                                .fillMaxWidth()
+                                .padding(3.dp),
+                            shape = RectangleShape
+                        ) { Text(stringResource(R.string.add_time_block)) }
+                    }
+                    items(items = times, key = { it.id?:Random.nextLong() }) { item ->
+                        TimeInputView(
+                            item,
+                            triedToSaveInput,
+                            deleteTimeBlock,
+                            updateTimeBlock
+                        )
+                        if (times.indexOf(item) != times.lastIndex) {
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
+                    }
+                    originalTask?.let {
+                        item {
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
+                        item(key = "TasksFragmentAddTaskDeleteButton") {
+                            IconButton(
+                                modifier = Modifier.testTag("TasksFragmentAddTaskDeleteButton")
+                                    .fillMaxWidth()
+                                    .padding(3.dp)
+                                    .background(color = Color.Red),
+                                onClick = { scope.launch { deleteTaskClicked() } }
+                            ) {
+                                MainActivity.Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.delete_marker)
+                                )
+                            }
                         }
                     }
                 }
@@ -1495,8 +1581,7 @@ fun AddDeliverableView(
                             PickTime(stateTime){
                                 buttonTimePick = false
                                 pickedDate = pickedDate.withHour(stateTime.hour).withMinute(stateTime.minute)
-                                scope.launch { updateDeliverable(deliverable.copy(endDateTime = pickedDate.toInstant(
-                                    ZoneOffset.UTC).toEpochMilli())) }
+                                scope.launch { updateDeliverable(deliverable.copy(endDateTime = Converters().fromLocalDateTime(pickedDate))) }
                             }
                         }
                         var showEndTypeOptions by remember { mutableStateOf(false) }
@@ -1569,8 +1654,7 @@ fun AddDeliverableView(
                                             localDate,
                                             LocalTime.of(stateTime.hour,stateTime.minute)
                                         )
-                                        scope.launch { updateDeliverable(deliverable.copy(endDateTime = pickedDate.toInstant(
-                                            ZoneOffset.UTC).toEpochMilli())) }
+                                        scope.launch { updateDeliverable(deliverable.copy(endDateTime = Converters().fromLocalDateTime(pickedDate))) }
                                         Text(
                                             stringResource(
                                                 R.string.end_type,
@@ -1680,10 +1764,26 @@ fun AddDeliverableView(
     }
 }
 
+@SuppressLint("ViewModelConstructorInComposable")
+@Preview(showBackground = true)
+@Composable
+fun MarkerCardViewPreview() {
+    MarkerCardView(
+        Marker(
+            id = 1,
+            parent = -1,
+            position = 0,
+            marker = "It is the end where I begin",
+            dateTime = Converters().fromLocalDateTime(LocalDateTime.now().minusDays(5))
+        ),
+        editMarker = {}
+    )
+}
+
 @Composable
 fun MarkerCardView(
     marker: Marker,
-    viewModel: TaskViewModel
+    editMarker: suspend (Marker) -> Unit
 ){
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1694,44 +1794,48 @@ fun MarkerCardView(
         LocalDateTime.now().toLocalDate(),
         dateTime.toLocalDate()).days
     Card(
-        modifier = Modifier
+        modifier = Modifier.testTag("TasksFragmentMarkerCardView-${marker.id}")
             .fillMaxWidth()
-            .padding(3.dp)
+            .defaultMinSize(minHeight = 64.dp)
             .wrapContentHeight()
-            .combinedClickable(onClick = {
-                scope.launch { viewModel.editMarker(marker) }
-            }),
-        elevation = CardDefaults.cardElevation(),
-        colors = CardColors(
-            containerColor = Color.White,
-            contentColor = Color.Black,
-            disabledContainerColor = Color.LightGray,
-            disabledContentColor = Color.DarkGray
-        ),
-        shape = RectangleShape
+            .padding(8.dp)
+            .combinedClickable(
+                onClick = {
+
+                },
+                onLongClick = {
+                    scope.launch { editMarker(marker) }
+                }
+            ),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
     ) {
-        Column(modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight()) {
-            Text(text = marker.marker,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            // Title
+            Text(
+                text = marker.marker,
                 style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(5.dp),
-                textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                fontSize = 16.sp)
-            Row(modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)) {
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            // Row with start and end aligned texts
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
                     text = AppResources.getFullDate(context, dateTime),
-                    modifier = Modifier
-                        .padding(start = 5.dp)
-                        .weight(1f),
-                    textAlign = TextAlign.Start,
-                    fontSize = 12.sp
+                    style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
                     text = when {
@@ -1745,11 +1849,19 @@ fun MarkerCardView(
                             stringResource(R.string.days_since, daysFromNow * -1)
                         }
                     },
-                    modifier = Modifier
-                        .padding(end = 5.dp)
-                        .weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.End,
-                    fontSize = 12.sp
+                    color = when {
+                        daysFromNow>0 -> {
+                            Color.Blue
+                        }
+                        daysFromNow==0 -> {
+                            Color.Green
+                        }
+                        else -> {
+                            Color.Red
+                        }
+                    }
                 )
             }
         }
@@ -1906,7 +2018,8 @@ fun AddMarkerView(
             ) { innerPadding ->
                 LazyColumn(
                     state = bottomSheetLazyListState,
-                    modifier = Modifier.fillMaxSize().padding(innerPadding)
+                    modifier = Modifier.testTag("TasksFragmentAddMarkerViewLazyColumn")
+                        .fillMaxSize().padding(innerPadding)
                 ) {
                     item {
                         OutlinedTextField(
@@ -1996,15 +2109,15 @@ fun AddMarkerView(
                         item {
                             Spacer(modifier = Modifier.width(2.dp))
                         }
-                        item {
+                        item(key = "TasksFragmentMarkerDeleteButton") {
                             IconButton(
-                                modifier = Modifier
+                                modifier = Modifier.testTag("TasksFragmentMarkerDeleteButton")
                                     .fillMaxWidth()
                                     .padding(4.dp)
                                     .background(color = Color.Red),
                                 onClick = { scope.launch { deleteMarkerClicked() } }
                             ) {
-                                Icon(
+                                MainActivity.Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = stringResource(R.string.delete_marker)
                                 )

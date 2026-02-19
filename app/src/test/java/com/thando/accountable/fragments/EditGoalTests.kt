@@ -38,7 +38,6 @@ import com.thando.accountable.input_forms.TimeBlockTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -54,7 +53,7 @@ import org.junit.runners.MethodSorters
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class EditGoalTests: AccountableComposeRobolectricTest() {
     @Test
-    fun `01 coreClassesNotNull`() = runTest(TestMainActivity.dispatcher) {
+    fun `01 coreClassesNotNull`() = runMainTest {
         val activity = getTestMainActivity()
         assertNotNull(activity)
         assertNotNull(activity.viewModel)
@@ -62,7 +61,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `02 currentFragmentIsHomeFragment`() = runTest(TestMainActivity.dispatcher) {
+    fun `02 currentFragmentIsHomeFragment`() = runMainTest {
         val activity = getTestMainActivity()
         assertNotNull(activity.viewModel.currentFragment.value)
         assertEquals(
@@ -72,7 +71,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `03 Can Go To Goals`() = runTest(TestMainActivity.dispatcher) {
+    fun `03 Can Go To Goals`() = runMainTest {
         val activity = getTestMainActivity()
         assertEquals(
             HomeViewModel::class.java.name,
@@ -94,7 +93,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `04 Is In AppSettings Base, Set To Goals And Is Empty`() = runTest(TestMainActivity.dispatcher) {
+    fun `04 Is In AppSettings Base, Set To Goals And Is Empty`() = runMainTest {
         val activity = getTestMainActivity()
         checkFragmentIs(
             activity,
@@ -118,12 +117,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `05 Open Edit Goal And Check Views`() = runTest(TestMainActivity.dispatcher) {
+    fun `05 Open Edit Goal And Check Views`() = runMainTest {
         val activity = getTestMainActivity()
         withTag("BooksFloatingActionButton") {
             performPressWithoutScroll()
         }
-        
+
         checkFragmentIs(
             activity,
             AccountableFragment.EditGoalFragment,
@@ -142,7 +141,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `06 Input Goal`() = runTest(TestMainActivity.dispatcher) {
+    fun `06 Input Goal`() = runMainTest {
         val activity = getTestMainActivity()
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
         assertNotNull(editGoalViewModel)
@@ -165,7 +164,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `07 Input Location`() = runTest(TestMainActivity.dispatcher) {
+    fun `07 Input Location`() = runMainTest {
         val activity = getTestMainActivity()
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
         assertNotNull(editGoalViewModel)
@@ -187,7 +186,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `08 Input Image`() = runTest(TestMainActivity.dispatcher) {
+    fun `08 Input Image`() = runMainTest {
         val activity = getTestMainActivity()
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
         assertNotNull(editGoalViewModel)
@@ -271,7 +270,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `09 Colour Input`() = runTest(TestMainActivity.dispatcher) {
+    fun `09 Colour Input`() = runMainTest {
         val activity = getTestMainActivity()
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
         assertNotNull(editGoalViewModel)
@@ -329,7 +328,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `10 End Type Undefined`() = runTest(TestMainActivity.dispatcher) {
+    fun `10 End Type Undefined`() = runMainTest {
         val activity = getTestMainActivity()
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
         assertNotNull(editGoalViewModel)
@@ -383,7 +382,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Test
-    fun `11 End Type Date`() = runTest(TestMainActivity.dispatcher) {
+    fun `11 End Type Date`() = runMainTest {
         val activity = getTestMainActivity()
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
         assertNotNull(editGoalViewModel)
@@ -411,7 +410,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `12 End Type Deliverable`() = runTest(TestMainActivity.dispatcher) {
+    fun `12 End Type Deliverable`() = runMainTest {
         val activity = getTestMainActivity()
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
         assertNotNull(editGoalViewModel)
@@ -547,7 +546,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `13 End Type Deliverable End Type Undefined`() = runTest(TestMainActivity.dispatcher) {
+    fun `13 End Type Deliverable End Type Undefined`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -618,7 +617,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Test
-    fun `14 End Type Deliverable End Type Date`() = runTest(TestMainActivity.dispatcher) {
+    fun `14 End Type Deliverable End Type Date`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -827,7 +826,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `15 End Type Deliverable End Type Goal`() = runTest(TestMainActivity.dispatcher) {
+    fun `15 End Type Deliverable End Type Goal`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -943,7 +942,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
      */
 
     @Test
-    fun `16 End Type Deliverable End Type Work`() = runTest(TestMainActivity.dispatcher) {
+    fun `16 End Type Deliverable End Type Work`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1003,7 +1002,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `17 Add Time Block`() = runTest(TestMainActivity.dispatcher) {
+    fun `17 Add Time Block`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1029,7 +1028,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `18 Save Deliverable`() = runTest(TestMainActivity.dispatcher) {
+    fun `18 Save Deliverable`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1084,7 +1083,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         deliverableTwo:Deliverable,
         idsEqual:Boolean = true,
         parentsEqual:Boolean = true
-    ) = runTest(TestMainActivity.dispatcher) {
+    ) = runMainTest {
         val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
             {objectA, objectB -> assertEquals(objectA,objectB)}
         else {objectA, objectB -> assertNotEquals(objectA,objectB)}
@@ -1145,36 +1144,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         }
     }
 
-    private fun timesAreEqual(
-        timeOne: GoalTaskDeliverableTime,
-        timeTwo: GoalTaskDeliverableTime,
-        idsEqual:Boolean = true,
-        parentsEqual: Boolean = true
-    ) = runTest(TestMainActivity.dispatcher) {
-        val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
-            {objectA, objectB -> assertEquals(objectA,objectB)}
-        else {objectA, objectB -> assertNotEquals(objectA,objectB)}
-
-        assertionFunction(timeOne.id, timeTwo.id)
-
-        if (parentsEqual) assertionFunction(timeOne.parent,timeTwo.parent)
-        else assertNotEquals(timeOne.parent,timeTwo.parent)
-
-        assertEquals(timeOne.type,timeTwo.type)
-
-        assertEquals(timeOne.timeBlockType,timeTwo.timeBlockType)
-
-        assertEquals(timeOne.start,timeTwo.start)
-
-        assertEquals(timeOne.duration,timeTwo.duration)
-
-        if (!idsEqual && parentsEqual) {
-            assertEquals(timeOne.id,timeTwo.cloneId)
-        }
-    }
-
     @Test
-    fun `19 Select Deliverable Button`() = runTest(TestMainActivity.dispatcher) {
+    fun `19 Select Deliverable Button`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1229,7 +1200,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `20 Edit Deliverable`() = runTest(TestMainActivity.dispatcher) {
+    fun `20 Edit Deliverable`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1325,7 +1296,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `21 Edit Deliverable Time`() = runTest(TestMainActivity.dispatcher) {
+    fun `21 Edit Deliverable Time`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1441,7 +1412,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `22 Remove Selected Deliverable By Editing Deliverable`() = runTest(TestMainActivity.dispatcher) {
+    fun `22 Remove Selected Deliverable By Editing Deliverable`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1505,7 +1476,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `23 Remove Deliverable By Clicking Button`() = runTest(TestMainActivity.dispatcher) {
+    fun `23 Remove Deliverable By Clicking Button`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1577,7 +1548,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `24 Add Goal Time Block`() = runTest(TestMainActivity.dispatcher) {
+    fun `24 Add Goal Time Block`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1609,7 +1580,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         goalTwo:Goal,
         idsEqual:Boolean = true,
         timesAndDeliverables:Pair<List<GoalTaskDeliverableTime>, List<Deliverable>>? = null
-    ) = runTest(TestMainActivity.dispatcher) {
+    ) = runMainTest {
         val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
             {objectA, objectB -> assertEquals(objectA,objectB)}
         else {objectA, objectB -> assertNotEquals(objectA,objectB)}
@@ -1715,7 +1686,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `25 Save Goal`() = runTest(TestMainActivity.dispatcher) {
+    fun `25 Save Goal`() = runMainTest {
         val activity = getTestMainActivity()
 
         val editGoalViewModel: EditGoalViewModel = getViewModel(activity)
@@ -1785,7 +1756,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `26 Edit Goal`() = runTest(TestMainActivity.dispatcher) {
+    fun `26 Edit Goal`() = runMainTest {
         val activity = getTestMainActivity()
         var booksViewModel: BooksViewModel = getViewModel(activity)
         assertTrue(booksViewModel.goalsList.first().isNotEmpty())
