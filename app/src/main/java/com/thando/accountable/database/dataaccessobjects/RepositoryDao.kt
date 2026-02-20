@@ -371,14 +371,12 @@ interface RepositoryDao {
             val existingEntity = getTask(task.id).first()
             if (existingEntity!=null){
                 update(task)
-                return task.id!!
             }
             else{
-                task.id = null
-                return insert(task)
+                task.id = insert(task)
             }
-        }
-        return insert(task)
+        } else task.id = insert(task)
+        return task.id!!
     }
 
     @Transaction
@@ -393,8 +391,6 @@ interface RepositoryDao {
             }
         }
         else deliverable.id = insert(deliverable)
-        //val storedTimes = getDeliverableTimes(deliverable.id)
-
         return deliverable.id!!
     }
 

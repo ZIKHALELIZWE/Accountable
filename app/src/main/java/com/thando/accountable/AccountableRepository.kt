@@ -2321,6 +2321,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 )
 
                 to.id = saveTask(to)
+
+                if (setCloneId) to.cloneId = from.id
             }
         }
     }

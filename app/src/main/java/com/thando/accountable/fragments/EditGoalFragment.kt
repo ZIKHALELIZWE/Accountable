@@ -287,14 +287,12 @@ fun EditGoalFragmentView(
         val scrollState = remember {
             Converters().fromScrollStateLazy(newGoal.scrollPosition)
         }
-        LaunchedEffect(scrollState) {
-            snapshotFlow { scrollState.isScrollInProgress }
-                .filter { !it } // only when scrolling ends
-                .collect {
-                    viewModel.updateScrollPosition(
+        LaunchedEffect(scrollState.isScrollInProgress) {
+            if (!scrollState.isScrollInProgress){
+                viewModel.updateScrollPosition(
                         Converters().toScrollStateLazy(scrollState)
-                    )
-                }
+                )
+            }
         }
 
         val imageBitmap by newGoal.getImageBitmap(context).collectAsStateWithLifecycle(null)

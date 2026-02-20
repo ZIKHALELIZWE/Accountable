@@ -397,12 +397,10 @@ fun TasksFragmentView(
     val tabListState = remember {
         Converters().fromScrollStateLazy(goal.tabListState)
     }
-    LaunchedEffect(tabListState) {
-        snapshotFlow { tabListState.isScrollInProgress }
-            .filter { !it } // only when scrolling ends
-            .collect {
-                viewModel.updateGoal(goal.copy(tabListState = Converters().toScrollStateLazy(tabListState)))
-            }
+    LaunchedEffect(tabListState.isScrollInProgress) {
+        if (!tabListState.isScrollInProgress) {
+            viewModel.updateGoal(goal.copy(tabListState = Converters().toScrollStateLazy(tabListState)))
+        }
     }
     val goalTitle = remember { TextFieldState(goal.goal) }
     val tabs = GoalTab.entries.map { stringResource(it.stringRes) }
@@ -744,7 +742,7 @@ fun AddTaskView(
     showErrorMessage: MutableState<Boolean>,
     errorMessage: MutableIntState,
     pickColour: (Color?) -> Unit,
-    updateTask: suspend(Task) -> Unit,
+    updateTask: suspend (Task) -> Unit,
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
@@ -765,17 +763,14 @@ fun AddTaskView(
         val bottomSheetLazyListState = remember {
             Converters().fromScrollStateLazy(task.scrollPosition)
         }
-        LaunchedEffect(bottomSheetLazyListState) {
-            snapshotFlow { bottomSheetLazyListState.isScrollInProgress }
-                .filter { !it } // only when scrolling ends
-                .collect {
-                    updateTask(task.copy(
-                        scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)
-                    ))
-                }
+        LaunchedEffect(bottomSheetLazyListState.isScrollInProgress) {
+            if (!bottomSheetLazyListState.isScrollInProgress){
+                updateTask(task.copy(
+                    scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)
+                ))
+            }
         }
         val taskText = remember { TextFieldState(task.task) }
-        MainActivity.log("taskText:${taskText.text.toString()} task.task:${task.task}")
         val taskTextFocusRequester = remember { task.taskTextFocusRequester }
         val location = remember { TextFieldState(task.location) }
         val locationFocusRequester = remember { task.locationFocusRequester }
@@ -1456,13 +1451,11 @@ fun AddDeliverableView(
             val bottomSheetLazyListState = remember {
                 Converters().fromScrollStateLazy(deliverable.scrollPosition)
             }
-            LaunchedEffect(bottomSheetLazyListState) {
-                snapshotFlow { bottomSheetLazyListState.isScrollInProgress }
-                    .filter { !it } // only when scrolling ends
-                    .collect {
-                        updateDeliverable(deliverable.copy(
-                            scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)))
-                    }
+            LaunchedEffect(bottomSheetLazyListState.isScrollInProgress) {
+                if(!bottomSheetLazyListState.isScrollInProgress) {
+                    updateDeliverable(deliverable.copy(
+                        scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)))
+                }
             }
 
             val deliverableText = remember { TextFieldState(deliverable.deliverable) }
@@ -1925,14 +1918,12 @@ fun AddMarkerView(
         val bottomSheetLazyListState = remember {
             Converters().fromScrollStateLazy(marker.scrollPosition)
         }
-        LaunchedEffect(bottomSheetLazyListState) {
-            snapshotFlow { bottomSheetLazyListState.isScrollInProgress }
-                .filter { !it } // only when scrolling ends
-                .collect {
-                    updateMarker(marker.copy(
-                        scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)
-                    ))
-                }
+        LaunchedEffect(bottomSheetLazyListState.isScrollInProgress) {
+            if (!bottomSheetLazyListState.isScrollInProgress){
+                updateMarker(marker.copy(
+                    scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)
+                ))
+            }
         }
         val markerText = remember { TextFieldState(marker.marker) }
         val markerTextFocusRequester = remember { marker.markerTextFocusRequester }

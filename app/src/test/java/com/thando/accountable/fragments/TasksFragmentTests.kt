@@ -1090,8 +1090,6 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             idsEqual = true,
             times
         )
-
-        LogTest.w("task.task",tasksList[0].task)
     }
 
     private fun tasksAreEqual(
@@ -1250,7 +1248,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             )
         }
 
-        withTag("TasksFragmentAddTaskLazyColumn"){
+        withTag("TasksFragmentAddTaskViewLazyColumn"){
             assertExists()
             assertIsDisplayed()
             performScrollToKey("TasksFragmentAddTaskLocationTextField")
@@ -1288,10 +1286,11 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         }
 
         val task = taskViewModel.task.first()
+        val taskTimes = task?.times?.first()
         assertNotNull(task?.endDateTime)
         assertTrue(task!!.endDateTime>0)
 
-        withTag("TasksFragmentAddTaskLazyColumn"){
+        withTag("TasksFragmentAddTaskViewLazyColumn"){
             assertExists()
             assertIsDisplayed()
             performScrollToKey("TasksFragmentAddTaskDeleteButton")
@@ -1314,7 +1313,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         tasksAreEqual(
             task,
             tasksList[0],
-            false
+            false,
+            taskTimes
         )
 
         assertNotEquals(
