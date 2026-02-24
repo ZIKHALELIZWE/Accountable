@@ -5,6 +5,7 @@ import androidx.compose.ui.util.packInts
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.thando.accountable.MainActivity
 import com.thando.accountable.database.Converters
@@ -16,7 +17,12 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import java.time.LocalDateTime
 
-@Entity(tableName = "deliverable_table")
+@Entity(
+    tableName = "deliverable_table",
+    indices = [
+        Index(value = ["deliverable_task_id"], unique = true) // Enforces uniqueness
+    ]
+)
 data class Deliverable (
     @PrimaryKey(autoGenerate = true)
     var id: Long? = null,
@@ -42,6 +48,12 @@ data class Deliverable (
     @ColumnInfo (name = "deliverable_deliverable")
     var deliverable : String = "",
 
+    @ColumnInfo (name = "deliverable_quantity")
+    var quantity: Long = 0L,
+
+    @ColumnInfo (name = "deliverable_time")
+    var time: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
+
     @ColumnInfo (name = "deliverable_status")
     var status : String = Goal.Status.PENDING.name,
 
@@ -50,6 +62,9 @@ data class Deliverable (
 
     @ColumnInfo (name = "deliverable_goal_id")
     var goalId: Long? = null,
+
+    @ColumnInfo (name = "deliverable_task_id")
+    var taskId: Long? = null,
 
     @ColumnInfo (name = "deliverable_size")
     var size: Float = 0F,

@@ -319,4 +319,5 @@
     <string name="monthly">Monthly</string>
     <string name="yearly">Yearly</string>
     <string name="back_button">Back Button</string>
+    <string name="deliverable_with_a_quantity">Deliverable with a Quantity</string>
 </resources>

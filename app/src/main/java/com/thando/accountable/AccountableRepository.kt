@@ -2506,8 +2506,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     fun getTask(taskId: Long?): Flow<Task?> = dao.getTask(taskId).map { task ->
         task?.loadTimes(dao)
+        task?.loadDeliverable(dao)
         task
     }
+
+    fun getTaskDeliverable(taskId: Long?): Flow<Deliverable?> = dao.getTaskDeliverable(taskId)
 
     fun getMarker(markerId: Long?): Flow<Marker?> = dao.getMarker(markerId)
     fun getGoals(parent: Long?): Flow<List<Goal>> = dao.getGoals(parent).map { goals ->
@@ -2546,6 +2549,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return dao.getTasks(parentId, parentType).map { tasks ->
             tasks.forEach { task ->
                 task.loadTimes(dao)
+                task.loadDeliverable(dao)
             }
             tasks
         }

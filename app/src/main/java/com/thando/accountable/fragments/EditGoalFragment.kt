@@ -256,6 +256,7 @@ fun EditGoalView(
                     deleteTimeBlock = viewModel::deleteTimeBlock,
                     updateTimeBlock = viewModel::updateTimeBlock,
                     updateDeliverable = viewModel::updateDeliverable,
+                    updateTaskEndType = null,
                     deleteTaskClicked = null,
                     originalTask = null,
                     task = null,

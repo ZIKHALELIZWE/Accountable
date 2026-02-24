@@ -185,6 +185,7 @@ data class Goal(
         goalTasksState.value = dao.getTasks(id, Task.TaskParentType.GOAL).map { tasks ->
             tasks.forEach { task ->
                 task.loadTimes(dao)
+                task.loadDeliverable(dao)
             }
             tasks
         }

@@ -520,6 +520,9 @@ interface RepositoryDao {
     @Query("SELECT * FROM deliverable_table WHERE id = :deliverableId")
     fun getDeliverable(deliverableId: Long?): Flow<Deliverable?>
 
+    @Query("SELECT * FROM deliverable_table WHERE deliverable_task_id = :taskId")
+    fun getTaskDeliverable(taskId: Long?): Flow<Deliverable?>
+
     @Query("SELECT * FROM marker_table WHERE id = :markerId")
     fun getMarker(markerId: Long?): Flow<Marker?>
 

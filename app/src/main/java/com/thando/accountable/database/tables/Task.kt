@@ -107,6 +107,13 @@ data class Task(
     val times = timesState.flatMapLatest { timesFlow ->
             timesFlow?: MutableStateFlow(emptyList())
     }.flowOn(MainActivity.IO)
+    @Ignore
+    val deliverableState = MutableStateFlow<Flow<Deliverable?>?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val deliverable = deliverableState.flatMapLatest { deliverableFlow ->
+        deliverableFlow ?: MutableStateFlow(null)
+    }.flowOn(MainActivity.IO)
 
     @Ignore
     val taskTextFocusRequester = FocusRequester()
@@ -119,5 +126,9 @@ data class Task(
 
     fun loadTimes(dao: RepositoryDao) {
         timesState.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.TASK)
+    }
+
+    fun loadDeliverable(dao: RepositoryDao) {
+        deliverableState.value = dao.getTaskDeliverable(id)
     }
 }

@@ -950,7 +950,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertTextContains(activity.getString(Task.TaskType.TIME.stringRes))
         }
 
-        withTag("TasksFragmentAddTaskNormalQuantityTextField") {
+        withTag("TasksFragmentAddTaskNormalQuantityTimeTextField") {
             assertExists()
             performScrollTo()
             assertIsDisplayed()
@@ -1233,7 +1233,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertHasClickAction()
         }
 
-        withTag("TasksFragmentAddTaskNormalQuantityTextField"){
+        withTag("TasksFragmentAddTaskNormalQuantityTimeTextField"){
             assertExists()
             performScrollTo()
             assertIsDisplayed()
@@ -1368,5 +1368,197 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         tasksList = goal.goalTasks.first()
         assertNotNull(tasksList)
         assertEquals(0,tasksList.size)
+    }
+
+    @Test
+    fun `12 Adding Quantity Deliverable Task`() = runMainTest {
+        val activity = getTestMainActivity()
+
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        var goal = taskViewModel.goal.first()!!
+
+        var tasksList = goal.goalTasks.first()
+        assertNotNull(tasksList)
+        assertEquals(0, tasksList.size)
+
+        withTag("TasksFragmentAddTextButton"){
+            assertExists()
+            assertTextContains(activity.getString(Goal.GoalTab.TASKS.addStringRes))
+            performPressWithoutScroll()
+        }
+        assertEquals(Goal.GoalTab.TASKS,taskViewModel.bottomSheetType.value)
+
+        withTag("TasksFragmentAddTaskView"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        assertNull(taskViewModel.originalTask.value)
+        assertNotNull(taskViewModel.task.first())
+
+        withTag("TasksFragmentAddTaskViewTaskTypeButton-${Task.TaskType.QUANTITY.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performPressWithoutScroll()
+            assertEquals(
+                Color.Blue,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(Task.TaskType.QUANTITY.stringRes))
+        }
+
+        withTag("TasksFragmentAddTaskViewTaskTypeButton-${Task.TaskType.NORMAL.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertEquals(
+                Color.LightGray,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(Task.TaskType.NORMAL.stringRes))
+        }
+
+        withTag("TasksFragmentAddTaskViewTaskTypeButton-${Task.TaskType.TIME.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertEquals(
+                Color.LightGray,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(Task.TaskType.TIME.stringRes))
+        }
+
+        assertEquals(
+            Task.TaskType.QUANTITY.name,
+            taskViewModel.task.first()?.type
+        )
+
+        withTag("TasksFragmentAddTaskNormalQuantityTimeTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("My Quantity 6 Deliverable Task 7")
+            assertTextContains(
+                value = "My Quantity 6 Deliverable Task ",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        assertEquals(6L,taskViewModel.task.first()?.quantity)
+        withTag("TasksFragmentAddTaskNormalQuantityTimeTextField") {
+            performTextReplacement("Jump 2 times33")
+            assertTextContains(
+                value = "Jump 2 times",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        assertEquals(2L,taskViewModel.task.first()?.quantity)
+
+        withTag("TasksFragmentAddTaskLocationTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("At Home")
+            assertTextContains(
+                value = "At Home",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        assertNotNull(taskViewModel.task.first()?.colour)
+        val taskColour = taskViewModel.task.first()!!.colour
+        withTag("TasksFragmentAddTaskColourBox") {
+            if (taskColour == -1) assertDoesNotExist()
+            else{
+                assertExists()
+                performScrollTo()
+                assertIsDisplayed()
+                assertEquals(
+                    taskColour,
+                    fetchSemanticsNode().config[BackgroundColorKey].toArgb()
+                )
+            }
+        }
+
+        withTag("TasksFragmentAddTaskColourButton") {
+            performPressWithScroll()
+        }
+
+        withTag("ColourPickerDialogCanvas") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            performTouchInput { click(Offset(50f, 50f)) }
+        }
+        finishProcesses()
+
+        withTag("ColourPickerDialogOKButton") {
+            performPressWithScroll()
+        }
+
+        withTag("ColourPickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.colour)
+        assertNotEquals(-1, taskViewModel.task.first()?.colour)
+        withTag("TasksFragmentAddTaskColourBox") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertEquals(
+                taskColour,
+                fetchSemanticsNode().config[BackgroundColorKey].toArgb()
+            )
+        }
+
+        withTag("TasksFragmentAddTaskEndTypeButton") {
+            performPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.DELIVERABLE.name}") {
+            performPressWithoutScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverable?.first())
+
+        withTag("TasksFragmentAddTaskEndTypeButton") {
+            performPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.UNDEFINED.name}") {
+            performPressWithoutScroll()
+        }
+
+        assertNull(taskViewModel.task.first()?.deliverable?.first())
+
+        withTag("TasksFragmentAddTaskEndTypeButton") {
+            performPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.DELIVERABLE.name}") {
+            performPressWithoutScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverable?.first())
     }
 }

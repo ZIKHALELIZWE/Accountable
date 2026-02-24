@@ -34,7 +34,7 @@ import java.time.LocalDateTime
     Task::class,
     Deliverable::class,
     Marker::class
-], version = 12, exportSchema = false)
+], version = 13, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AccountableDatabase: RoomDatabase() {
     abstract val repositoryDao : RepositoryDao
@@ -162,6 +162,12 @@ abstract class AccountableDatabase: RoomDatabase() {
                         },
                         Migration(11,12){ db ->
                             db.execSQL("ALTER TABLE goal_table DROP COLUMN goal_category")
+                        },
+                        Migration(12,13){ db ->
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_quantity INTEGER DEFAULT ${0L}")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_time INTEGER DEFAULT ${Converters().fromLocalDateTime(LocalDateTime.now())}")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_task_id INTEGER DEFAULT ${null} NULL")
+                            db.execSQL("CREATE UNIQUE INDEX index_deliverable_table_deliverable_task_id ON users(deliverable_task_id)")
                         }
                     )
                     .build()

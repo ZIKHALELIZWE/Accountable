@@ -325,6 +325,33 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         repository.update(deliverable)
     }
 
+    suspend fun updateTaskEndType(task: Task) {
+        if (task.endType == Task.TaskEndType.DELIVERABLE.name) {
+            if (task.deliverable.first() == null) {
+                repository.insert(
+                    Deliverable(
+                        parent = task.parent,
+                        position = repository.getDeliverables(
+                            task.parent
+                        ).first().size.toLong(),
+                        location = task.location,
+                        taskId = task.id,
+                        endType = Deliverable.DeliverableEndType.WORK.name,
+                    )
+                )
+            }
+        } else {
+            // remove deliverable
+            if (this.task.first()!=null) {
+                val taskDeliverable = this.task.first()!!.deliverable.first()
+                if (taskDeliverable != null) {
+                    repository.deleteDeliverable(taskDeliverable)
+                }
+            }
+        }
+        updateTask(task)
+    }
+
     suspend fun updateTask(task: Task) {
         repository.update(task)
     }

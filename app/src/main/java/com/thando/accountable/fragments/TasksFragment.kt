@@ -72,7 +72,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
@@ -119,7 +118,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.LocalDateTime
@@ -274,6 +273,7 @@ fun TaskView(
                     deleteTimeBlock = viewModel::deleteTimeBlock,
                     updateTimeBlock = viewModel::updateTimeBlock,
                     updateDeliverable = viewModel::updateDeliverable,
+                    updateTaskEndType = viewModel::updateTaskEndType,
                     deleteTaskClicked = viewModel::deleteTaskClicked,
                     originalTask = viewModel.originalTask,
                     task = viewModel.task,
@@ -307,6 +307,7 @@ fun TaskDeliverableMarkerBottomSheet(
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateDeliverable: suspend (Deliverable) -> Unit,
+    updateTaskEndType: (suspend (Task) -> Unit)?,
     deleteTaskClicked: (suspend () -> Unit)?=null,
     originalTask: MutableStateFlow<Flow<Task?>?>?=null,
     task: Flow<Task?>?=null,
@@ -347,6 +348,8 @@ fun TaskDeliverableMarkerBottomSheet(
                         updateTimeBlock = updateTimeBlock,
                         deleteTaskClicked = deleteTaskClicked,
                         updateTask = updateTask,
+                        updateDeliverable = updateDeliverable,
+                        updateTaskEndType = updateTaskEndType,
                         dismissBottomSheet = dismissBottomSheet
                     )
                 }
@@ -412,7 +415,9 @@ fun TasksFragmentView(
 
     LazyColumn(
         state = tabListState,
-        modifier = modifier.fillMaxSize().testTag("TasksFragmentViewLazyColumn")
+        modifier = modifier
+            .fillMaxSize()
+            .testTag("TasksFragmentViewLazyColumn")
     ) {
         item( key = "The Top") {
             Card(
@@ -544,7 +549,8 @@ fun TaskCardView(
     val location = remember { TextFieldState(task.location) }
 
     Card(
-        modifier = Modifier.testTag("TasksFragmentTaskCardView-${task.id}")
+        modifier = Modifier
+            .testTag("TasksFragmentTaskCardView-${task.id}")
             .fillMaxWidth()
             .padding(3.dp)
             .wrapContentHeight()
@@ -705,8 +711,20 @@ fun AddTaskViewPreview() {
         parent = 1,
         parentType = Task.TaskParentType.GOAL.name,
         position = 1,
-        type = Task.TaskType.NORMAL.name
-    ))
+        type = Task.TaskType.QUANTITY.name,
+        task = "Jump 2 times33 4",
+        location = "At Home",
+        endType = Task.TaskEndType.DELIVERABLE.name
+    ).apply {
+        deliverableState.value = flowOf(Deliverable(
+            deliverable = "Jump a total of 200 times654",
+            parent = parent,
+            position = 0,
+            location = location,
+            taskId = id,
+            endType = Deliverable.DeliverableEndType.WORK.name
+        ))
+    })
     val colourPickerDialog = ColourPickerDialog()
 
     val triedToSaveInput = MutableStateFlow(false)
@@ -723,6 +741,8 @@ fun AddTaskViewPreview() {
         errorMessage = errorMessage,
         pickColour = {},
         updateTask = {},
+        updateDeliverable = {},
+        updateTaskEndType = {},
         addTimeBlock = {},
         deleteTimeBlock = {},
         updateTimeBlock = {},
@@ -743,6 +763,8 @@ fun AddTaskView(
     errorMessage: MutableIntState,
     pickColour: (Color?) -> Unit,
     updateTask: suspend (Task) -> Unit,
+    updateDeliverable: suspend (Deliverable) -> Unit,
+    updateTaskEndType: (suspend (Task) -> Unit)?,
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
@@ -862,8 +884,10 @@ fun AddTaskView(
             ) { innerPadding ->
                 LazyColumn(
                     state = bottomSheetLazyListState,
-                    modifier = Modifier.testTag("TasksFragmentAddTaskViewLazyColumn")
-                        .fillMaxSize().padding(innerPadding)
+                    modifier = Modifier
+                        .testTag("TasksFragmentAddTaskViewLazyColumn")
+                        .fillMaxSize()
+                        .padding(innerPadding)
                 ) {
                     item {
                         Row(
@@ -874,7 +898,8 @@ fun AddTaskView(
                         ) {
                             Task.TaskType.entries.forEach { boxType ->
                                 Box(
-                                    modifier = Modifier.testTag("TasksFragmentAddTaskViewTaskTypeButton-${boxType.name}")
+                                    modifier = Modifier
+                                        .testTag("TasksFragmentAddTaskViewTaskTypeButton-${boxType.name}")
                                         .fillMaxWidth()
                                         .weight(1f)
                                         .height(TopAppBarDefaults.MediumAppBarCollapsedHeight) // makes it a big square
@@ -896,155 +921,34 @@ fun AddTaskView(
                         }
                     }
                     item {
-                        LaunchedEffect(taskText.text) {
-                            updateTask(task.copy(task = taskText.text.toString()))
-                        }
-                        when(Task.TaskType.valueOf(task.type)){
-                            Task.TaskType.QUANTITY,
-                            Task.TaskType.NORMAL -> {
-                                var styledText by remember { mutableStateOf<AnnotatedString?>(null) }
-                                if (Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY){
-                                    LaunchedEffect(Unit) {
-                                        getOnlyOneQuantityText(taskText.text.toString())?.let{
-                                            if (it != task.task) updateTask(task.copy(task = it))
-                                        }
-                                    }
-                                    LaunchedEffect(taskText.text) {
-                                        updateTask(task.copy(quantity =
-                                            Regex("\\d+").find(taskText.text)?.value?.toLongOrNull()?:0
-                                        ))
-                                    }
-                                    styledText = buildAnnotatedString {
-                                        val regex = Regex("\\d+")
-                                        val match = regex.find(taskText.text)
-                                        if (match != null) {
-                                            val start = match.range.first
-                                            val end = match.range.last + 1
-                                            // Text before number
-                                            append(taskText.text.substring(0, start))
-                                            // Highlighted number
-                                            withStyle(
-                                                SpanStyle(
-                                                    color = Color.Red,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            ) {
-                                                append(taskText.text.substring(start, end))
-                                            }
-                                            // Text after number
-                                            append(taskText.text.substring(end))
-                                        } else {
-                                            append(stringResource(R.string.please_enter_a_quantity))
-                                        }
-                                    }
-                                } else styledText = null
-
-                                OutlinedTextField(
-                                    state = taskText,
-                                    supportingText = {styledText?.let { styledText -> Text(styledText)}},
-                                    label = { Text(stringResource(
-                                        if (Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY) R.string.task_with_quantity
-                                        else R.string.task
-                                    )) },
-                                    modifier = Modifier.testTag("TasksFragmentAddTaskNormalQuantityTextField")
-                                        .fillMaxWidth()
-                                        .padding(3.dp)
-                                        .focusRequester(taskTextFocusRequester),
-                                    trailingIcon = {
-                                        if (triedToSave && taskText.text.isEmpty()){
-                                            Icon(
-                                                imageVector = Icons.Default.Warning,
-                                                contentDescription = stringResource(R.string.empty_field),
-                                                tint = Color.Red
-                                            )
-                                        }
-                                    },
-                                    inputTransformation = InputTransformation {
-                                        if(Task.TaskType.valueOf(task.type) == Task.TaskType.QUANTITY) {
-                                            val cleaned = getOnlyOneQuantityText(toString())
-                                            cleaned?.let { cleaned ->
-                                                val start = selection.start.coerceIn(0, cleaned.length)
-                                                val end = selection.end.coerceIn(0, cleaned.length)
-
-                                                replace(0, length, cleaned)
-                                                // Fix cursor if out of bounds
-                                                selection = TextRange(
-                                                    start - 1,
-                                                    end - 1
-                                                )
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                            Task.TaskType.TIME -> {
-                                val firstText = rememberTextFieldState("")
-                                val secondText = rememberTextFieldState("")
-
-                                LaunchedEffect(Unit) {
-                                    val initialTime = AppResources.getDurationString(context, taskTime)
-                                    val index = taskText.text.toString().indexOf(initialTime)
-                                    if (index != -1) {
-                                        val before = taskText.text.toString().substring(0, index)
-                                        val after = taskText.text.toString().substring(index + initialTime.length)
-                                        firstText.setTextAndPlaceCursorAtEnd(before.trim())
-                                        secondText.setTextAndPlaceCursorAtEnd(after.trim())
-                                    }
+                        NormalQuantityTimeTextField(
+                            modifier = Modifier
+                                .testTag("TasksFragmentAddTaskNormalQuantityTimeTextField")
+                                .focusRequester(taskTextFocusRequester),
+                            taskType = Task.TaskType.valueOf(task.type),
+                            textFieldState = taskText,
+                            triedToSave = triedToSave,
+                            updateTextFieldState = { newValue ->
+                                if (newValue != task.task) {
+                                    updateTask(task.copy(task = newValue))
+                                    taskText.edit { replace(0,length,newValue) }
                                 }
-
-                                val datePicked = LocalDateTime.now().withHour(0).withMinute(0)
-                                val context = LocalContext.current
-
-                                LaunchedEffect(firstText.text, taskTime, secondText.text) {
-                                    taskText.edit {
-                                        replace(0, length,
-                                            "${firstText.text.trim()} ${
-                                                AppResources.getDurationString(context, taskTime)
-                                            } ${secondText.text.trim()}")
-                                    }
-                                }
-
-                                val buttonDurationPick = remember { mutableStateOf(false) }
-                                if (buttonDurationPick.value) {
-                                    TimeDurationPicker(datePicked, taskTime) { hours, minutes ->
-                                        taskTime = taskTime.withHour(hours).withMinute(minutes)
-                                        scope.launch {
-                                            updateTask(task.copy(time = Converters().fromLocalDateTime(taskTime)))
-                                        }
-                                        buttonDurationPick.value = false
-                                    }
-                                }
-                                FlowRow(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(3.dp),
-                                    maxItemsInEachRow = Int.MAX_VALUE // allow natural wrapping
-                                ) {
-                                    OutlinedTextField(
-                                        state = firstText,
-                                        label = { Text(stringResource(R.string.task_with_time)) },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    OutlinedButton(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        onClick = { buttonDurationPick.value = true },
-                                        shape = RectangleShape,
-                                        border = BorderStroke(1.dp,Color.DarkGray)
-                                    ) {
-                                        Text(
-                                            text = AppResources.getDurationString(taskTime),
-                                            modifier = Modifier
-                                        )
-                                    }
-                                    OutlinedTextField(
-                                        state = secondText,
-                                        placeholder = { Text("Second part") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        supportingText = {Text(taskText.text.toString())}
-                                    )
-                                }
-                            }
-                        }
+                            },
+                            updateQuantity = { newQuantity ->
+                                updateTask(task.copy(quantity =
+                                    newQuantity
+                                ))
+                            },
+                            isDeliverable = false,
+                            updateTaskTask = { newTaskTask ->
+                                updateTask(task.copy(task = newTaskTask))
+                            },
+                            updateTaskTime = { newTime ->
+                                updateTask(task.copy(time = newTime))
+                            },
+                            taskTime = taskTime,
+                            changeTaskTime = { newTaskTime -> taskTime = newTaskTime}
+                        )
                     }
                     item {
                         Spacer(modifier = Modifier.width(2.dp))
@@ -1056,7 +960,8 @@ fun AddTaskView(
                         OutlinedTextField(
                             state = location,
                             label = { Text(stringResource(R.string.location)) },
-                            modifier = Modifier.testTag("TasksFragmentAddTaskLocationTextField")
+                            modifier = Modifier
+                                .testTag("TasksFragmentAddTaskLocationTextField")
                                 .fillMaxWidth()
                                 .padding(3.dp)
                                 .focusRequester(locationFocusRequester),
@@ -1084,7 +989,8 @@ fun AddTaskView(
                         ) {
                             if (task.colour != -1) {
                                 Box(
-                                    modifier = Modifier.testTag("TasksFragmentAddTaskColourBox")
+                                    modifier = Modifier
+                                        .testTag("TasksFragmentAddTaskColourBox")
                                         .fillMaxWidth()
                                         .fillMaxHeight()
                                         .padding(end = 3.dp)
@@ -1099,7 +1005,8 @@ fun AddTaskView(
                                 onClick = { pickColour(
                                     Color(task.colour)
                                 ) },
-                                modifier = Modifier.testTag("TasksFragmentAddTaskColourButton")
+                                modifier = Modifier
+                                    .testTag("TasksFragmentAddTaskColourButton")
                                     .fillMaxWidth()
                                     .fillMaxHeight()
                                     .weight(2f)
@@ -1156,35 +1063,36 @@ fun AddTaskView(
                         var showEndTypeOptions by remember { mutableStateOf(false) }
                         var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>())}
                         OutlinedButton(
-                            modifier = Modifier.testTag("TasksFragmentAddTaskEndTypeButton")
+                            modifier = Modifier
+                                .testTag("TasksFragmentAddTaskEndTypeButton")
                                 .fillMaxWidth()
                                 .padding(3.dp),
                             onClick = {
                                 endTypeOptions = listOf(
                                     MenuItemData(Task.TaskEndType.UNDEFINED.name){
                                         scope.launch {
-                                            updateTask(task.copy(endType = Task.TaskEndType.UNDEFINED.name))
+                                            (updateTaskEndType?:updateTask).invoke(task.copy(endType = Task.TaskEndType.UNDEFINED.name))
                                         }
                                     },
                                     MenuItemData(Task.TaskEndType.DATE.name){
                                         scope.launch {
-                                            updateTask(task.copy(endType = Task.TaskEndType.DATE.name))
+                                            (updateTaskEndType?:updateTask).invoke(task.copy(endType = Task.TaskEndType.DATE.name))
                                         }
                                         buttonDatePick = true
                                     },
                                     MenuItemData(Task.TaskEndType.GOAL.name){
                                         scope.launch {
-                                            updateTask(task.copy(endType = Task.TaskEndType.GOAL.name))
+                                            (updateTaskEndType?:updateTask).invoke(task.copy(endType = Task.TaskEndType.GOAL.name))
                                         }
                                     },
                                     MenuItemData(Task.TaskEndType.DELIVERABLE.name){
                                         scope.launch {
-                                            updateTask(task.copy(endType = Task.TaskEndType.DELIVERABLE.name))
+                                            (updateTaskEndType?:updateTask).invoke(task.copy(endType = Task.TaskEndType.DELIVERABLE.name))
                                         }
                                     },
                                     MenuItemData(Task.TaskEndType.MARKER.name){
                                         scope.launch {
-                                            updateTask(task.copy(endType = Task.TaskEndType.MARKER.name))
+                                            (updateTaskEndType?:updateTask).invoke(task.copy(endType = Task.TaskEndType.MARKER.name))
                                         }
                                     }
                                 )
@@ -1280,13 +1188,28 @@ fun AddTaskView(
                             }
                         }
                     }
+                    if (Task.TaskEndType.valueOf(task.endType) == Task.TaskEndType.DELIVERABLE) {
+                        item {
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
+                        item {
+                            TaskDeliverableWorkInput(
+                                modifier = Modifier,
+                                taskType = Task.TaskType.valueOf(task.type),
+                                deliverable = task.deliverable,
+                                updateDeliverable = updateDeliverable,
+                                triedToSave = triedToSave
+                            )
+                        }
+                    }
                     item {
                         Spacer(modifier = Modifier.width(2.dp))
                     }
                     stickyHeader(key = "TasksFragmentAddTaskAddTimeBlockButton") {
                         Button(
                             onClick = { scope.launch { addTimeBlock() } },
-                            modifier = Modifier.testTag("TasksFragmentAddTaskAddTimeBlockButton")
+                            modifier = Modifier
+                                .testTag("TasksFragmentAddTaskAddTimeBlockButton")
                                 .fillMaxWidth()
                                 .padding(3.dp),
                             shape = RectangleShape
@@ -1309,7 +1232,8 @@ fun AddTaskView(
                         }
                         item(key = "TasksFragmentAddTaskDeleteButton") {
                             IconButton(
-                                modifier = Modifier.testTag("TasksFragmentAddTaskDeleteButton")
+                                modifier = Modifier
+                                    .testTag("TasksFragmentAddTaskDeleteButton")
                                     .fillMaxWidth()
                                     .padding(3.dp)
                                     .background(color = Color.Red),
@@ -1325,6 +1249,226 @@ fun AddTaskView(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun NormalQuantityTimeTextField(
+    modifier: Modifier,
+    taskType: Task.TaskType,
+    textFieldState: TextFieldState,
+    triedToSave: Boolean,
+    updateTextFieldState: suspend (String) -> Unit,
+    updateQuantity: suspend (Long) -> Unit,
+    isDeliverable: Boolean,
+    updateTaskTask: suspend (String) -> Unit,
+    updateTaskTime: suspend (Long) -> Unit,
+    taskTime: LocalDateTime,
+    changeTaskTime: (LocalDateTime) -> Unit
+) {
+    var initialized by remember { mutableStateOf(false) }
+    LaunchedEffect(textFieldState.text) {
+        if (initialized || taskType!=Task.TaskType.QUANTITY) updateTaskTask(textFieldState.text.toString())
+    }
+    when(taskType){
+        Task.TaskType.QUANTITY,
+        Task.TaskType.NORMAL -> {
+            var styledText by remember { mutableStateOf<AnnotatedString?>(null) }
+            if (taskType == Task.TaskType.QUANTITY){
+                LaunchedEffect(Unit) {
+                    getOnlyOneQuantityText(textFieldState.text.toString())?.let{
+                        updateTextFieldState(it)
+                    }
+                    initialized = true
+                }
+                LaunchedEffect(textFieldState.text) {
+                    updateQuantity(Regex("\\d+").find(textFieldState.text)?.value?.toLongOrNull()?:0)
+                }
+                styledText = buildAnnotatedString {
+                    val regex = Regex("\\d+")
+                    val match = regex.find(textFieldState.text)
+                    if (match != null) {
+                        val start = match.range.first
+                        val end = match.range.last + 1
+                        // Text before number
+                        append(textFieldState.text.substring(0, start))
+                        // Highlighted number
+                        withStyle(
+                            SpanStyle(
+                                color = Color.Red,
+                                fontWeight = FontWeight.Bold
+                            )
+                        ) {
+                            append(textFieldState.text.substring(start, end))
+                        }
+                        // Text after number
+                        append(textFieldState.text.substring(end))
+                    } else {
+                        append(stringResource(R.string.please_enter_a_quantity))
+                    }
+                }
+            } else styledText = null
+
+            OutlinedTextField(
+                state = textFieldState,
+                supportingText = {styledText?.let { styledText -> Text(styledText)}},
+                label = { Text(stringResource(
+                    if (isDeliverable) {
+                        R.string.deliverable_with_a_quantity
+                    }
+                    else {
+                        if (taskType == Task.TaskType.QUANTITY) R.string.task_with_quantity
+                        else R.string.task
+                    }
+                )) },
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(3.dp),
+                trailingIcon = {
+                    if (triedToSave && textFieldState.text.isEmpty()){
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = stringResource(R.string.empty_field),
+                            tint = Color.Red
+                        )
+                    }
+                },
+                inputTransformation = InputTransformation {
+                    if(taskType == Task.TaskType.QUANTITY) {
+                        val cleaned = getOnlyOneQuantityText(toString())
+                        cleaned?.let { cleaned ->
+                            val start = selection.start.coerceIn(0, cleaned.length)
+                            val end = selection.end.coerceIn(0, cleaned.length)
+
+                            replace(0, length, cleaned)
+                            // Fix cursor if out of bounds
+                            selection = TextRange(
+                                start - 1,
+                                end - 1
+                            )
+                        }
+                    }
+                }
+            )
+        }
+        Task.TaskType.TIME -> {
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+            val firstText = rememberTextFieldState("")
+            val secondText = rememberTextFieldState("")
+            val datePicked = LocalDateTime.now().withHour(0).withMinute(0)
+
+            LaunchedEffect(Unit) {
+                val initialTime = AppResources.getDurationString(context, taskTime)
+                val index = textFieldState.text.toString().indexOf(initialTime)
+                if (index != -1) {
+                    val before = textFieldState.text.toString().substring(0, index)
+                    val after = textFieldState.text.toString().substring(index + initialTime.length)
+                    firstText.setTextAndPlaceCursorAtEnd(before.trim())
+                    secondText.setTextAndPlaceCursorAtEnd(after.trim())
+                }
+            }
+
+            LaunchedEffect(firstText.text, taskTime, secondText.text) {
+                textFieldState.edit {
+                    replace(0, length,
+                        "${firstText.text.trim()} ${
+                            AppResources.getDurationString(context, taskTime)
+                        } ${secondText.text.trim()}")
+                }
+            }
+
+            val buttonDurationPick = remember { mutableStateOf(false) }
+            if (buttonDurationPick.value) {
+                TimeDurationPicker(datePicked, taskTime) { hours, minutes ->
+                    changeTaskTime(taskTime.withHour(hours).withMinute(minutes))
+                    scope.launch {
+                        updateTaskTime(Converters().fromLocalDateTime(taskTime))
+                    }
+                    buttonDurationPick.value = false
+                }
+            }
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(3.dp),
+                maxItemsInEachRow = Int.MAX_VALUE // allow natural wrapping
+            ) {
+                OutlinedTextField(
+                    state = firstText,
+                    label = { Text(stringResource(R.string.task_with_time)) },
+                    modifier = modifier.fillMaxWidth()
+                )
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { buttonDurationPick.value = true },
+                    shape = RectangleShape,
+                    border = BorderStroke(1.dp,Color.DarkGray)
+                ) {
+                    Text(
+                        text = AppResources.getDurationString(taskTime),
+                        modifier = Modifier
+                    )
+                }
+                OutlinedTextField(
+                    state = secondText,
+                    placeholder = { Text("Second part") },
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = {Text(textFieldState.text.toString())}
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TaskDeliverableWorkInput(
+    modifier: Modifier,
+    taskType: Task.TaskType,
+    deliverable: Flow<Deliverable?>,
+    updateDeliverable: suspend (Deliverable) -> Unit,
+    triedToSave: Boolean
+){
+    val deliverable by deliverable.collectAsStateWithLifecycle(null)
+    deliverable?.let { deliverable ->
+        val deliverableWorkText = remember { TextFieldState(deliverable.deliverable) }
+        val deliverableWorkTextFocusRequester = remember { deliverable.deliverableTextFocusRequester }
+        var deliverableTime by remember {
+            Converters().toLocalDateTime(
+                deliverable.time
+            )
+        }
+        NormalQuantityTimeTextField(
+            modifier = modifier
+                .testTag("TasksFragmentTaskDeliverableWorkInputTextField")
+                .focusRequester(deliverableWorkTextFocusRequester),
+            taskType = taskType,
+            textFieldState = deliverableWorkText,
+            triedToSave = triedToSave,
+            updateTextFieldState = { newValue ->
+                if (newValue != deliverable.deliverable) {
+                    updateDeliverable(deliverable.copy(deliverable = newValue))
+                    deliverableWorkText.edit { replace(0, length, newValue) }
+                }
+            },
+            updateQuantity = { newQuantity ->
+                updateDeliverable(
+                    deliverable.copy(
+                        quantity =
+                            newQuantity
+                    )
+                )
+            },
+            isDeliverable = true,
+            updateTaskTask = { newTaskTask ->
+                updateDeliverable(deliverable.copy(deliverable = newTaskTask))
+            },
+            updateTaskTime = { newTime ->
+                updateDeliverable(deliverable.copy(time = newTime))
+            },
+            taskTime = deliverableTime,
+            changeTaskTime = { newTaskTime -> deliverableTime = newTaskTime}
+        )
     }
 }
 
@@ -1787,7 +1931,8 @@ fun MarkerCardView(
         LocalDateTime.now().toLocalDate(),
         dateTime.toLocalDate()).days
     Card(
-        modifier = Modifier.testTag("TasksFragmentMarkerCardView-${marker.id}")
+        modifier = Modifier
+            .testTag("TasksFragmentMarkerCardView-${marker.id}")
             .fillMaxWidth()
             .defaultMinSize(minHeight = 64.dp)
             .wrapContentHeight()
@@ -2009,8 +2154,10 @@ fun AddMarkerView(
             ) { innerPadding ->
                 LazyColumn(
                     state = bottomSheetLazyListState,
-                    modifier = Modifier.testTag("TasksFragmentAddMarkerViewLazyColumn")
-                        .fillMaxSize().padding(innerPadding)
+                    modifier = Modifier
+                        .testTag("TasksFragmentAddMarkerViewLazyColumn")
+                        .fillMaxSize()
+                        .padding(innerPadding)
                 ) {
                     item {
                         OutlinedTextField(
@@ -2102,7 +2249,8 @@ fun AddMarkerView(
                         }
                         item(key = "TasksFragmentMarkerDeleteButton") {
                             IconButton(
-                                modifier = Modifier.testTag("TasksFragmentMarkerDeleteButton")
+                                modifier = Modifier
+                                    .testTag("TasksFragmentMarkerDeleteButton")
                                     .fillMaxWidth()
                                     .padding(4.dp)
                                     .background(color = Color.Red),
