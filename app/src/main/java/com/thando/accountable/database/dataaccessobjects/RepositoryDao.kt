@@ -26,7 +26,6 @@ import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
@@ -171,21 +170,21 @@ interface RepositoryDao {
 
     @Transaction
     suspend fun deleteDeliverable(deliverable: Deliverable){
-        val times = getTimes(deliverable.id, GoalTaskDeliverableTime.TimesType.GOAL).first()
+        val times = getTimes(deliverable.deliverableId, GoalTaskDeliverableTime.TimesType.GOAL).first()
         times.forEach { time -> delete(time) }
         delete(deliverable)
     }
 
     @Transaction
     suspend fun deleteTask(task: Task) {
-        val times = getTimes(task.id, GoalTaskDeliverableTime.TimesType.TASK).first()
+        val times = getTimes(task.taskId, GoalTaskDeliverableTime.TimesType.TASK).first()
         times.forEach { time -> delete(time) }
         // Fix task Positions
         val tasks = getTasks(task.parent, Task.TaskParentType.GOAL).first()
         var passedTask = false
         tasks.forEach {
             if (!passedTask){
-                if (it.id == task.id) passedTask = true
+                if (it.taskId == task.taskId) passedTask = true
             } else{
                 it.position -= 1
                 update(it)
@@ -367,31 +366,31 @@ interface RepositoryDao {
 
     @Transaction
     suspend fun upsert(task: Task): Long {
-        if (task.id!=null){
-            val existingEntity = getTask(task.id).first()
+        if (task.taskId!=null){
+            val existingEntity = getTask(task.taskId).first()
             if (existingEntity!=null){
                 update(task)
             }
             else{
-                task.id = insert(task)
+                task.taskId = insert(task)
             }
-        } else task.id = insert(task)
-        return task.id!!
+        } else task.taskId = insert(task)
+        return task.taskId!!
     }
 
     @Transaction
     suspend fun upsert(deliverable: Deliverable): Long {
-        if (deliverable.id!=null){
-            val existingEntity = getDeliverable(deliverable.id).first()
+        if (deliverable.deliverableId!=null){
+            val existingEntity = getDeliverable(deliverable.deliverableId).first()
             if (existingEntity!=null){
                 update(deliverable)
             }
             else{
-                deliverable.id = insert(deliverable)
+                deliverable.deliverableId = insert(deliverable)
             }
         }
-        else deliverable.id = insert(deliverable)
-        return deliverable.id!!
+        else deliverable.deliverableId = insert(deliverable)
+        return deliverable.deliverableId!!
     }
 
     @Transaction
@@ -514,14 +513,52 @@ interface RepositoryDao {
     @Query("SELECT * FROM marker_table WHERE marker_parent = :goalId")
     fun getMarkers(goalId:Long?): Flow<List<Marker>>
 
-    @Query("SELECT * FROM task_table WHERE id = :taskId")
+    @Query("SELECT * FROM task_table WHERE taskId = :taskId")
     fun getTask(taskId: Long?): Flow<Task?>
 
-    @Query("SELECT * FROM deliverable_table WHERE id = :deliverableId")
+    @Query("SELECT * FROM deliverable_table WHERE deliverableId = :deliverableId")
     fun getDeliverable(deliverableId: Long?): Flow<Deliverable?>
 
-    @Query("SELECT * FROM deliverable_table WHERE deliverable_task_id = :taskId")
-    fun getTaskDeliverable(taskId: Long?): Flow<Deliverable?>
+    @Query("""
+        SELECT * 
+        FROM deliverable_table d 
+        WHERE d.deliverable_parent = :goalId 
+            AND d.deliverable_end_type = :endType 
+            AND d.deliverable_work_type IN (:workTypeList) 
+            AND NOT EXISTS (
+                SELECT 1 
+                FROM TaskDeliverable td 
+                WHERE td.taskId = :taskId 
+                    AND td.deliverableId = d.deliverableId
+                )
+    """)
+    fun getTaskDeliverableNotSelected(
+        goalId: Long?,
+        taskId: Long?,
+        workTypeList: List<String>,
+        endType: String = Deliverable.DeliverableEndType.WORK.name
+    ): Flow<List<Deliverable>>
+
+    @Query("""
+        SELECT *
+        FROM deliverable_table d
+        WHERE d.deliverable_parent = :goalId
+          AND d.deliverable_end_type = :endType
+          AND d.deliverable_work_type IN (:workTypeList)
+          AND EXISTS (
+              SELECT 1
+              FROM TaskDeliverable td
+              WHERE td.taskId = :taskId
+                AND td.deliverableId = d.deliverableId
+          )
+    """)
+    fun getTaskDeliverableSelected(
+        goalId: Long?,
+        taskId: Long?,
+        workTypeList: List<String>,
+        endType: String = Deliverable.DeliverableEndType.WORK.name
+    ): Flow<List<Deliverable>>
+
 
     @Query("SELECT * FROM marker_table WHERE id = :markerId")
     fun getMarker(markerId: Long?): Flow<Marker?>

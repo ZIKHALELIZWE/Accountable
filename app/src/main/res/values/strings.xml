@@ -320,4 +320,6 @@
     <string name="yearly">Yearly</string>
     <string name="back_button">Back Button</string>
     <string name="deliverable_with_a_quantity">Deliverable with a Quantity</string>
+    <string name="enter_deliverable_information">Enter Deliverable Information</string>
+    <string name="pick_deliverables">Pick Deliverables</string>
 </resources>

@@ -65,7 +65,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,7 +106,6 @@ import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.time.LocalDateTime
@@ -256,7 +254,6 @@ fun EditGoalView(
                     deleteTimeBlock = viewModel::deleteTimeBlock,
                     updateTimeBlock = viewModel::updateTimeBlock,
                     updateDeliverable = viewModel::updateDeliverable,
-                    updateTaskEndType = null,
                     deleteTaskClicked = null,
                     originalTask = null,
                     task = null,
@@ -267,7 +264,11 @@ fun EditGoalView(
                     deleteMarkerClicked = null,
                     originalMarker = null,
                     marker = null,
-                    updateMarker = viewModel::updateMarker
+                    updateMarker = viewModel::updateMarker,
+                    addTaskDeliverable = null,
+                    addDeliverableDialog = viewModel.addDeliverableDialog,
+                    selectTaskDeliverable = null,
+                    pickDeliverableDialog = viewModel.pickDeliverableDialog
                 )
             }
         }
@@ -370,11 +371,11 @@ fun EditGoalFragmentView(
                         ) {
                             items(
                                 items = notSelectedGoalDeliverables,
-                                key = { it.id ?: Random.nextLong() }
+                                key = { it.deliverableId ?: Random.nextLong() }
                             ) { deliverable ->
                                 Row(
                                     modifier = Modifier
-                                        .testTag("EditGoalPickDeliverableRow-${deliverable.id}")
+                                        .testTag("EditGoalPickDeliverableRow-${deliverable.deliverableId}")
                                         .height(IntrinsicSize.Min)
                                         .fillMaxWidth()
                                         .padding(3.dp)
@@ -389,7 +390,7 @@ fun EditGoalFragmentView(
                                     IconButton(
                                         modifier = Modifier
                                             .weight(1f).fillMaxWidth()
-                                            .testTag("EditGoalPickDeliverableButton-${deliverable.id}")
+                                            .testTag("EditGoalPickDeliverableButton-${deliverable.deliverableId}")
                                             .background(color = Color.Green),
                                         onClick = {
                                             scope.launch {
@@ -724,7 +725,7 @@ fun EditGoalFragmentView(
                     }
                     items(
                         items = selectedGoalDeliverables,
-                        key = { it.id ?: Random.nextLong() }
+                        key = { it.deliverableId ?: Random.nextLong() }
                     ) { deliverable ->
                         Row(
                             modifier = Modifier
@@ -737,14 +738,14 @@ fun EditGoalFragmentView(
                                 viewModel::editDeliverable,
                                 Modifier
                                     .weight(4f).fillMaxSize()
-                                    .testTag("TasksFragmentDeliverableCard-${deliverable.id}")
+                                    .testTag("TasksFragmentDeliverableCard-${deliverable.deliverableId}")
                                     .padding(3.dp)
                                     .wrapContentHeight()
                             )
                             IconButton(
                                 modifier = Modifier
                                     .weight(1f).fillMaxSize()
-                                    .testTag("EditGoalUnpickDeliverableButton-${deliverable.id}")
+                                    .testTag("EditGoalUnpickDeliverableButton-${deliverable.deliverableId}")
                                     .background(color = Color.Red),
                                 onClick = {
                                     scope.launch {

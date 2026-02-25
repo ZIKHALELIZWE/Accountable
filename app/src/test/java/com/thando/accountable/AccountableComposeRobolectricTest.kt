@@ -29,10 +29,12 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.MainActivityTest.FilteredPrintStream
 import com.thando.accountable.MainActivityTest.Log
+import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -204,6 +206,72 @@ abstract class AccountableComposeRobolectricTest(
 
         if (!idsEqual && parentsEqual) {
             assertEquals(timeOne.id,timeTwo.cloneId)
+        }
+    }
+
+    fun deliverablesAreEqual(
+        deliverableOne:Deliverable,
+        deliverableTwo:Deliverable,
+        idsEqual:Boolean = true,
+        parentsEqual:Boolean = true
+    ) = runMainTest {
+        val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
+            {objectA, objectB -> assertEquals(objectA,objectB)}
+        else {objectA, objectB -> assertNotEquals(objectA,objectB)}
+
+        assertionFunction(
+            deliverableOne.deliverableId,
+            deliverableTwo.deliverableId
+        )
+
+        assertEquals(
+            deliverableOne.initialDateTime,
+            deliverableTwo.initialDateTime
+        )
+
+        assertEquals(
+            deliverableOne.deliverable,
+            deliverableTwo.deliverable
+        )
+        assertEquals(
+            deliverableOne.location,
+            deliverableTwo.location
+        )
+        assertEquals(
+            deliverableOne.endDateTime,
+            deliverableTwo.endDateTime
+        )
+        assertEquals(
+            deliverableOne.status,
+            deliverableTwo.status
+        )
+        assertEquals(
+            deliverableOne.endType,
+            deliverableTwo.endType
+        )
+        if (parentsEqual) assertEquals(
+            deliverableOne.parent,
+            deliverableTwo.parent
+        )
+        else assertNotEquals(deliverableOne.parent,deliverableTwo.parent)
+        assertEquals(
+            deliverableOne.times.first().size,
+            deliverableTwo.times.first().size
+        )
+
+        if (!idsEqual && parentsEqual) {
+            assertEquals(deliverableOne.deliverableId,deliverableTwo.cloneId)
+        }
+
+        val timesTwoList = deliverableTwo.times.first()
+        deliverableOne.times.first().forEachIndexed { index, timeOne ->
+            val timeTwo = timesTwoList[index]
+            timesAreEqual(
+                timeOne,
+                timeTwo,
+                idsEqual = idsEqual,
+                parentsEqual = parentsEqual
+            )
         }
     }
 

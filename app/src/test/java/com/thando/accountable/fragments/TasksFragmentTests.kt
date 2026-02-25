@@ -1103,8 +1103,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         else {objectA, objectB -> assertNotEquals(objectA,objectB)}
 
         assertionFunction(
-            taskOne.id,
-            taskTwo.id
+            taskOne.taskId,
+            taskTwo.taskId
         )
 
         assertEquals(
@@ -1171,7 +1171,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         )
 
         if (!idsEqual && times == null) {
-            assertEquals(taskOne.id, taskTwo.cloneId)
+            assertEquals(taskOne.taskId, taskTwo.cloneId)
         }
 
         val timesTwoList = taskTwo.times.first()
@@ -1184,6 +1184,16 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 parentsEqual = idsEqual
             )
         }
+
+        /*if (taskOne.deliverable.first() != null) {
+            assertNotNull(taskTwo.deliverable.first())
+            deliverablesAreEqual(
+                taskOne.deliverable.first()!!,
+                taskTwo.deliverable.first()!!,
+                idsEqual,
+                parentsEqual = idsEqual
+            )
+        } else assertNull(taskTwo.deliverable.first())*/
     }
 
     @Test
@@ -1201,7 +1211,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         val oldTask = tasksList[0]
         val oldTimes = oldTask.times.first()
 
-        withTag("TasksFragmentTaskCardView-${tasksList[0].id}") {
+        withTag("TasksFragmentTaskCardView-${tasksList[0].taskId}") {
             performLongPressWithScroll()
         }
 
@@ -1327,7 +1337,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             tasksList[0].location
         )
 
-        assertEquals(oldTask.id,tasksList[0].id)
+        assertEquals(oldTask.taskId,tasksList[0].taskId)
 
         assertNotEquals(oldTask.endDateTime,tasksList[0].endDateTime)
 
@@ -1351,7 +1361,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         assertNotNull(tasksList)
         assertEquals(1,tasksList.size)
 
-        withTag("TasksFragmentTaskCardView-${tasksList[0].id}") {
+        withTag("TasksFragmentTaskCardView-${tasksList[0].taskId}") {
             performLongPressWithScroll()
         }
 
@@ -1539,9 +1549,112 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverable?.first())
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskModifyDeliverableButtons")
+        }
 
-        withTag("TasksFragmentAddTaskEndTypeButton") {
+        withTag("TasksFragmentAddTaskAddDeliverableButton") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0])
+
+        withTag("DeliverableAdderDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("My Quantity 6 Deliverable 7")
+            assertTextContains(
+                value = "My Quantity 6 Deliverable",
+                substring = true,
+                ignoreCase = false
+            )
+            finishProcesses()
+        }
+        assertEquals(6L,taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.quantity)
+        withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
+            performTextReplacement("Jump a total of 20 times33")
+            assertTextContains(
+                value = "Jump a total of 20 times",
+                substring = true,
+                ignoreCase = false
+            )
+            finishProcesses()
+        }
+        assertEquals(20L,taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.quantity)
+
+        withTag("DeliverableAdderDialogDismissButton") {
+            performPressWithScroll()
+        }
+
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("DeliverableAdderDialog") {
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentAddTaskAddDeliverableButton") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0])
+
+        withTag("DeliverableAdderDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("My Quantity 6 Deliverable 7")
+            assertTextContains(
+                value = "My Quantity 6 Deliverable",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        assertEquals(6L,taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.quantity)
+        withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
+            performTextReplacement("Jump a total of 20 times33")
+            assertTextContains(
+                value = "Jump a total of 20 times",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        assertEquals(20L,taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.quantity)
+
+        withTag("DeliverableAdderDialogOKButton") {
+            performPressWithScroll()
+        }
+
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("DeliverableAdderDialog") {
+            assertDoesNotExist()
+        }
+
+
+        /*withTag("TasksFragmentAddTaskEndTypeButton") {
             performPressWithScroll()
         }
 
@@ -1560,5 +1673,72 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         }
 
         assertNotNull(taskViewModel.task.first()?.deliverable?.first())
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentTaskDeliverableWorkInputTextField")
+        }
+        finishProcesses()
+
+        withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains("", substring = true,false)
+            performTextReplacement("Jump a total of 200 times564")
+            assertTextContains(
+                value = "Jump a total of 200 times",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        assertEquals(
+            "Jump a total of 200 times",
+            taskViewModel.task.first()?.deliverable?.first()?.deliverable
+        )
+        assertEquals(
+            200L,
+            taskViewModel.task.first()?.deliverable?.first()?.quantity
+        )
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskAddTimeBlockButton")
+        }
+
+        assertNotNull(taskViewModel.task.first()?.times)
+        TimeBlockTest(
+            "TasksFragmentAddTaskAddTimeBlockButton",
+            taskViewModel.task.first()!!.times,
+            Triple(
+                instantTaskExecutorRule,
+                composeTestRule,
+                activity
+            ),
+            lazyColumnTag = "TasksFragmentAddTaskViewLazyColumn"
+        ).runTests(this@TasksFragmentTests::class)
+
+        withTag("TasksFragmentAddTaskDeleteButton").assertDoesNotExist()
+        val task = taskViewModel.task.first()!!
+        val times = task.times.first()
+
+        withTag("TasksFragmentTaskSaveButton"){
+            performPressWithoutScroll()
+        }
+
+        assertNotNull(taskViewModel.goal.first()?.goalTasks?.first())
+        tasksList = taskViewModel.goal.first()!!.goalTasks.first()
+        assertEquals(1,tasksList.size)
+
+        tasksAreEqual(
+            taskOne = task,
+            taskTwo = tasksList[0],
+            idsEqual = true,
+            times
+        )*/
     }
 }

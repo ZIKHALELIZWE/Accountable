@@ -18,6 +18,7 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.Task
+import com.thando.accountable.database.tables.TaskDeliverable
 import com.thando.accountable.database.tables.TeleprompterSettings
 import java.time.LocalDateTime
 
@@ -33,8 +34,9 @@ import java.time.LocalDateTime
     GoalTaskDeliverableTime::class,
     Task::class,
     Deliverable::class,
-    Marker::class
-], version = 13, exportSchema = false)
+    Marker::class,
+    TaskDeliverable::class
+], version = 15, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AccountableDatabase: RoomDatabase() {
     abstract val repositoryDao : RepositoryDao
@@ -60,7 +62,7 @@ abstract class AccountableDatabase: RoomDatabase() {
                         Migration(1, 2) { db ->
                             db.execSQL("DROP TABLE IF EXISTS goal_table")
                             db.execSQL("DROP TABLE IF EXISTS times_table")
-                            db.execSQL("CREATE TABLE IF NOT EXISTS goal_table (goal_category TEXT NOT NULL, goal_parent INTEGER NOT NULL, goal_colour INTEGER NOT NULL, goal_date_of_completion INTEGER NULL, goal_date_time INTEGER NOT NULL, goal_goal TEXT NOT NULL, goal_location TEXT NOT NULL, goal_num_audios INTEGER NOT NULL, goal_num_documents INTEGER NOT NULL, goal_num_images INTEGER NOT NULL, goal_num_scripts INTEGER NOT NULL, goal_num_videos INTEGER NOT NULL, goal_picture TEXT NULL, goal_position INTEGER NOT NULL, goal_scroll_position INTEGER NOT NULL, goal_size REAL NOT NULL, goal_status TEXT NOT NULL, id INTEGER PRIMARY KEY AUTOINCREMENT NULL)")
+                            db.execSQL("CREATE TABLE IF NOT EXISTS goal_table (goal_category TEXT NOT NULL, goal_parent INTEGER NOT NULL, goal_colour INTEGER NOT NULL, goal_date_of_completion INTEGER NULL, goal_date_time INTEGER NOT NULL, goal_goal TEXT NOT NULL, goal_location TEXT NOT NULL, goal_num_audios INTEGER NOT NULL, goal_num_documents INTEGER NOT NULL, goal_num_images INTEGER NOT NULL, goal_num_scripts INTEGER NOT NULL, goal_num_videos INTEGER NOT NULL, goal_picture TEXT NULL, goal_position INTEGER NOT NULL, goal_scroll_position INTEGER NOT NULL, goal_size REAL NOT NULL, goal_status TEXT NOT NULL, taskId INTEGER PRIMARY KEY AUTOINCREMENT NULL)")
                             db.execSQL("CREATE TABLE IF NOT EXISTS times_table (id INTEGER PRIMARY KEY AUTOINCREMENT NULL, times_deliverable INTEGER NOT NULL, times_duration TEXT NOT NULL, times_goal INTEGER NOT NULL," +
                                     " times_start TEXT NOT NULL, times_task INTEGER NOT NULL, times_time_block_type TEXT NOT NULL)")
                         },
@@ -161,13 +163,48 @@ abstract class AccountableDatabase: RoomDatabase() {
                             db.execSQL("ALTER TABLE marker_table ADD marker_clone_id INTEGER DEFAULT ${null} NULL")
                         },
                         Migration(11,12){ db ->
+                            db.execSQL("ALTER TABLE deliverable_table DROP COLUMN deliverable_goal_id")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_goal_id INTEGER NULL")
+                            db.execSQL("ALTER TABLE deliverable_table DROP COLUMN deliverable_size")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_size REAL NOT NULL")
                             db.execSQL("ALTER TABLE goal_table DROP COLUMN goal_category")
                         },
                         Migration(12,13){ db ->
-                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_quantity INTEGER DEFAULT ${0L}")
-                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_time INTEGER DEFAULT ${Converters().fromLocalDateTime(LocalDateTime.now())}")
-                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_task_id INTEGER DEFAULT ${null} NULL")
-                            db.execSQL("CREATE UNIQUE INDEX index_deliverable_table_deliverable_task_id ON users(deliverable_task_id)")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_quantity INTEGER NOT NULL")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_time INTEGER NOT NULL")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_task_id INTEGER NULL")
+
+                            db.execSQL("ALTER TABLE task_table RENAME COLUMN id TO taskId")
+                            db.execSQL("ALTER TABLE deliverable_table RENAME COLUMN id TO deliverableId")
+                            db.execSQL("CREATE TABLE TaskDeliverable (taskId INT NOT NULL,deliverableId INT NOT NULL,percentage FLOAT NULL,PRIMARY KEY (taskId, deliverableId),FOREIGN KEY (taskId) REFERENCES task_table(taskId),FOREIGN KEY (deliverableId) REFERENCES deliverable_table(deliverableId))")
+                        },
+                        Migration(13,14) { db ->
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_work_type TEXT NOT NULL")
+                            db.execSQL("ALTER TABLE TaskDeliverable ADD startDate INTEGER NOT NULL")
+                            db.execSQL("ALTER TABLE TaskDeliverable ADD streak INTEGER NULL")
+                            db.execSQL("ALTER TABLE TaskDeliverable ADD workType TEXT NOT NULL")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_should_complete_work INTEGER NOT NULL")
+                            db.execSQL("ALTER TABLE deliverable_table DROP COLUMN deliverable_end_date")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_end_date INTEGER NULL")
+
+                            db.execSQL("ALTER TABLE deliverable_table DROP COLUMN deliverable_clone_id")
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_clone_id INTEGER NULL")
+                        },
+                        Migration(14,15) { db ->
+                            db.execSQL("DROP TABLE TaskDeliverable")
+                            db.execSQL("""
+                              CREATE TABLE TaskDeliverable (
+                                  taskId INTEGER NOT NULL,
+                                  deliverableId INTEGER NOT NULL,
+                                  percentage REAL NULL,
+                                  startDate INTEGER NOT NULL,
+                                  streak INTEGER NULL,
+                                  workType TEXT NOT NULL,
+                                  PRIMARY KEY (taskId, deliverableId),
+                                  FOREIGN KEY (taskId) REFERENCES task_table(taskId),
+                                  FOREIGN KEY (deliverableId) REFERENCES deliverable_table(deliverableId)
+                              )
+                              """.trimIndent())
                         }
                     )
                     .build()

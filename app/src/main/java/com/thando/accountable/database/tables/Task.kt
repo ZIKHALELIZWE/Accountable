@@ -13,6 +13,7 @@ import com.thando.accountable.database.dataaccessobjects.RepositoryDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import java.time.LocalDateTime
@@ -20,7 +21,7 @@ import java.time.LocalDateTime
 @Entity(tableName = "task_table")
 data class Task(
     @PrimaryKey(autoGenerate = true)
-    var id: Long? = null,
+    var taskId: Long? = null,
 
     @ColumnInfo(name = "task_parent")
     var parent: Long,
@@ -108,12 +109,22 @@ data class Task(
             timesFlow?: MutableStateFlow(emptyList())
     }.flowOn(MainActivity.IO)
     @Ignore
-    val deliverableState = MutableStateFlow<Flow<Deliverable?>?>(null)
+    val deliverableNormalListState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
-    val deliverable = deliverableState.flatMapLatest { deliverableFlow ->
-        deliverableFlow ?: MutableStateFlow(null)
-    }.flowOn(MainActivity.IO)
+    val deliverableNormalList = deliverableNormalListState.flatMapLatest { it }.flowOn(MainActivity.IO)
+
+    @Ignore
+    val deliverableQuantityListState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val deliverableQuantityList = deliverableQuantityListState.flatMapLatest { it }.flowOn(MainActivity.IO)
+
+    @Ignore
+    val deliverableTimeListState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val deliverableTimeList = deliverableTimeListState.flatMapLatest { it }.flowOn(MainActivity.IO)
 
     @Ignore
     val taskTextFocusRequester = FocusRequester()
@@ -124,11 +135,49 @@ data class Task(
     @Ignore
     val colourFocusRequester = FocusRequester()
 
+    fun getNotSelectedDeliverablesList():Flow<List<Deliverable>> {
+        return if (endType == TaskEndType.DELIVERABLE.name){
+            when(TaskType.valueOf(type)){
+                TaskType.NORMAL -> deliverableNormalList
+                TaskType.QUANTITY -> deliverableQuantityList
+                TaskType.TIME -> deliverableTimeList
+            }
+        } else{
+            emptyFlow()
+        }
+    }
+
     fun loadTimes(dao: RepositoryDao) {
-        timesState.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.TASK)
+        timesState.value = dao.getTimes(taskId, GoalTaskDeliverableTime.TimesType.TASK)
     }
 
     fun loadDeliverable(dao: RepositoryDao) {
-        deliverableState.value = dao.getTaskDeliverable(id)
+        // Deliverable Must Be Equal To Work.
+        deliverableNormalListState.value = dao.getTaskDeliverableNotSelected(
+            parent,
+            taskId,
+            listOf(
+                TaskDeliverable.WorkType.RepeatingTaskTimes.name,
+                TaskDeliverable.WorkType.CompleteTasks.name
+            )
+        )
+        deliverableQuantityListState.value = dao.getTaskDeliverableNotSelected(
+            parent,
+            taskId,
+            listOf(
+                TaskDeliverable.WorkType.RepeatingTaskTimes.name,
+                TaskDeliverable.WorkType.QuantityTaskOnce.name,
+                TaskDeliverable.WorkType.CompleteTasks.name
+            )
+        )
+        deliverableTimeListState.value = dao.getTaskDeliverableNotSelected(
+            parent,
+            taskId,
+            listOf(
+                TaskDeliverable.WorkType.RepeatingTaskTimes.name,
+                TaskDeliverable.WorkType.TimeTaskOnce.name,
+                TaskDeliverable.WorkType.CompleteTasks.name
+            )
+        )
     }
 }

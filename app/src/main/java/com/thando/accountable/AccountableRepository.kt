@@ -2173,7 +2173,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         // Delete the ones that are not in from (originally in to)
                         if (
                             !fromDeliverables.any { fromDeliverable ->
-                                toDeliverable.id == fromDeliverable.cloneId
+                                toDeliverable.deliverableId == fromDeliverable.cloneId
                             }
                         ) {
                             dao.delete(toDeliverable)
@@ -2183,20 +2183,20 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     for (deliverable in fromDeliverables) {
                         to.id?.let { id ->
                             var newDeliverable = to.goalDeliverables.first()
-                                .find { toDeliverable -> toDeliverable.id == deliverable.cloneId }
+                                .find { toDeliverable -> toDeliverable.deliverableId == deliverable.cloneId }
                             if (newDeliverable == null) {
                                 newDeliverable = Deliverable(
                                     parent = id,
                                     position = deliverable.position
                                 )
-                                newDeliverable.id = saveDeliverable(newDeliverable)
+                                newDeliverable.deliverableId = saveDeliverable(newDeliverable)
                             } else {
                                 newDeliverable.parent = id
                                 newDeliverable.position = deliverable.position
                             }
 
-                            val fromMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(deliverable.id))
-                            val toMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(newDeliverable.id))
+                            val fromMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(deliverable.deliverableId))
+                            val toMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(newDeliverable.deliverableId))
                             cloneDeliverableTo(
                                 fromMutable,
                                 toMutable,
@@ -2309,20 +2309,20 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.numDocuments = from.numDocuments
                 to.numScripts = from.numScripts
 
-                if (setCloneId) to.cloneId = from.id
+                if (setCloneId) to.cloneId = from.taskId
 
-                if (to.id == null) to.id = saveTask(to)
+                if (to.taskId == null) to.taskId = saveTask(to)
                 cloneTimesTo(
-                    to.id,
+                    to.taskId,
                     from.times,
                     to.times,
                     GoalTaskDeliverableTime.TimesType.TASK,
                     setCloneId
                 )
 
-                to.id = saveTask(to)
+                to.taskId = saveTask(to)
 
-                if (setCloneId) to.cloneId = from.id
+                if (setCloneId) to.cloneId = from.taskId
             }
         }
     }
@@ -2372,13 +2372,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.numDocuments = from.numDocuments
                 to.numScripts = from.numScripts
 
-                if (setCloneId) to.cloneId = from.id
+                if (setCloneId) to.cloneId = from.deliverableId
 
-                if (to.id == null) to.id = saveDeliverable(to)
-                to.goalId = if (from.goalId!=null) to.id else null
+                if (to.deliverableId == null) to.deliverableId = saveDeliverable(to)
+                to.goalId = if (from.goalId!=null) to.deliverableId else null
 
                 cloneTimesTo(
-                    to.id,
+                    to.deliverableId,
                     from.times,
                     to.times,
                     GoalTaskDeliverableTime.TimesType.DELIVERABLE,
@@ -2509,8 +2509,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
         task?.loadDeliverable(dao)
         task
     }
-
-    fun getTaskDeliverable(taskId: Long?): Flow<Deliverable?> = dao.getTaskDeliverable(taskId)
 
     fun getMarker(markerId: Long?): Flow<Marker?> = dao.getMarker(markerId)
     fun getGoals(parent: Long?): Flow<List<Goal>> = dao.getGoals(parent).map { goals ->

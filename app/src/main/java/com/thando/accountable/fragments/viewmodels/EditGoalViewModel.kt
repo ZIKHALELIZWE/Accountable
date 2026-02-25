@@ -29,6 +29,8 @@ import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showB
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showInputError
 import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.cards.ColourPickerDialog
+import com.thando.accountable.ui.cards.DeliverableAdderDialog
+import com.thando.accountable.ui.cards.DeliverablePickerDialog
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +52,8 @@ class EditGoalViewModel(
     val locationFocusRequester = FocusRequester()
     val colourFocusRequester = FocusRequester()
     val colourPickerDialog = ColourPickerDialog()
+    val addDeliverableDialog = DeliverableAdderDialog()
+    val pickDeliverableDialog = DeliverablePickerDialog()
     private val deliverableState: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(null)
     val deliverable = deliverableState.flatMapLatest { it?:flowOf(null) }
     private val originalDeliverableState = MutableStateFlow<Flow<Deliverable?>?>(null)
@@ -179,7 +183,7 @@ class EditGoalViewModel(
     }
 
     suspend fun editDeliverable(originalDeliverableInput: Deliverable) {
-        originalDeliverableInput.id?.let { id ->
+        originalDeliverableInput.deliverableId?.let { id ->
             editDeliverable(repository.getDeliverable(id))
         }
     }

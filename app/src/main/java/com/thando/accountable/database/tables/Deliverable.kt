@@ -17,15 +17,10 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import java.time.LocalDateTime
 
-@Entity(
-    tableName = "deliverable_table",
-    indices = [
-        Index(value = ["deliverable_task_id"], unique = true) // Enforces uniqueness
-    ]
-)
+@Entity(tableName = "deliverable_table")
 data class Deliverable (
     @PrimaryKey(autoGenerate = true)
-    var id: Long? = null,
+    var deliverableId: Long? = null,
 
     @ColumnInfo(name = "deliverable_parent")
     var parent: Long,
@@ -37,7 +32,7 @@ data class Deliverable (
     var initialDateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
 
     @ColumnInfo (name = "deliverable_end_date")
-    var endDateTime: Long = Converters().fromLocalDateTime(LocalDateTime.now()),
+    var endDateTime: Long? = null,
 
     @ColumnInfo (name = "deliverable_end_type")
     var endType: String = DeliverableEndType.UNDEFINED.name,
@@ -85,7 +80,13 @@ data class Deliverable (
     var numScripts: Int = 0,
 
     @ColumnInfo (name = "deliverable_clone_id")
-    var cloneId: Long? = null
+    var cloneId: Long? = null,
+
+    @ColumnInfo (name = "deliverable_work_type")
+    var workType: String = TaskDeliverable.WorkType.CompleteTasks.name,
+
+    @ColumnInfo (name = "deliverable_should_complete_work")
+    var shouldCompleteWork: Boolean = true
 ) {
     enum class DeliverableEndType {
         UNDEFINED, DATE, GOAL, WORK
@@ -105,6 +106,6 @@ data class Deliverable (
     val locationFocusRequester = FocusRequester()
 
     fun loadTimes(dao: RepositoryDao) {
-        timesState.value = dao.getTimes(id, GoalTaskDeliverableTime.TimesType.DELIVERABLE)
+        timesState.value = dao.getTimes(deliverableId, GoalTaskDeliverableTime.TimesType.DELIVERABLE)
     }
 }

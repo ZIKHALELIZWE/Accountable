@@ -926,7 +926,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertNull(editGoalViewModel.deliverable.first()?.goalId)
     }
-
     /**
      * <h2><b>Types of work:</b></h2>
      *  1. Complete a certain repeating task x amount of times (including streak)
@@ -938,7 +937,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
      *  4. Work deliverables can have deadlines stored in endDateTime (when there is no deadline
      *  it will be null)
      *
-     *  I think this can wait until you finish the task input then you can come back TODO
+     *  I think this can wait until you finish the task input then you can come back
+     *  (this is tested in TasksFragment)
      */
 
     @Test
@@ -1078,72 +1078,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertEquals(1, savedDeliverable.times.first().size)
     }
 
-    private fun deliverablesAreEqual(
-        deliverableOne:Deliverable,
-        deliverableTwo:Deliverable,
-        idsEqual:Boolean = true,
-        parentsEqual:Boolean = true
-    ) = runMainTest {
-        val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
-            {objectA, objectB -> assertEquals(objectA,objectB)}
-        else {objectA, objectB -> assertNotEquals(objectA,objectB)}
-
-        assertionFunction(
-            deliverableOne.id,
-            deliverableTwo.id
-        )
-
-        assertEquals(
-            deliverableOne.initialDateTime,
-            deliverableTwo.initialDateTime
-        )
-
-        assertEquals(
-            deliverableOne.deliverable,
-            deliverableTwo.deliverable
-        )
-        assertEquals(
-            deliverableOne.location,
-            deliverableTwo.location
-        )
-        assertEquals(
-            deliverableOne.endDateTime,
-            deliverableTwo.endDateTime
-        )
-        assertEquals(
-            deliverableOne.status,
-            deliverableTwo.status
-        )
-        assertEquals(
-            deliverableOne.endType,
-            deliverableTwo.endType
-        )
-        if (parentsEqual) assertEquals(
-                deliverableOne.parent,
-                deliverableTwo.parent
-            )
-        else assertNotEquals(deliverableOne.parent,deliverableTwo.parent)
-        assertEquals(
-            deliverableOne.times.first().size,
-            deliverableTwo.times.first().size
-        )
-
-        if (!idsEqual && parentsEqual) {
-            assertEquals(deliverableOne.id,deliverableTwo.cloneId)
-        }
-
-        val timesTwoList = deliverableTwo.times.first()
-        deliverableOne.times.first().forEachIndexed { index, timeOne ->
-            val timeTwo = timesTwoList[index]
-            timesAreEqual(
-                timeOne,
-                timeTwo,
-                idsEqual = idsEqual,
-                parentsEqual = parentsEqual
-            )
-        }
-    }
-
     @Test
     fun `19 Select Deliverable Button`() = runMainTest {
         val activity = getTestMainActivity()
@@ -1165,12 +1099,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        withTag("EditGoalPickDeliverableRow-${databaseDeliverable.id}") {
+        withTag("EditGoalPickDeliverableRow-${databaseDeliverable.deliverableId}") {
             assertExists()
             assertIsDisplayed()
         }
 
-        withTag("EditGoalPickDeliverableButton-${databaseDeliverable.id}") {
+        withTag("EditGoalPickDeliverableButton-${databaseDeliverable.deliverableId}") {
             performPressWithScroll()
         }
 
@@ -1222,7 +1156,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performScrollToKey(1L)
         }
 
-        withTag("TasksFragmentDeliverableCard-${databaseDeliverable.id}"){
+        withTag("TasksFragmentDeliverableCard-${databaseDeliverable.deliverableId}"){
             performPressWithScroll()
         }
 
@@ -1318,7 +1252,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performScrollToKey(1L)
         }
 
-        withTag("TasksFragmentDeliverableCard-${databaseDeliverable.id}"){
+        withTag("TasksFragmentDeliverableCard-${databaseDeliverable.deliverableId}"){
             performPressWithScroll()
         }
 
@@ -1434,7 +1368,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             performScrollToKey(1L)
         }
 
-        withTag("TasksFragmentDeliverableCard-${databaseDeliverable.id}"){
+        withTag("TasksFragmentDeliverableCard-${databaseDeliverable.deliverableId}"){
             performPressWithScroll()
         }
 
@@ -1496,12 +1430,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        withTag("EditGoalPickDeliverableRow-${databaseDeliverable.id}") {
+        withTag("EditGoalPickDeliverableRow-${databaseDeliverable.deliverableId}") {
             assertExists()
             assertIsDisplayed()
         }
 
-        withTag("EditGoalPickDeliverableButton-${databaseDeliverable.id}") {
+        withTag("EditGoalPickDeliverableButton-${databaseDeliverable.deliverableId}") {
             performPressWithScroll()
         }
 
@@ -1529,15 +1463,15 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         databaseDeliverable = activity.viewModel.repository.getDeliverables(
             editGoalViewModel.newGoal.first()!!.id!!
         ).first()[0]
-        assertNotNull(databaseDeliverable.id)
+        assertNotNull(databaseDeliverable.deliverableId)
 
         withTag("EditGoalLazyColumn") {
             assertExists()
             assertIsDisplayed()
-            performScrollToKey(databaseDeliverable.id!!)
+            performScrollToKey(databaseDeliverable.deliverableId!!)
         }
 
-        withTag("EditGoalUnpickDeliverableButton-${databaseDeliverable.id}"){
+        withTag("EditGoalUnpickDeliverableButton-${databaseDeliverable.deliverableId}"){
             performPressWithScroll()
         }
 
@@ -1706,12 +1640,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        withTag("EditGoalPickDeliverableRow-${databaseDeliverable.id}") {
+        withTag("EditGoalPickDeliverableRow-${databaseDeliverable.deliverableId}") {
             assertExists()
             assertIsDisplayed()
         }
 
-        withTag("EditGoalPickDeliverableButton-${databaseDeliverable.id}") {
+        withTag("EditGoalPickDeliverableButton-${databaseDeliverable.deliverableId}") {
             performPressWithScroll()
         }
 
