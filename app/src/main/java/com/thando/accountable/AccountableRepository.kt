@@ -37,6 +37,7 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.Task
+import com.thando.accountable.database.tables.TaskDeliverable
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.ContentPosition
 import com.thando.accountable.fragments.viewmodels.BooksViewModel.Companion.INITIAL_FOLDER_ID
@@ -2469,7 +2470,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return dao.upsert(goalTaskDeliverableTime)
     }
 
-    suspend fun insert(goal: Goal): Long = dao.insert(goal)
+    suspend fun upsert(taskDeliverable: TaskDeliverable): Long = dao.upsert(taskDeliverable)
     suspend fun insert(task: Task): Long = dao.insert(task)
     suspend fun insert(marker: Marker): Long = dao.insert(marker)
     suspend fun insert(deliverable: Deliverable): Long = dao.insert(deliverable)
@@ -2496,6 +2497,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
     suspend fun deleteGoalTaskDeliverableTime(goalTaskDeliverableTime: GoalTaskDeliverableTime) {
         dao.delete(goalTaskDeliverableTime)
     }
+
+    suspend fun deleteTaskDeliverable(taskId: Long, deliverableId: Long) {
+        getTaskDeliverable(taskId,deliverableId).first()?.let { dao.delete(it) }
+    }
+
     fun getGoal(goalId: Long?): Flow<Goal?> = dao.getGoal(goalId).map { goal ->
         goal?.loadGoalTimes(dao)
         goal?.loadTasks(dao)
@@ -2534,12 +2540,16 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getDeliverable(deliverableId: Long?): Flow<Deliverable?> =
         dao.getDeliverable(deliverableId).map { deliverable ->
             deliverable?.loadTimes(dao)
+            deliverable?.loadTaskDeliverables(dao)
             deliverable
         }
 
     fun getGoalDeliverables(goalId: Long?): Flow<List<Deliverable>> =
         dao.getGoalDeliverables(goalId).map { deliverables ->
-            deliverables.forEach { deliverable -> deliverable.loadTimes(dao) }
+            deliverables.forEach { deliverable ->
+                deliverable.loadTimes(dao)
+                deliverable.loadTaskDeliverables(dao)
+            }
             deliverables
         }
 
@@ -2557,6 +2567,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return dao.getDeliverables(parentId).map { deliverables ->
             deliverables.forEach { deliverable ->
                 deliverable.loadTimes(dao)
+                deliverable.loadTaskDeliverables(dao)
             }
             deliverables
         }
@@ -2565,4 +2576,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getMarkers(parentId: Long): Flow<List<Marker>> {
         return dao.getMarkers(parentId)
     }
+
+    fun getTaskDeliverable(taskId: Long, deliverableId: Long) = dao.getTaskDeliverable(
+        taskId, deliverableId
+    )
 }

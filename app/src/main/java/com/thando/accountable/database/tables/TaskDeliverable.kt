@@ -3,6 +3,7 @@ package com.thando.accountable.database.tables
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import java.time.LocalDateTime
 
@@ -37,7 +38,10 @@ data class TaskDeliverable (
     @ColumnInfo(name = "workType")
     var workType: String = WorkType.RepeatingTaskTimes.name
 ) {
-    enum class WorkType {
-        RepeatingTaskTimes, QuantityTaskOnce, TimeTaskOnce, CompleteTasks
+    enum class WorkType(val resString: Int) {
+        RepeatingTaskTimes(R.string.task_accumulation),
+        QuantityTaskOnce(R.string.quantity_accumulation),
+        TimeTaskOnce(R.string.time_accumulation),
+        CompleteTasks(R.string.complete_tasks)
     }
 }

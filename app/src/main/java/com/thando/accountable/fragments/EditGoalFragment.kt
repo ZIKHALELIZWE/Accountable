@@ -268,7 +268,9 @@ fun EditGoalView(
                     addTaskDeliverable = null,
                     addDeliverableDialog = viewModel.addDeliverableDialog,
                     selectTaskDeliverable = null,
-                    pickDeliverableDialog = viewModel.pickDeliverableDialog
+                    pickDeliverableDialog = viewModel.pickDeliverableDialog,
+                    deselectTaskDeliverable = {},
+                    deselectAllTaskDeliverables = {}
                 )
             }
         }
@@ -642,9 +644,8 @@ fun EditGoalFragmentView(
                                 Text(
                                     modifier = Modifier.testTag("EditGoalEndTypeUndefinedText"),
                                     text = stringResource(
-                                        R.string.end_type,
-                                        stringResource(R.string.undefined),
-                                        ""
+                                        R.string.end_type_1_arg,
+                                        stringResource(R.string.undefined)
                                     ).trim()
                                 )
                             }
@@ -663,7 +664,7 @@ fun EditGoalFragmentView(
                                     Text(
                                         modifier = Modifier.testTag("EditGoalEndTypePickedDateText"),
                                         text = stringResource(
-                                            R.string.end_type,
+                                            R.string.end_type_2_arg,
                                             stringResource(R.string.date),
                                             stringResource(
                                                 R.string.end_time_and_date,
@@ -683,9 +684,8 @@ fun EditGoalFragmentView(
                                 Text(
                                     modifier = Modifier.testTag("EditGoalEndTypeDeliverableText"),
                                     text = stringResource(
-                                        R.string.end_type,
-                                        stringResource(R.string.deliverable),
-                                        ""
+                                        R.string.end_type_1_arg,
+                                        stringResource(R.string.deliverable)
                                     ).trim()
                                 )
                             }

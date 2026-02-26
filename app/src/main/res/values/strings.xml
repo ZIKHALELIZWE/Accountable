@@ -260,10 +260,12 @@
     <string name="please_select_a_colour">Please select a colour.</string>
     <string name="please_select_a_duration">Please Select A Duration</string>
     <string name="start_time_and_date">Start Time and Date: %1$s %2$s</string>
+    <string name="end_time_and_date_without_args">End Time and Date:</string>
     <string name="end_time_and_date">End Time and Date: %1$s %2$s</string>
     <string name="start_time_and_weekday">Start Time and Weekday: %1$s %2$s</string>
     <string name="start_time">Start Time: %1$s</string>
     <string name="start_date">Start Date: %1$s</string>
+    <string name="start_date_without_args">Start Date:</string>
     <string name="location_with_string">Location: %1$s</string>
     <string name="goal_display_image">Goal Display Image</string>
     <string name="tasks_navigate_back_button">Tasks Navigate Back Button</string>
@@ -288,7 +290,8 @@
     <string name="delete_marker">Delete Marker</string>
     <string name="undefined">Undefined</string>
     <string name="date">Date</string>
-    <string name="end_type">End Type: %1$s\n%2$s</string>
+    <string name="end_type_1_arg">End Type: %1$s</string>
+    <string name="end_type_2_arg">End Type: %1$s\n%2$s</string>
     <string name="end_type_without_args">End Type:</string>
     <string name="work">Work</string>
     <string name="edit_with_arg">Edit %1$s</string>
@@ -322,4 +325,15 @@
     <string name="deliverable_with_a_quantity">Deliverable with a Quantity</string>
     <string name="enter_deliverable_information">Enter Deliverable Information</string>
     <string name="pick_deliverables">Pick Deliverables</string>
+    <string name="work_type">Work Type:</string>
+    <string name="task_accumulation">Task Accumulation</string>
+    <string name="quantity_accumulation">Quantity Accumulation</string>
+    <string name="time_accumulation">Time Accumulation</string>
+    <string name="complete_tasks">Complete Tasks</string>
+    <string name="assigned_tasks">Assigned Tasks:</string>
+    <string name="progress">Progress:</string>
+    <string name="should_complete_work">Should Complete Work:</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="deselect">Deselect</string>
 </resources>

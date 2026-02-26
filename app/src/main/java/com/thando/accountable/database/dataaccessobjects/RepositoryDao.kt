@@ -9,6 +9,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.Upsert
 import com.thando.accountable.AppResources
 import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.AppSettings
@@ -22,6 +23,7 @@ import com.thando.accountable.database.tables.MarkupLanguage
 import com.thando.accountable.database.tables.Script
 import com.thando.accountable.database.tables.SpecialCharacters
 import com.thando.accountable.database.tables.Task
+import com.thando.accountable.database.tables.TaskDeliverable
 import com.thando.accountable.database.tables.TeleprompterSettings
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -71,6 +73,9 @@ interface RepositoryDao {
 
     @Insert
     suspend fun insert(marker: Marker): Long
+
+    @Upsert
+    suspend fun upsert(taskDeliverable: TaskDeliverable): Long
 
     @Update
     suspend fun update(folder: Folder)
@@ -140,6 +145,9 @@ interface RepositoryDao {
 
     @Delete
     suspend fun delete(marker: Marker)
+
+    @Delete
+    suspend fun delete(taskDeliverable: TaskDeliverable)
 
     @Transaction
     suspend fun deleteGoal(goalId: Long?, context: Context){
@@ -449,6 +457,12 @@ interface RepositoryDao {
 
     @Query("SELECT * FROM times_table WHERE times_parent =:parentId AND times_type =:type")
     fun getTimes(parentId: Long?, type: GoalTaskDeliverableTime.TimesType): Flow<List<GoalTaskDeliverableTime>>
+
+    @Query("SELECT * FROM TaskDeliverable WHERE taskId = :taskId AND deliverableId = :deliverableId")
+    fun getTaskDeliverable(taskId: Long?, deliverableId: Long?): Flow<TaskDeliverable?>
+
+    @Query("SELECT * FROM TaskDeliverable WHERE deliverableId = :deliverableId")
+    fun getDeliverableTaskDeliverables(deliverableId: Long?): Flow<List<TaskDeliverable>>
 
     @Query("SELECT * FROM folder_table WHERE folder_parent = :parent AND folder_type = :folderType ORDER BY folder_position ASC")
     fun getFolders(parent:Long?, folderType: Folder.FolderType?): Flow<List<Folder>>

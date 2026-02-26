@@ -1,5 +1,6 @@
 package com.thando.accountable.ui.cards
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -9,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,6 +24,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -51,13 +56,17 @@ class DeliverablePickerDialog {
     val notSelectedListState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
     val notSelectedList = notSelectedListState.flatMapLatest { it }
 
+    val deliverablePickedState = MutableStateFlow<suspend (Deliverable) -> Unit> {}
     val onDismiss = MutableStateFlow<suspend () -> Unit> {
         showDeliverablePickerDialog.value = false
     }
+
     fun pickDeliverable(
-        notSelectedList: Flow<List<Deliverable>>
+        notSelectedList: Flow<List<Deliverable>>,
+        deliverablePicked: suspend (Deliverable) -> Unit
     ) {
         notSelectedListState.value = notSelectedList
+        deliverablePickedState.value = deliverablePicked
         showDeliverablePickerDialog.value = true
     }
 
@@ -67,7 +76,15 @@ class DeliverablePickerDialog {
         if (showDeliverablePickerDialog) {
             val notSelectedList by notSelectedList.collectAsStateWithLifecycle(emptyList())
             val onDismiss by onDismiss.collectAsStateWithLifecycle()
+            val deliverablePicked by deliverablePickedState.collectAsStateWithLifecycle()
             val scope = rememberCoroutineScope()
+            var initialized by remember { mutableStateOf(false) }
+            LaunchedEffect(notSelectedList.isEmpty()) {
+                if (initialized) {
+                    if (notSelectedList.isEmpty()) onDismiss()
+                } else initialized = true
+            }
+
             Dialog(
                 onDismissRequest = {
                     scope.launch {
@@ -83,11 +100,11 @@ class DeliverablePickerDialog {
                     modifier = Modifier
                         .fillMaxWidth()
                         .wrapContentHeight()
-                        .testTag("DeliverableAdderDialog")
+                        .testTag("DeliverablePickerDialog")
                 ) {
                     LazyColumn(
                         state = rememberLazyListState(),
-                        modifier = Modifier
+                        modifier = Modifier.testTag("DeliverablePickerDialogLazyColumn")
                             .padding(16.dp)
                             .fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -102,11 +119,33 @@ class DeliverablePickerDialog {
                             Spacer(modifier = Modifier.height(16.dp))
                         }
                         items(items = notSelectedList, key = {it.deliverableId?:Random.nextLong()}) { deliverable ->
-                            DeliverableCardView(
-                                deliverable,
-                                {},
-                                Modifier
-                            )
+                            Column(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                DeliverableCardView(
+                                    deliverable,
+                                    {},
+                                    Modifier
+                                )
+                                Button(
+                                    onClick = {
+                                        scope.launch { 
+                                            deliverablePicked(deliverable)
+                                        }
+                                    },
+                                    modifier = Modifier.testTag("DeliverablePickerDialogPickButton-${deliverable.deliverableId}")
+                                        .fillMaxWidth().padding(horizontal = 4.dp),
+                                    shape = RectangleShape,
+                                    colors = ButtonColors(
+                                        containerColor = Color.Green,
+                                        contentColor = Color.Black,
+                                        disabledContainerColor = Color.LightGray,
+                                        disabledContentColor = Color.DarkGray
+                                    )
+                                ) {
+                                    Text(stringResource(R.string.pick_deliverable))
+                                }
+                            }
                         }
                     }
                 }
@@ -170,7 +209,8 @@ fun DeliverablePickerDialogPreview() {
                     fakeDeliverable,
                     fakeDeliverableTwo
                 )
-            )
+            ),
+            deliverablePicked = {}
         )
     }
 

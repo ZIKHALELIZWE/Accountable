@@ -213,7 +213,8 @@ abstract class AccountableComposeRobolectricTest(
         deliverableOne:Deliverable,
         deliverableTwo:Deliverable,
         idsEqual:Boolean = true,
-        parentsEqual:Boolean = true
+        parentsEqual:Boolean = true,
+        times:List<GoalTaskDeliverableTime>? = null
     ) = runMainTest {
         val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
             {objectA, objectB -> assertEquals(objectA,objectB)}
@@ -254,8 +255,9 @@ abstract class AccountableComposeRobolectricTest(
             deliverableTwo.parent
         )
         else assertNotEquals(deliverableOne.parent,deliverableTwo.parent)
+
         assertEquals(
-            deliverableOne.times.first().size,
+            (times?:deliverableOne.times.first()).size,
             deliverableTwo.times.first().size
         )
 
@@ -264,7 +266,7 @@ abstract class AccountableComposeRobolectricTest(
         }
 
         val timesTwoList = deliverableTwo.times.first()
-        deliverableOne.times.first().forEachIndexed { index, timeOne ->
+        (times?:deliverableOne.times.first()).forEachIndexed { index, timeOne ->
             val timeTwo = timesTwoList[index]
             timesAreEqual(
                 timeOne,

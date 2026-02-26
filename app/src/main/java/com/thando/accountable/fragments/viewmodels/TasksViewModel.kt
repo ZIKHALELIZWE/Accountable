@@ -377,8 +377,49 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     suspend fun selectTaskDeliverable() {
         task.first()?.let { task ->
             pickDeliverableDialog.pickDeliverable(
-                task.getNotSelectedDeliverablesList()
+                notSelectedList = task.getNotSelectedDeliverablesList(),
+                deliverablePicked = { deliverable ->
+                    deliverable.deliverableId?.let { deliverableId ->
+                        task.taskId?.let { taskId ->
+                            repository.upsert(TaskDeliverable(
+                                deliverableId = deliverableId,
+                                taskId = taskId,
+                                // percentage = TODO(),
+                                // startDate = TODO(),
+                                // streak = TODO(),
+                                workType = deliverable.workType
+                            ))
+                        }
+                    }
+                }
             )
+        }
+    }
+
+    suspend fun deselectTaskDeliverable(deliverable: Deliverable) {
+        task.first()?.taskId?.let { taskId ->
+            deliverable.deliverableId?.let { deliverableId ->
+                repository.deleteTaskDeliverable(taskId,deliverableId)
+            }
+        }
+    }
+
+    suspend fun deselectAllTaskDeliverables() {
+        task.first()?.let { task ->
+            task.taskId?.let { taskId ->
+                task.deliverableNormalList.first()
+                    .forEach { it.deliverableId?.let { deliverableId ->
+                        repository.deleteTaskDeliverable(taskId, deliverableId)
+                    } }
+                task.deliverableQuantityList.first()
+                    .forEach { it.deliverableId?.let { deliverableId ->
+                        repository.deleteTaskDeliverable(taskId, deliverableId)
+                    } }
+                task.deliverableTimeList.first()
+                    .forEach { it.deliverableId?.let { deliverableId ->
+                        repository.deleteTaskDeliverable(taskId, deliverableId)
+                    } }
+            }
         }
     }
 

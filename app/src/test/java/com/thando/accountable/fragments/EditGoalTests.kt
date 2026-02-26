@@ -1041,7 +1041,9 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         assertNotNull(editGoalViewModel.deliverable.first()?.times)
+        assertNotNull(editGoalViewModel.deliverable.first()?.times?.first())
         val savedDeliverable = editGoalViewModel.deliverable.first()!!
+        val savedTimes = editGoalViewModel.deliverable.first()!!.times.first()
 
         withTag(
             "TasksFragmentDeliverableProcessDeliverable"
@@ -1074,7 +1076,11 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNotNull(databaseDeliverableFlow)
         val databaseDeliverable = databaseDeliverableFlow!!
 
-        deliverablesAreEqual(savedDeliverable,databaseDeliverable)
+        deliverablesAreEqual(
+            savedDeliverable,
+            databaseDeliverable,
+            times = savedTimes
+        )
         assertEquals(1, savedDeliverable.times.first().size)
     }
 

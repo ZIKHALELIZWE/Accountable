@@ -28,6 +28,7 @@ import com.thando.accountable.AccountableComposeRobolectricTest
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
+import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
@@ -1075,6 +1076,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         withTag("TasksFragmentAddTaskDeleteButton").assertDoesNotExist()
         val task = taskViewModel.task.first()!!
         val times = task.times.first()
+        val deliverablesLists = getTaskDeliverablesLists(task)
 
         withTag("TasksFragmentTaskSaveButton"){
             performPressWithoutScroll()
@@ -1088,7 +1090,31 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             taskOne = task,
             taskTwo = tasksList[0],
             idsEqual = true,
-            times
+            times = times,
+            deliverablesLists = deliverablesLists
+        )
+    }
+
+    private suspend fun getTaskDeliverablesLists(
+        task: Task
+    ): Triple<List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>> {
+        val deliverablesNormal = task.deliverableNormalList.first()
+        val deliverablesQuantity = task.deliverableQuantityList.first()
+        val deliverablesTime = task.deliverableTimeList.first()
+
+        val deliverableTimesNormal = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
+        deliverablesNormal.forEach { deliverableTimesNormal.add(it to it.times.first()) }
+
+        val deliverableTimesQuantity = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
+        deliverablesQuantity.forEach { deliverableTimesQuantity.add(it to it.times.first()) }
+
+        val deliverableTimesTime = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
+        deliverablesTime.forEach { deliverableTimesTime.add(it to it.times.first()) }
+
+        return Triple(
+            deliverableTimesNormal.toList(),
+            deliverableTimesQuantity.toList(),
+            deliverableTimesTime.toList()
         )
     }
 
@@ -1096,7 +1122,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         taskOne:Task,
         taskTwo: Task,
         idsEqual:Boolean = true,
-        times:List<GoalTaskDeliverableTime>? = null
+        times:List<GoalTaskDeliverableTime>? = null,
+        deliverablesLists:Triple<List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>>? = null
     ) = runMainTest {
         val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
             {objectA, objectB -> assertEquals(objectA,objectB)}
@@ -1170,6 +1197,21 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             taskTwo.times.first().size
         )
 
+        assertEquals(
+            (deliverablesLists?.first?:taskOne.deliverableNormalList.first()).size,
+            taskTwo.deliverableNormalList.first().size
+        )
+
+        assertEquals(
+            (deliverablesLists?.second?:taskOne.deliverableQuantityList.first()).size,
+            taskTwo.deliverableQuantityList.first().size
+        )
+
+        assertEquals(
+            (deliverablesLists?.third?:taskOne.deliverableTimeList.first()).size,
+            taskTwo.deliverableTimeList.first().size
+        )
+
         if (!idsEqual && times == null) {
             assertEquals(taskOne.taskId, taskTwo.cloneId)
         }
@@ -1185,15 +1227,77 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             )
         }
 
-        /*if (taskOne.deliverable.first() != null) {
-            assertNotNull(taskTwo.deliverable.first())
-            deliverablesAreEqual(
-                taskOne.deliverable.first()!!,
-                taskTwo.deliverable.first()!!,
-                idsEqual,
-                parentsEqual = idsEqual
-            )
-        } else assertNull(taskTwo.deliverable.first())*/
+        val deliverablesNormalTwoList = taskTwo.deliverableNormalList.first()
+        if (deliverablesLists?.first != null) {
+            deliverablesLists.first.forEachIndexed { index, pair ->
+                val deliverableTwo = deliverablesNormalTwoList[index]
+                deliverablesAreEqual(
+                    pair.first,
+                    deliverableTwo,
+                    idsEqual = idsEqual,
+                    parentsEqual = idsEqual,
+                    times = pair.second
+                )
+            }
+        } else {
+            taskOne.deliverableNormalList.first().forEachIndexed { index, deliverableOne ->
+                val deliverableTwo = deliverablesNormalTwoList[index]
+                deliverablesAreEqual(
+                    deliverableOne,
+                    deliverableTwo,
+                    idsEqual = idsEqual,
+                    parentsEqual = idsEqual
+                )
+            }
+        }
+
+        val deliverablesQuantityTwoList = taskTwo.deliverableQuantityList.first()
+        if (deliverablesLists?.second != null) {
+            deliverablesLists.second.forEachIndexed { index, pair ->
+                val deliverableTwo = deliverablesQuantityTwoList[index]
+                deliverablesAreEqual(
+                    pair.first,
+                    deliverableTwo,
+                    idsEqual = idsEqual,
+                    parentsEqual = idsEqual,
+                    times = pair.second
+                )
+            }
+        } else {
+            taskOne.deliverableQuantityList.first().forEachIndexed { index, deliverableOne ->
+                val deliverableTwo = deliverablesQuantityTwoList[index]
+                deliverablesAreEqual(
+                    deliverableOne,
+                    deliverableTwo,
+                    idsEqual = idsEqual,
+                    parentsEqual = idsEqual
+                )
+            }
+        }
+
+        val deliverablesTimeTwoList = taskTwo.deliverableTimeList.first()
+        if (deliverablesLists?.third != null) {
+            deliverablesLists.third.forEachIndexed { index, pair ->
+                val deliverableTwo = deliverablesTimeTwoList[index]
+                deliverablesAreEqual(
+                    pair.first,
+                    deliverableTwo,
+                    idsEqual = idsEqual,
+                    parentsEqual = idsEqual,
+                    times = pair.second
+                )
+            }
+        } else {
+            taskOne.deliverableTimeList.first().forEachIndexed { index, deliverableOne ->
+                val deliverableTwo = deliverablesTimeTwoList[index]
+                deliverablesAreEqual(
+                    deliverableOne,
+                    deliverableTwo,
+                    idsEqual = idsEqual,
+                    parentsEqual = idsEqual
+                )
+            }
+        }
     }
 
     @Test
@@ -1210,6 +1314,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         assertEquals(1,tasksList.size)
         val oldTask = tasksList[0]
         val oldTimes = oldTask.times.first()
+        val oldDeliverablesLists = getTaskDeliverablesLists(oldTask)
 
         withTag("TasksFragmentTaskCardView-${tasksList[0].taskId}") {
             performLongPressWithScroll()
@@ -1228,7 +1333,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             oldTask,
             taskViewModel.task.first()!!,
             idsEqual = false,
-            times = oldTimes
+            times = oldTimes,
+            deliverablesLists = oldDeliverablesLists
         )
 
         withTag("TasksFragmentTaskTitle"){
@@ -1298,7 +1404,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         val task = taskViewModel.task.first()
         val taskTimes = task?.times?.first()
         assertNotNull(task?.endDateTime)
-        assertTrue(task!!.endDateTime>0)
+        val deliverablesLists = getTaskDeliverablesLists(task!!)
+        assertTrue(task.endDateTime>0)
 
         withTag("TasksFragmentAddTaskViewLazyColumn"){
             assertExists()
@@ -1324,7 +1431,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             task,
             tasksList[0],
             false,
-            taskTimes
+            taskTimes,
+            deliverablesLists = deliverablesLists
         )
 
         assertNotEquals(
@@ -1387,7 +1495,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         val taskViewModel: TaskViewModel = getViewModel(activity)
         assertNotNull(taskViewModel)
         assertNotNull(taskViewModel.goal.first())
-        var goal = taskViewModel.goal.first()!!
+        val goal = taskViewModel.goal.first()!!
 
         var tasksList = goal.goalTasks.first()
         assertNotNull(tasksList)
@@ -1559,7 +1667,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0])
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0])
 
         withTag("DeliverableAdderDialog") {
             assertExists()
@@ -1583,7 +1691,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             )
             finishProcesses()
         }
-        assertEquals(6L,taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.quantity)
+        assertEquals(6L,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.quantity)
         withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
             performTextReplacement("Jump a total of 20 times33")
             assertTextContains(
@@ -1593,13 +1701,13 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             )
             finishProcesses()
         }
-        assertEquals(20L,taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.quantity)
+        assertEquals(20L,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.quantity)
 
         withTag("DeliverableAdderDialogDismissButton") {
             performPressWithScroll()
         }
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
 
         withTag("DeliverableAdderDialog") {
             assertDoesNotExist()
@@ -1609,7 +1717,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0])
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0])
 
         withTag("DeliverableAdderDialog") {
             assertExists()
@@ -1632,7 +1740,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 ignoreCase = false
             )
         }
-        assertEquals(6L,taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.quantity)
+        assertEquals(6L,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.quantity)
         withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
             performTextReplacement("Jump a total of 20 times33")
             assertTextContains(
@@ -1641,20 +1749,152 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 ignoreCase = false
             )
         }
-        assertEquals(20L,taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.quantity)
+        assertEquals(20L,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.quantity)
 
         withTag("DeliverableAdderDialogOKButton") {
             performPressWithScroll()
         }
 
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
 
         withTag("DeliverableAdderDialog") {
             assertDoesNotExist()
         }
 
+        withTag("TasksFragmentAddTaskSelectDeliverableButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = activity.getString(R.string.select_deliverable) + " (${1})",
+                substring = true,
+                ignoreCase = false
+            )
+            performPressWithoutScroll()
+        }
 
-        /*withTag("TasksFragmentAddTaskEndTypeButton") {
+        withTag("DeliverablePickerDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
+        var deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+
+        withTag("DeliverablePickerDialogLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("DeliverablePickerDialogPickButton-${deliverableId}") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()!!.taskId)
+
+        assertNotNull(activity.viewModel.repository.getTaskDeliverable(
+            taskViewModel.task.first()!!.taskId!!,
+            deliverableId
+        ).first())
+
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("DeliverablePickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentAddTaskTaskDeliverableDeselectButton-${deliverableId}") {
+            performPressWithScroll()
+        }
+
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentAddTaskSelectDeliverableButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = activity.getString(R.string.select_deliverable) + " (${1})",
+                substring = true,
+                ignoreCase = false
+            )
+            performPressWithoutScroll()
+        }
+
+        withTag("DeliverablePickerDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+
+        withTag("DeliverablePickerDialogLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("DeliverablePickerDialogPickButton-${deliverableId}") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()!!.taskId)
+
+        assertNotNull(activity.viewModel.repository.getTaskDeliverable(
+            taskViewModel.task.first()!!.taskId!!,
+            deliverableId
+        ).first())
+
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("DeliverablePickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskEndTypeButton")
+        }
+
+        withTag("TasksFragmentAddTaskEndTypeButton") {
             performPressWithScroll()
         }
 
@@ -1662,7 +1902,11 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertNull(taskViewModel.task.first()?.deliverable?.first())
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertDoesNotExist()
+        }
 
         withTag("TasksFragmentAddTaskEndTypeButton") {
             performPressWithScroll()
@@ -1672,37 +1916,63 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverable?.first())
+        withTag("TasksFragmentAddTaskSelectDeliverableButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = activity.getString(R.string.select_deliverable) + " (${1})",
+                substring = true,
+                ignoreCase = false
+            )
+            performPressWithoutScroll()
+        }
+
+        withTag("DeliverablePickerDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+
+        withTag("DeliverablePickerDialogLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("DeliverablePickerDialogPickButton-${deliverableId}") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()!!.taskId)
+
+        assertNotNull(activity.viewModel.repository.getTaskDeliverable(
+            taskViewModel.task.first()!!.taskId!!,
+            deliverableId
+        ).first())
+
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("DeliverablePickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
             assertIsDisplayed()
-            performScrollToKey("TasksFragmentTaskDeliverableWorkInputTextField")
+            performScrollToKey(deliverableId)
         }
-        finishProcesses()
 
-        withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
             assertExists()
-            performScrollTo()
             assertIsDisplayed()
-            assertTextContains("", substring = true,false)
-            performTextReplacement("Jump a total of 200 times564")
-            assertTextContains(
-                value = "Jump a total of 200 times",
-                substring = true,
-                ignoreCase = false
-            )
         }
-        finishProcesses()
-
-        assertEquals(
-            "Jump a total of 200 times",
-            taskViewModel.task.first()?.deliverable?.first()?.deliverable
-        )
-        assertEquals(
-            200L,
-            taskViewModel.task.first()?.deliverable?.first()?.quantity
-        )
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -1724,6 +1994,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
 
         withTag("TasksFragmentAddTaskDeleteButton").assertDoesNotExist()
         val task = taskViewModel.task.first()!!
+        val deliverablesLists = getTaskDeliverablesLists(task)
         val times = task.times.first()
 
         withTag("TasksFragmentTaskSaveButton"){
@@ -1738,7 +2009,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             taskOne = task,
             taskTwo = tasksList[0],
             idsEqual = true,
-            times
-        )*/
+            times = times,
+            deliverablesLists = deliverablesLists
+        )
     }
 }

@@ -5,15 +5,17 @@ import androidx.compose.ui.util.packInts
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Ignore
-import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.thando.accountable.MainActivity
+import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import java.time.LocalDateTime
 
@@ -88,15 +90,25 @@ data class Deliverable (
     @ColumnInfo (name = "deliverable_should_complete_work")
     var shouldCompleteWork: Boolean = true
 ) {
-    enum class DeliverableEndType {
-        UNDEFINED, DATE, GOAL, WORK
+    enum class DeliverableEndType(val resString: Int) {
+        UNDEFINED(R.string.undefined),
+        DATE(R.string.date),
+        GOAL(R.string.goal),
+        WORK(R.string.work)
     }
 
     @Ignore
-    val timesState = MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>(null)
+    val timesState = MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>>(flowOf(emptyList()))
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
-    val times = timesState.flatMapLatest { it?: MutableStateFlow(emptyList()) }
+    val times = timesState.flatMapLatest { it }
+        .flowOn(MainActivity.IO)
+
+    @Ignore
+    val taskDeliverablesState = MutableStateFlow<Flow<List<TaskDeliverable>>>(emptyFlow())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val taskDeliverables = taskDeliverablesState.flatMapLatest { it }
         .flowOn(MainActivity.IO)
 
     @Ignore
@@ -107,5 +119,9 @@ data class Deliverable (
 
     fun loadTimes(dao: RepositoryDao) {
         timesState.value = dao.getTimes(deliverableId, GoalTaskDeliverableTime.TimesType.DELIVERABLE)
+    }
+
+    fun loadTaskDeliverables(dao: RepositoryDao) {
+        taskDeliverablesState.value = dao.getDeliverableTaskDeliverables(deliverableId)
     }
 }

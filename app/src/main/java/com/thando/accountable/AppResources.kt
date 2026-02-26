@@ -192,11 +192,14 @@ sealed class AppResources {
             return getTime(localDateTime)+" "+getFullDate(context,localDateTime)
         }
 
-        fun getDaysFromToday(localDateTime: LocalDateTime): String{
-            val now = LocalDateTime.now()
+        fun getDaysFromToday(localDateTime: LocalDateTime): String {
+            return getDaysBetween(LocalDateTime.now(),localDateTime)
+        }
+
+        fun getDaysBetween(start: LocalDateTime, end: LocalDateTime): String {
             return Period.between(
-                now.toLocalDate(),
-                localDateTime.toLocalDate()
+                start.toLocalDate(),
+                end.toLocalDate()
             ).days.toString()
         }
 

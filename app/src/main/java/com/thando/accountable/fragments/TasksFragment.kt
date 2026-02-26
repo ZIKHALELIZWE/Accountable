@@ -34,9 +34,11 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
@@ -110,6 +112,7 @@ import com.thando.accountable.database.tables.Goal.GoalTab
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.Task
+import com.thando.accountable.database.tables.TaskDeliverable
 import com.thando.accountable.fragments.viewmodels.TaskViewModel
 import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.cards.ColourPickerDialog
@@ -290,7 +293,9 @@ fun TaskView(
                     addTaskDeliverable = viewModel::addTaskDeliverable,
                     addDeliverableDialog = viewModel.addDeliverableDialog,
                     selectTaskDeliverable = viewModel::selectTaskDeliverable,
-                    pickDeliverableDialog = viewModel.pickDeliverableDialog
+                    pickDeliverableDialog = viewModel.pickDeliverableDialog,
+                    deselectTaskDeliverable = viewModel::deselectTaskDeliverable,
+                    deselectAllTaskDeliverables = viewModel::deselectAllTaskDeliverables
                 )
             }
         }
@@ -327,7 +332,9 @@ fun TaskDeliverableMarkerBottomSheet(
     addTaskDeliverable: (suspend () -> Unit)?,
     addDeliverableDialog: DeliverableAdderDialog,
     selectTaskDeliverable: (suspend () -> Unit)?,
-    pickDeliverableDialog: DeliverablePickerDialog
+    pickDeliverableDialog: DeliverablePickerDialog,
+    deselectTaskDeliverable: suspend (Deliverable) -> Unit,
+    deselectAllTaskDeliverables: suspend () -> Unit
 ){
     val scope = rememberCoroutineScope()
     val bottomSheetType by bottomSheetTypeState.collectAsStateWithLifecycle()
@@ -357,7 +364,8 @@ fun TaskDeliverableMarkerBottomSheet(
                         updateTimeBlock = updateTimeBlock,
                         deleteTaskClicked = deleteTaskClicked,
                         updateTask = updateTask,
-                        updateDeliverable = updateDeliverable,
+                        deselectTaskDeliverable = deselectTaskDeliverable,
+                        deselectAllTaskDeliverables = deselectAllTaskDeliverables,
                         dismissBottomSheet = dismissBottomSheet,
                         addDeliverable = addTaskDeliverable,
                         addDeliverableDialog = addDeliverableDialog,
@@ -749,7 +757,7 @@ fun AddTaskViewPreview() {
         errorMessage = errorMessage,
         pickColour = {},
         updateTask = {},
-        updateDeliverable = {},
+        deselectTaskDeliverable = {},
         addTimeBlock = {},
         deleteTimeBlock = {},
         updateTimeBlock = {},
@@ -758,7 +766,8 @@ fun AddTaskViewPreview() {
         addDeliverable = {},
         addDeliverableDialog = addDeliverableDialog,
         selectDeliverable = {},
-        pickDeliverableDialog = pickDeliverableDialog
+        pickDeliverableDialog = pickDeliverableDialog,
+        deselectAllTaskDeliverables = {}
     )
 }
 
@@ -774,7 +783,7 @@ fun AddTaskView(
     errorMessage: MutableIntState,
     pickColour: (Color?) -> Unit,
     updateTask: suspend (Task) -> Unit,
-    updateDeliverable: suspend (Deliverable) -> Unit,
+    deselectTaskDeliverable: suspend (Deliverable) -> Unit,
     addTimeBlock: suspend () -> Unit,
     deleteTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
@@ -783,7 +792,8 @@ fun AddTaskView(
     addDeliverable: (suspend () -> Unit)?,
     addDeliverableDialog: DeliverableAdderDialog,
     selectDeliverable: (suspend () -> Unit)?,
-    pickDeliverableDialog: DeliverablePickerDialog
+    pickDeliverableDialog: DeliverablePickerDialog,
+    deselectAllTaskDeliverables: suspend () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val originalTask by originalTask.collectAsStateWithLifecycle()
@@ -827,11 +837,17 @@ fun AddTaskView(
             emptyFlow()
         ) }
 
+        var selectedTaskDeliverablesState by remember { mutableStateOf<Flow<List<Deliverable>>>(
+            emptyFlow()
+        ) }
+
         LaunchedEffect(task.type, task.endType) {
             notSelectedTaskDeliverablesState = task.getNotSelectedDeliverablesList()
+            selectedTaskDeliverablesState = task.getDeliverablesList()
         }
 
         val notSelectedTaskDeliverables by notSelectedTaskDeliverablesState.collectAsStateWithLifecycle(emptyList())
+        val selectedTaskDeliverables by selectedTaskDeliverablesState.collectAsStateWithLifecycle(emptyList())
 
         Column(modifier = Modifier.fillMaxSize()) {
             colourPickerDialog.ColourPicker()
@@ -1050,7 +1066,7 @@ fun AddTaskView(
                     item {
                         Spacer(modifier = Modifier.width(2.dp))
                     }
-                    item {
+                    item(key = "TasksFragmentAddTaskEndTypeButton") {
                         var pickedDate by remember { Converters().toLocalDateTime(task.endDateTime) }
                         val stateTime = rememberTimePickerState(
                             pickedDate.hour,
@@ -1093,17 +1109,20 @@ fun AddTaskView(
                                     MenuItemData(Task.TaskEndType.UNDEFINED.name){
                                         scope.launch {
                                             updateTask(task.copy(endType = Task.TaskEndType.UNDEFINED.name))
+                                            deselectAllTaskDeliverables()
                                         }
                                     },
                                     MenuItemData(Task.TaskEndType.DATE.name){
                                         scope.launch {
                                             updateTask(task.copy(endType = Task.TaskEndType.DATE.name))
+                                            deselectAllTaskDeliverables()
                                         }
                                         buttonDatePick = true
                                     },
                                     MenuItemData(Task.TaskEndType.GOAL.name){
                                         scope.launch {
                                             updateTask(task.copy(endType = Task.TaskEndType.GOAL.name))
+                                            deselectAllTaskDeliverables()
                                         }
                                     },
                                     MenuItemData(Task.TaskEndType.DELIVERABLE.name){
@@ -1114,6 +1133,7 @@ fun AddTaskView(
                                     MenuItemData(Task.TaskEndType.MARKER.name){
                                         scope.launch {
                                             updateTask(task.copy(endType = Task.TaskEndType.MARKER.name))
+                                            deselectAllTaskDeliverables()
                                         }
                                     }
                                 )
@@ -1145,9 +1165,8 @@ fun AddTaskView(
                                     Text(
                                         modifier = Modifier,
                                         text = stringResource(
-                                            R.string.end_type,
-                                            stringResource(R.string.undefined),
-                                            ""
+                                            R.string.end_type_1_arg,
+                                            stringResource(R.string.undefined)
                                         ).trim()
                                     )
                                 }
@@ -1166,7 +1185,7 @@ fun AddTaskView(
                                         }
                                         Text(
                                             stringResource(
-                                                R.string.end_type,
+                                                R.string.end_type_2_arg,
                                                 stringResource(R.string.date),
                                                 stringResource(
                                                     R.string.end_time_and_date,
@@ -1182,27 +1201,24 @@ fun AddTaskView(
                                 Task.TaskEndType.GOAL -> {
                                     Text(
                                         stringResource(
-                                            R.string.end_type,
-                                            stringResource(R.string.goal),
-                                            ""
+                                            R.string.end_type_1_arg,
+                                            stringResource(R.string.goal)
                                         ).trim()
                                     )
                                 }
                                 Task.TaskEndType.DELIVERABLE -> {
                                     Text(
                                         stringResource(
-                                            R.string.end_type,
-                                            stringResource(R.string.deliverable),
-                                            ""
+                                            R.string.end_type_1_arg,
+                                            stringResource(R.string.deliverable)
                                         ).trim()
                                     )
                                 }
                                 Task.TaskEndType.MARKER -> {
                                     Text(
                                         stringResource(
-                                            R.string.end_type,
-                                            stringResource(R.string.marker),
-                                            ""
+                                            R.string.end_type_1_arg,
+                                            stringResource(R.string.marker)
                                         ).trim()
                                     )
                                 }
@@ -1246,8 +1262,40 @@ fun AddTaskView(
                         item {
                             Spacer(modifier = Modifier.width(2.dp))
                         }
-                        item(key = "TasksFragmentTaskDeliverableWorkInputTextField") {
-
+                        items(items = selectedTaskDeliverables, key = {it.deliverableId?:Random.nextLong()}) { deliverable ->
+                            Column(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                DeliverableCardView(
+                                    deliverable,
+                                    {},
+                                    Modifier
+                                )
+                                Button(
+                                    onClick = {
+                                        scope.launch {
+                                            deselectTaskDeliverable(deliverable)
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .testTag("TasksFragmentAddTaskTaskDeliverableDeselectButton-${deliverable.deliverableId}")
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp),
+                                    shape = RectangleShape,
+                                    colors = ButtonColors(
+                                        containerColor = Color.Red,
+                                        contentColor = Color.Black,
+                                        disabledContainerColor = Color.LightGray,
+                                        disabledContentColor = Color.DarkGray
+                                    )
+                                ) {
+                                    MainActivity.Icon(
+                                        Icons.Default.Deselect,
+                                        contentDescription = stringResource(R.string.deselect),
+                                        tint = Color.Black
+                                    )
+                                }
+                            }
                         }
                     }
                     item {
@@ -1471,6 +1519,36 @@ fun NormalQuantityTimeTextField(
     }
 }
 
+@Preview(showBackground = true)
+@Composable
+fun DeliverableCardViewPreview() {
+    DeliverableCardView(
+        deliverable = Deliverable(
+            deliverableId = 1L,
+            parent = 1L,
+            position = 0L,
+            endDateTime = Converters().fromLocalDateTime(LocalDateTime.now().plusDays(5)),
+            endType = Deliverable.DeliverableEndType.DATE.name,
+            deliverable = "Complete Task Deliverable Module",
+            location = "At My Desk",
+            workType = TaskDeliverable.WorkType.QuantityTaskOnce.name,
+            shouldCompleteWork = true,
+        ).apply {
+            timesState.value = flowOf(listOf(
+                GoalTaskDeliverableTime(
+                    id = 1L,
+                    parent = 1L,
+                    type = GoalTaskDeliverableTime.TimesType.DELIVERABLE.name,
+                    timeBlockType = Goal.TimeBlockType.DAILY.name,
+                    duration = Converters().fromLocalDateTime(LocalDateTime.now().withHour(0).withMinute(1)),
+                )
+            ))
+        },
+        editDeliverable = {},
+        modifier = Modifier
+    )
+}
+
 @Composable
 fun DeliverableCardView(
     deliverable: Deliverable,
@@ -1478,9 +1556,12 @@ fun DeliverableCardView(
     modifier: Modifier
 ){
     val scope = rememberCoroutineScope()
+    val taskDeliverables by deliverable.taskDeliverables.collectAsStateWithLifecycle(emptyList())
 
     Card(
         modifier = modifier
+            .testTag("TasksFragmentDeliverableCardViewCard-${deliverable.deliverableId}")
+            .padding(4.dp)
             .combinedClickable(onClick = {
                 scope.launch { editDeliverable(deliverable) }
             }),
@@ -1497,6 +1578,7 @@ fun DeliverableCardView(
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight()
+                .padding(2.dp)
         ) {
             Text(
                 text = deliverable.deliverable,
@@ -1509,6 +1591,114 @@ fun DeliverableCardView(
                 color = Color.Black,
                 fontSize = 16.sp
             )
+            Row(
+                modifier = Modifier
+                    .height(IntrinsicSize.Min)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(stringResource(
+                    R.string.start_date_without_args
+                ))
+                Text(
+                    AppResources.getTimeFullDate(
+                        LocalContext.current,
+                        Converters().toLocalDateTime(deliverable.initialDateTime).value
+                    )
+                    + " (" +AppResources.getDaysFromToday(
+                        Converters().toLocalDateTime(deliverable.initialDateTime).value
+                    ) + ")"
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .height(IntrinsicSize.Min)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(stringResource(R.string.end_type_without_args))
+                Text(stringResource(Deliverable.DeliverableEndType.valueOf(deliverable.endType).resString))
+            }
+            if (deliverable.endType == Deliverable.DeliverableEndType.WORK.name) {
+                Row(
+                    modifier = Modifier
+                        .height(IntrinsicSize.Min)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.work_type))
+                    Text(stringResource(TaskDeliverable.WorkType.valueOf(deliverable.workType).resString))
+                }
+
+                // Assigned Tasks
+                Row(
+                    modifier = Modifier
+                        .height(IntrinsicSize.Min)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.assigned_tasks))
+                    Text(taskDeliverables.size.toString())
+                }
+
+                // Progress
+                Row(
+                    modifier = Modifier
+                        .height(IntrinsicSize.Min)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.progress))
+                    Text( "Not yet coded/${
+                        when(TaskDeliverable.WorkType.valueOf(deliverable.workType)){
+                            TaskDeliverable.WorkType.RepeatingTaskTimes,
+                            TaskDeliverable.WorkType.QuantityTaskOnce,
+                            TaskDeliverable.WorkType.CompleteTasks -> {
+                                deliverable.quantity
+                            }
+                            TaskDeliverable.WorkType.TimeTaskOnce -> {
+                                AppResources.getDurationString(
+                                    LocalContext.current,
+                                    Converters().toLocalDateTime(deliverable.time).value
+                                )
+                            }
+                        }
+                    }")
+                }
+
+                // Should Complete Work
+                Row(
+                    modifier = Modifier
+                        .height(IntrinsicSize.Min)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.should_complete_work))
+                    Text(
+                        if (deliverable.shouldCompleteWork) stringResource(R.string.yes)
+                        else stringResource(R.string.no)
+                    )
+                }
+            }
+            else if (deliverable.endType == Deliverable.DeliverableEndType.DATE.name) {
+                Row(
+                    modifier = Modifier
+                        .height(IntrinsicSize.Min)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.end_time_and_date_without_args))
+                    Text(
+                        AppResources.getTimeFullDate(
+                            LocalContext.current,
+                            Converters().toLocalDateTime(deliverable.endDateTime).value?: LocalDateTime.now()
+                        )+ " (" +AppResources.getDaysBetween(
+                            Converters().toLocalDateTime(deliverable.initialDateTime).value,
+                            Converters().toLocalDateTime(deliverable.endDateTime).value?: LocalDateTime.now()
+                        ) + ")"
+                    )
+                }
+            }
         }
     }
 }
@@ -1764,10 +1954,11 @@ fun AddDeliverableView(
                             var buttonTimePick by remember { mutableStateOf(false) }
                             var showEndTypeOptions by remember { mutableStateOf(false) }
                             var endTypeOptions by remember { mutableStateOf(listOf<MenuItemData>())}
-                            OutlinedButton(modifier = Modifier
-                                .testTag("TasksFragmentDeliverableEndTypeButton")
-                                .fillMaxWidth()
-                                .padding(4.dp),
+                            OutlinedButton(
+                                modifier = Modifier
+                                    .testTag("TasksFragmentDeliverableEndTypeButton")
+                                    .fillMaxWidth()
+                                    .padding(4.dp),
                                 onClick = {
                                     endTypeOptions = listOf(
                                         MenuItemData(Deliverable.DeliverableEndType.UNDEFINED.name){
@@ -1803,7 +1994,9 @@ fun AddDeliverableView(
                                         }
                                     )
                                     showEndTypeOptions = true
-                                }
+                                },
+                                shape = RectangleShape,
+                                border = BorderStroke(1.dp,Color.DarkGray)
                             ) {
                                 if (showEndTypeOptions) {
                                     DropdownMenu(
@@ -1827,18 +2020,22 @@ fun AddDeliverableView(
                                     Deliverable.DeliverableEndType.UNDEFINED -> {
                                         Text(
                                             stringResource(
-                                                R.string.end_type,
-                                                stringResource(R.string.undefined),
-                                                ""
+                                                R.string.end_type_1_arg,
+                                                stringResource(R.string.undefined)
                                             )
                                         )
                                     }
+
                                     Deliverable.DeliverableEndType.DATE -> {
                                         LaunchedEffect(deliverable.endDateTime) {
-                                            if (deliverable.endDateTime == null){
-                                                updateDeliverable(deliverable.copy(
-                                                    endDateTime = Converters().fromLocalDateTime(LocalDateTime.now())
-                                                ))
+                                            if (deliverable.endDateTime == null) {
+                                                updateDeliverable(
+                                                    deliverable.copy(
+                                                        endDateTime = Converters().fromLocalDateTime(
+                                                            LocalDateTime.now()
+                                                        )
+                                                    )
+                                                )
                                             }
                                         }
                                         deliverable.endDateTime?.let { endDateTime ->
@@ -1866,8 +2063,9 @@ fun AddDeliverableView(
                                             if (buttonTimePick) {
                                                 PickTime(stateTime) {
                                                     buttonTimePick = false
-                                                    pickedDate = pickedDate.withHour(stateTime.hour)
-                                                        .withMinute(stateTime.minute)
+                                                    pickedDate =
+                                                        pickedDate.withHour(stateTime.hour)
+                                                            .withMinute(stateTime.minute)
                                                     scope.launch {
                                                         updateDeliverable(
                                                             deliverable.copy(
@@ -1882,7 +2080,10 @@ fun AddDeliverableView(
                                             stateDate.getSelectedDate()?.let { localDate ->
                                                 pickedDate = LocalDateTime.of(
                                                     localDate,
-                                                    LocalTime.of(stateTime.hour, stateTime.minute)
+                                                    LocalTime.of(
+                                                        stateTime.hour,
+                                                        stateTime.minute
+                                                    )
                                                 )
                                                 scope.launch {
                                                     updateDeliverable(
@@ -1895,7 +2096,7 @@ fun AddDeliverableView(
                                                 }
                                                 Text(
                                                     stringResource(
-                                                        R.string.end_type,
+                                                        R.string.end_type_2_arg,
                                                         stringResource(R.string.date),
                                                         stringResource(
                                                             R.string.start_time_and_date,
@@ -1909,21 +2110,21 @@ fun AddDeliverableView(
                                             }
                                         }
                                     }
+
                                     Deliverable.DeliverableEndType.GOAL -> {
                                         Text(
                                             stringResource(
-                                                R.string.end_type,
-                                                stringResource(R.string.goal),
-                                                ""
+                                                R.string.end_type_1_arg,
+                                                stringResource(R.string.goal)
                                             )
                                         )
                                     }
+
                                     Deliverable.DeliverableEndType.WORK -> {
                                         Text(
                                             stringResource(
-                                                R.string.end_type,
-                                                stringResource(R.string.work),
-                                                ""
+                                                R.string.end_type_1_arg,
+                                                stringResource(R.string.work)
                                             )
                                         )
                                     }

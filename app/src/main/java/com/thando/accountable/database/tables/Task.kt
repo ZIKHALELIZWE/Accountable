@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import java.time.LocalDateTime
 
@@ -102,12 +103,31 @@ data class Task(
     }
 
     @Ignore
-    val timesState = MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>?>(null)
+    val timesState = MutableStateFlow<Flow<List<GoalTaskDeliverableTime>>>(flowOf(emptyList()))
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val times = timesState.flatMapLatest { timesFlow ->
-            timesFlow?: MutableStateFlow(emptyList())
+        timesFlow
     }.flowOn(MainActivity.IO)
+
+    @Ignore
+    val deliverableNormalListNotSelectedState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val deliverableNormalListNotSelected = deliverableNormalListNotSelectedState.flatMapLatest { it }.flowOn(MainActivity.IO)
+
+    @Ignore
+    val deliverableQuantityListNotSelectedState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val deliverableQuantityListNotSelected = deliverableQuantityListNotSelectedState.flatMapLatest { it }.flowOn(MainActivity.IO)
+
+    @Ignore
+    val deliverableTimeListNotSelectedState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val deliverableTimeListNotSelected = deliverableTimeListNotSelectedState.flatMapLatest { it }.flowOn(MainActivity.IO)
+
     @Ignore
     val deliverableNormalListState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -138,6 +158,18 @@ data class Task(
     fun getNotSelectedDeliverablesList():Flow<List<Deliverable>> {
         return if (endType == TaskEndType.DELIVERABLE.name){
             when(TaskType.valueOf(type)){
+                TaskType.NORMAL -> deliverableNormalListNotSelected
+                TaskType.QUANTITY -> deliverableQuantityListNotSelected
+                TaskType.TIME -> deliverableTimeListNotSelected
+            }
+        } else{
+            emptyFlow()
+        }
+    }
+
+    fun getDeliverablesList():Flow<List<Deliverable>> {
+        return if (endType == TaskEndType.DELIVERABLE.name){
+            when(TaskType.valueOf(type)){
                 TaskType.NORMAL -> deliverableNormalList
                 TaskType.QUANTITY -> deliverableQuantityList
                 TaskType.TIME -> deliverableTimeList
@@ -153,7 +185,7 @@ data class Task(
 
     fun loadDeliverable(dao: RepositoryDao) {
         // Deliverable Must Be Equal To Work.
-        deliverableNormalListState.value = dao.getTaskDeliverableNotSelected(
+        deliverableNormalListNotSelectedState.value = dao.getTaskDeliverableNotSelected(
             parent,
             taskId,
             listOf(
@@ -161,7 +193,7 @@ data class Task(
                 TaskDeliverable.WorkType.CompleteTasks.name
             )
         )
-        deliverableQuantityListState.value = dao.getTaskDeliverableNotSelected(
+        deliverableQuantityListNotSelectedState.value = dao.getTaskDeliverableNotSelected(
             parent,
             taskId,
             listOf(
@@ -170,7 +202,34 @@ data class Task(
                 TaskDeliverable.WorkType.CompleteTasks.name
             )
         )
-        deliverableTimeListState.value = dao.getTaskDeliverableNotSelected(
+        deliverableTimeListNotSelectedState.value = dao.getTaskDeliverableNotSelected(
+            parent,
+            taskId,
+            listOf(
+                TaskDeliverable.WorkType.RepeatingTaskTimes.name,
+                TaskDeliverable.WorkType.TimeTaskOnce.name,
+                TaskDeliverable.WorkType.CompleteTasks.name
+            )
+        )
+
+        deliverableNormalListState.value = dao.getTaskDeliverableSelected(
+            parent,
+            taskId,
+            listOf(
+                TaskDeliverable.WorkType.RepeatingTaskTimes.name,
+                TaskDeliverable.WorkType.CompleteTasks.name
+            )
+        )
+        deliverableQuantityListState.value = dao.getTaskDeliverableSelected(
+            parent,
+            taskId,
+            listOf(
+                TaskDeliverable.WorkType.RepeatingTaskTimes.name,
+                TaskDeliverable.WorkType.QuantityTaskOnce.name,
+                TaskDeliverable.WorkType.CompleteTasks.name
+            )
+        )
+        deliverableTimeListState.value = dao.getTaskDeliverableSelected(
             parent,
             taskId,
             listOf(
