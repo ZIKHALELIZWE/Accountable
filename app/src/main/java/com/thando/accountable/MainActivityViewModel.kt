@@ -11,8 +11,10 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -27,16 +29,8 @@ class MainActivityViewModel(
     val drawerEnabled = mutableStateOf(true)
     var galleryLauncherReturnProcess: ((Uri?)->Unit)? = null
     var galleryLauncherMultipleReturnProcess: ((List<@JvmSuppressWildcards Uri>)->Unit)? = null
-    var restoreBackupReturnProcess: ((
-        Intent?,
-        ActivityResultLauncher<String>,
-        AtomicReference<(() -> Unit)?>
-    ) -> Unit)? = null
-    var makeBackupReturnProcess: ((
-        Intent?,
-        ActivityResultLauncher<String>,
-        AtomicReference<(() -> Unit)?>
-    ) -> Unit)? = null
+    var restoreBackupReturnProcess: ((Intent?) -> UUID?)? = null
+    var makeBackupReturnProcess: ((Intent?) -> Unit)? = null
     private val _galleryLauncherEvent = MutableSharedFlow<String>()
     val galleryLauncherEvent = _galleryLauncherEvent.asSharedFlow()
     private val _galleryLauncherMultipleEvent = MutableSharedFlow<String>()
@@ -49,9 +43,14 @@ class MainActivityViewModel(
         this,
         isIntentActivity
     )
+    val restoreBackupRequestId = MutableStateFlow<UUID?>(null)
 
     suspend fun directionChanged() {
         repository.directionChanged()
+    }
+
+    fun setRestoreBackupRequestId(inputUUID: UUID?){
+        restoreBackupRequestId.value = inputUUID
     }
     fun clearGalleryLaunchers(){
         setGalleryLauncherReturn()
@@ -95,22 +94,12 @@ class MainActivityViewModel(
         galleryLauncherMultipleReturnProcess = process
     }
 
-    fun setRestoreBackupReturn(process: (
-        (
-        Intent?,
-        ActivityResultLauncher<String>,
-        AtomicReference<(() -> Unit)?>
-    ) -> Unit)? = null) {
+    fun setRestoreBackupReturn(process: ((Intent?) -> UUID?)? = null) {
         restoreBackupReturnProcess = process
     }
 
     @OptIn(ExperimentalAtomicApi::class)
-    fun setMakeBackupReturn(process: (
-        (
-            Intent?,
-            ActivityResultLauncher<String>,
-            AtomicReference<(() -> Unit)?>
-        ) -> Unit)? = null) {
+    fun setMakeBackupReturn(process: ((Intent?) -> Unit)? = null) {
         makeBackupReturnProcess = process
     }
 
@@ -123,27 +112,15 @@ class MainActivityViewModel(
     }
 
     fun processMakeBackupResult(
-        result:Intent?,
-        pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-        pushNotificationUnit: AtomicReference<(()->Unit)?>
+        result:Intent?
     ){
-        makeBackupReturnProcess?.let { it(
-            result,
-            pushNotificationPermissionLauncher,
-            pushNotificationUnit
-        ) }
+        makeBackupReturnProcess?.let { it(result) }
     }
 
     fun processRestoreBackupResult(
-        result:Intent?,
-        pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-        pushNotificationUnit: AtomicReference<(()->Unit)?>
-    ){
-        restoreBackupReturnProcess?.let { it(
-            result,
-            pushNotificationPermissionLauncher,
-            pushNotificationUnit
-        ) }
+        result:Intent?
+    ) {
+        restoreBackupRequestId.value = restoreBackupReturnProcess?.let { it(result) }
     }
 
     fun closeUpdateSettings() {
@@ -176,6 +153,8 @@ class MainActivityViewModel(
     }
 
     companion object {
+        const val STORAGE_PERMISSION_CODE = 100
+
         fun Factory(isIntentActivity: Boolean): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(

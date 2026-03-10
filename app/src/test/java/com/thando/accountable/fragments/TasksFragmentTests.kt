@@ -2013,4 +2013,139 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             deliverablesLists = deliverablesLists
         )
     }
+
+    @Test
+    fun `13 Editing Quantity Deliverable Task`() = runMainTest {
+        val activity = getTestMainActivity()
+
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        val goal = taskViewModel.goal.first()!!
+
+        var tasksList = goal.goalTasks.first()
+        assertNotNull(tasksList)
+        assertEquals(1, tasksList.size)
+
+        val oldTask = tasksList[0]
+        val oldTimes = oldTask.times.first()
+        val oldDeliverablesLists = getTaskDeliverablesLists(oldTask)
+
+        withTag("TasksFragmentTaskCardView-${tasksList[0].taskId}") {
+            performLongPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first())
+        assertNotNull(taskViewModel.originalTask.value?.first())
+
+        assertEquals(Goal.GoalTab.TASKS,taskViewModel.bottomSheetType.value)
+        withTag("TasksFragmentAddTaskView"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        tasksAreEqual(
+            oldTask,
+            taskViewModel.task.first()!!,
+            idsEqual = false,
+            times = oldTimes,
+            deliverablesLists = oldDeliverablesLists
+        )
+
+        withTag("TasksFragmentTaskTitle"){
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(activity.getString(R.string.edit_with_arg,activity.getString(R.string.task)))
+        }
+
+        withTag("TasksFragmentTaskSaveButton"){
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+        }
+
+        assertEquals(2L,taskViewModel.task.first()?.quantity)
+        withTag("TasksFragmentAddTaskNormalQuantityTimeTextField"){
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                "Jump 2 times",
+                substring = true
+            )
+            performTextReplacement("Jump 2 times")
+            assertTextContains(
+                "Jump 3 times",
+                substring = true
+            )
+        }
+        assertEquals(3L,taskViewModel.task.first()?.quantity)
+
+        withTag("TasksFragmentAddTaskViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskLocationTextField")
+        }
+
+        withTag("TasksFragmentAddTaskLocationTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                "At Home",
+                substring = true
+            )
+            performTextReplacement("At Home Location")
+            assertTextContains(
+                "At Home Location",
+                substring = true
+            )
+        }
+
+
+
+        val task = taskViewModel.task.first()
+        val taskTimes = task?.times?.first()
+        val deliverablesLists = getTaskDeliverablesLists(task!!)
+
+        withTag("TasksFragmentAddTaskViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskDeleteButton")
+        }
+
+        withTag("TasksFragmentAddTaskDeleteButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentTaskSaveButton"){
+            performPressWithoutScroll()
+        }
+
+        assertNotNull(taskViewModel.goal.first()?.goalTasks?.first())
+        tasksList = taskViewModel.goal.first()?.goalTasks?.first()!!
+        assertEquals(1,tasksList.size)
+
+        tasksAreEqual(
+            task,
+            tasksList[0],
+            false,
+            taskTimes,
+            deliverablesLists = deliverablesLists
+        )
+
+        assertNotEquals(
+            oldTask.task,
+            tasksList[0].task
+        )
+
+        assertNotEquals(
+            oldTask.location,
+            tasksList[0].location
+        )
+
+        assertEquals(oldTask.taskId,tasksList[0].taskId)
+    }
 }

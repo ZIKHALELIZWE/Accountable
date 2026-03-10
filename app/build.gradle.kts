@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.thando.accountable"
-        minSdk = 28
+        minSdk = 29
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.ui.text)
     implementation(libs.androidx.compose.ui.test.junit4)
+    implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

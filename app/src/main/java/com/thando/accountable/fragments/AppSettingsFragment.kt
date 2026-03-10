@@ -73,25 +73,12 @@ fun AppSettingsView(
     }
 
     mainActivityViewModel.setRestoreBackupReturn {
-        result,
-        pushNotificationPermissionLauncher,
-        pushNotificationUnit ->
-            viewModel.restoreFromBackup(
-                result,
-                pushNotificationPermissionLauncher,
-                pushNotificationUnit
-            )
+        result -> viewModel.restoreFromBackup(result)
     }
 
     mainActivityViewModel.setMakeBackupReturn {
-        result,
-        pushNotificationPermissionLauncher,
-        pushNotificationUnit ->
-            viewModel.makeBackup(
-                result,
-                pushNotificationPermissionLauncher,
-                pushNotificationUnit
-            )
+        result ->
+            viewModel.makeBackup(result)
     }
 
     AccountableTheme {

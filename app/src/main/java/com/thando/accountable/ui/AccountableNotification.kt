@@ -12,24 +12,19 @@ import androidx.core.app.NotificationCompat
 import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.roundToInt
+import kotlin.random.Random
 
 class AccountableNotification private constructor(
     val context: Context,
-    private val pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-    private var title:String,
-    pushNotificationUnit: AtomicReference<(() -> Unit)?>,
-    executeUnit: (AccountableNotification) -> Unit
+    private val notificationID: Int,
+    private var title:String
 ): AutoCloseable {
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private var builtNotification: NotificationCompat.Builder? = null
     private var previousVal = 0
 
     init {
-        pushNotificationUnit.set {
-            buildProgressNotification(title)
-            executeUnit.invoke(this)
-        }
         createNotificationChannel()
     }
 
@@ -46,12 +41,32 @@ class AccountableNotification private constructor(
     }
 
     @SuppressLint("InlinedApi")
+    fun buildMessageNotification(title:String, message:String) {
+        builtNotification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stars_black_24dp) // Notification icon
+            .setContentTitle(title) // Title displayed in the notification
+            .setContentText(message) // Text displayed in the notification
+            .setPriority(NotificationCompat.PRIORITY_LOW) // Notification priority for better visibility
+            .setOnlyAlertOnce(true)
+
+        // Display the notification
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        notificationManager.notify(notificationID, builtNotification!!.build())
+    }
+
+    @SuppressLint("InlinedApi")
     fun buildProgressNotification(title:String) {
         this.title = title
 
         // Build the notification
         builtNotification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher) // Notification icon
+            .setSmallIcon(R.drawable.ic_stars_black_24dp) // Notification icon
             .setContentTitle(title) // Title displayed in the notification
             .setContentText("Initializing...") // Text displayed in the notification
             .setPriority(NotificationCompat.PRIORITY_LOW) // Notification priority for better visibility
@@ -66,29 +81,28 @@ class AccountableNotification private constructor(
                 Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            pushNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             return
         }
-        notificationManager.notify(NOTIFICATION_ID, builtNotification!!.build())
+        notificationManager.notify(notificationID, builtNotification!!.build())
     }
 
     @SuppressLint("MissingPermission")
     fun updateNotification(progress: Int,progressMax: Int){
         builtNotification?.let {
-            val newVal = Math.round((progress/progressMax.toFloat())*100)
+            val newVal = ((progress / progressMax.toFloat()) * 100).roundToInt()
             if (newVal == previousVal) return
             else previousVal = newVal
             if (newVal == 100) {
                 it.setContentText("$title Complete")
                     .setProgress(0, 0, false)
                     .setOngoing(false)
-                notificationManager.notify(NOTIFICATION_ID, it.build())
-                notificationManager.cancel(NOTIFICATION_ID)
+                notificationManager.notify(notificationID, it.build())
+                notificationManager.cancel(notificationID)
                 builtNotification = null
             } else {
-                it.setContentText("${newVal}%")
+                it.setContentTitle("$title ${newVal}%").setContentText(null)
                     .setProgress(100, newVal, false)
-                notificationManager.notify(NOTIFICATION_ID, it.build())
+                notificationManager.notify(notificationID, it.build())
             }
         }
     }
@@ -97,27 +111,62 @@ class AccountableNotification private constructor(
         // Unique channel ID for notifications
         const val CHANNEL_ID = "i.apps.notifications"
 
-        // Unique identifier for the notification
-        const val NOTIFICATION_ID = 1234
-
         // Description for the notification channel
         const val CHANNEL_NAME = "Test notification"
+
+        @SuppressLint("InlinedApi")
+        suspend fun createMessageNotification(
+            context: Context,
+            title: String,
+            message: String
+        ): AccountableNotification {
+            val accountableNotification = AccountableNotification(
+                context,
+                Random.nextInt(),
+                title
+            )
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                withContext(MainActivity.Main){
+                    accountableNotification.buildMessageNotification(title,message)
+                }
+            }
+            return accountableNotification
+        }
 
         @SuppressLint("InlinedApi")
         suspend fun createProgressNotification(
             context: Context,
             title: String,
-            pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-            pushNotificationUnit: AtomicReference<(() -> Unit)?>,
-            executeUnit: (AccountableNotification) -> Unit
+            executeUnit: suspend (AccountableNotification) -> Unit
         ):AccountableNotification{
             val accountableNotification = AccountableNotification(
                 context,
-                pushNotificationPermissionLauncher,
-                title,
-                pushNotificationUnit,
-                executeUnit
+                Random.nextInt(),
+                title
             )
+            if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                withContext(MainActivity.Main){
+                    accountableNotification.buildProgressNotification(title)
+                }
+                executeUnit.invoke(accountableNotification)
+            }
+            return accountableNotification
+        }
+
+        @SuppressLint("InlinedApi")
+        suspend fun canPushNotifications(
+            context: Context,
+            pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
+            work: () -> Unit
+        ){
             if (ActivityCompat.checkSelfPermission(
                     context,
                     Manifest.permission.POST_NOTIFICATIONS
@@ -127,11 +176,9 @@ class AccountableNotification private constructor(
             }
             else {
                 withContext(MainActivity.Main){
-                    accountableNotification.buildProgressNotification(title)
+                    work.invoke()
                 }
-                executeUnit.invoke(accountableNotification)
             }
-            return accountableNotification
         }
     }
 
@@ -139,8 +186,8 @@ class AccountableNotification private constructor(
         builtNotification?.setOngoing(false)
             ?.setProgress(0, 0, false)
             ?.setAutoCancel(true)
-        notificationManager.notify(NOTIFICATION_ID, builtNotification?.build())
-        notificationManager.cancel(NOTIFICATION_ID)
+        notificationManager.notify(notificationID, builtNotification?.build())
+        notificationManager.cancel(notificationID)
         builtNotification = null
     }
 }

@@ -1,5 +1,6 @@
 package com.thando.accountable
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -58,9 +59,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
+import com.thando.accountable.database.AccountableDatabase
 import com.thando.accountable.fragments.TeleprompterController
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
+import com.thando.accountable.ui.AccountableNotification
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -68,7 +73,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
-import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 
 open class MainActivity : ComponentActivity() {
@@ -95,20 +99,12 @@ open class MainActivity : ComponentActivity() {
         }
     }
     private val getResultRestoreBackup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){ result ->
-        if (result.resultCode == RESULT_OK)
-            viewModel.processRestoreBackupResult(
-                result.data,
-                pushNotificationPermissionLauncher,
-                pushNotificationUnit
-            )
+        if (result.resultCode == RESULT_OK){
+            viewModel.processRestoreBackupResult(result.data)
+        }
     }
     private val getResultMakeBackup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){ result ->
-        if (result.resultCode == RESULT_OK)
-            viewModel.processMakeBackupResult(
-                result.data,
-                pushNotificationPermissionLauncher,
-                pushNotificationUnit
-            )
+        if (result.resultCode == RESULT_OK) viewModel.processMakeBackupResult(result.data)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -130,16 +126,72 @@ open class MainActivity : ComponentActivity() {
             }
             LaunchedEffect(Unit) {
                 viewModel.makeBackupEvent.collect { intent ->
-                    getResultMakeBackup.launch(intent)
+                    pushNotificationUnit.set {
+                        getResultMakeBackup.launch(intent)
+                    }
+                    AccountableNotification.canPushNotifications(
+                        application,
+                        pushNotificationPermissionLauncher
+                    ) {
+                        getResultMakeBackup.launch(intent)
+                    }
                 }
             }
             LaunchedEffect(Unit) {
                 viewModel.restoreBackupEvent.collect { intent ->
-                    getResultRestoreBackup.launch(intent)
+                    pushNotificationUnit.set {
+                        getResultRestoreBackup.launch(intent)
+                    }
+                    AccountableNotification.canPushNotifications(
+                        application,
+                        pushNotificationPermissionLauncher
+                    ) {
+                        getResultRestoreBackup.launch(intent)
+                    }
+                }
+            }
+            val requestRestoreBackupId by viewModel.restoreBackupRequestId.collectAsStateWithLifecycle()
+            val context = LocalContext.current
+            LaunchedEffect(requestRestoreBackupId) {
+                if (requestRestoreBackupId!=null) {
+                    WorkManager.getInstance(context)
+                        .getWorkInfoByIdFlow(requestRestoreBackupId!!)
+                        .collect { workInfo ->
+                            if (workInfo!=null) {
+                                when (workInfo.state) {
+                                    WorkInfo.State.ENQUEUED -> {}
+                                    WorkInfo.State.BLOCKED -> {}
+                                    WorkInfo.State.RUNNING -> {}
+                                    WorkInfo.State.SUCCEEDED,
+                                    WorkInfo.State.FAILED,
+                                    WorkInfo.State.CANCELLED -> {
+                                        viewModel.repository.dao = AccountableDatabase.getInstance(viewModel.repository.application).repositoryDao
+                                    }
+                                }
+                            }
+                        }
                 }
             }
             MainActivityView(viewModel){
                 finish()
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String?>,
+        grantResults: IntArray,
+        deviceId: Int
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults, deviceId)
+        if (requestCode == MainActivityViewModel.STORAGE_PERMISSION_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                log("Permission Granted")
+                //createDownloadFolder()
+            } else {
+                log("Permission Not Granted")
+                //Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -338,7 +390,8 @@ fun MainActivityView(
                         }
                     }
                     Column(
-                        modifier = Modifier.testTag("MainActivityNavigationDrawerColumn")
+                        modifier = Modifier
+                            .testTag("MainActivityNavigationDrawerColumn")
                             .verticalScroll(rememberScrollState())
                     ) {
                         appSettings?.let { appSettings ->
@@ -360,7 +413,8 @@ fun MainActivityView(
 
                         Text(stringResource(R.string.activities), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)
                         NavigationDrawerItem(
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
                                 .testTag("NavigationDrawerItemHomeFragment"),
                             icon = {
                                 Icon(
@@ -377,7 +431,8 @@ fun MainActivityView(
                             }
                         )
                         NavigationDrawerItem(
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
                                 .testTag("NavigationDrawerItemBooksFragment"),
                             icon = {
                                 Icon(
@@ -397,7 +452,8 @@ fun MainActivityView(
 
                         Text(stringResource(R.string.support), modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)
                         NavigationDrawerItem(
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
                                 .testTag("NavigationDrawerItemAppSettingsFragment"),
                             label = { Text("Settings") },
                             selected = currentFragment == AccountableFragment.AppSettingsFragment,
@@ -409,7 +465,8 @@ fun MainActivityView(
                             ) }
                         )
                         NavigationDrawerItem(
-                            modifier = Modifier.padding(horizontal = 16.dp)
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
                                 .testTag("NavigationDrawerItemHelpFragment"),
                             label = { Text("Help and feedback") },
                             selected = currentFragment == AccountableFragment.HelpFragment,

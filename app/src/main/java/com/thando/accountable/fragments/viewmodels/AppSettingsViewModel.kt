@@ -12,6 +12,7 @@ import com.thando.accountable.AccountableRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 
 class AppSettingsViewModel(private val repository: AccountableRepository): ViewModel() {
@@ -29,17 +30,12 @@ class AppSettingsViewModel(private val repository: AccountableRepository): ViewM
         repository.restoreDefaultCustomAppSettingsImage()
     }
 
-    fun restoreFromBackup(data: Intent?,
-                          pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-                          pushNotificationUnit: AtomicReference<(() -> Unit)?>
-    ){
-        repository.restoreAccountableDataFromBackup(data, pushNotificationPermissionLauncher,pushNotificationUnit)
+    fun restoreFromBackup(data: Intent?): UUID?{
+        return repository.restoreAccountableDataFromBackup(data)
     }
 
-    fun makeBackup(data:Intent?,
-                   pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-                   pushNotificationUnit: AtomicReference<(() -> Unit)?>){
-        repository.makeAccountableBackup(data, pushNotificationPermissionLauncher,pushNotificationUnit)
+    fun makeBackup(data:Intent?){
+        repository.makeAccountableBackup(data)
     }
 
     fun chooseImage(){

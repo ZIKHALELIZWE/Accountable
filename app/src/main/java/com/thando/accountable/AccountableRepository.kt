@@ -1,5 +1,6 @@
 package com.thando.accountable
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
 import android.content.ContentValues
@@ -9,7 +10,6 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
-import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
@@ -20,8 +20,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.database.AccountableDatabase
 import com.thando.accountable.database.dataaccessobjects.RepositoryDao
@@ -44,6 +47,8 @@ import com.thando.accountable.fragments.viewmodels.BooksViewModel.Companion.INIT
 import com.thando.accountable.fragments.viewmodels.SearchViewModel
 import com.thando.accountable.player.AccountablePlayer
 import com.thando.accountable.ui.AccountableNotification
+import com.thando.accountable.workers.BackupWorker
+import com.thando.accountable.workers.RestoreBackupWorker
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,11 +68,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.OutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
 
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -150,6 +152,42 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
 
         val accountablePlayer = AccountablePlayer()
+
+        suspend fun copyAppMediaToExternalFolder(
+            context: Context,
+            inputFolder: String,
+            inputDocumentFile: DocumentFile?,
+            outputDocumentFile: DocumentFile?,
+            notification: AccountableNotification,
+            progress: AtomicInteger,
+            total: Int
+        ) {
+            outputDocumentFile?.findFile(inputFolder)?.delete()
+            outputDocumentFile?.createDirectory(inputFolder).let { imageDocFile ->
+                inputDocumentFile?.listFiles()?.forEach { inputImage ->
+                    context.contentResolver.openInputStream(inputImage.uri).use { input ->
+                        inputImage.name.let { name ->
+                            if (name != null) {
+                                imageDocFile?.createFile("", name)?.let { outputFile ->
+                                    context.contentResolver.openOutputStream(outputFile.uri)
+                                        .use { output ->
+                                            if (output != null) {
+                                                input?.copyTo(output)
+                                                withContext(MainActivity.Main) {
+                                                    notification.updateNotification(
+                                                        progress.incrementAndGet(),
+                                                        total
+                                                    )
+                                                }
+                                            }
+                                        }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     init {
@@ -1138,254 +1176,40 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return documentsDir + File.separator + folderName
     }
 
+    @SuppressLint("InlinedApi")
     fun makeAccountableBackup(
-        data: Intent?,
-        pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-        pushNotificationUnit: AtomicReference<(() -> Unit)?>
+        data: Intent?
     ) {
-        repositoryScope.launch {
-            withContext(MainActivity.IO) {
-                data?.data?.let { uri ->
-                    val docFile = DocumentFile.fromTreeUri(application, uri) ?: run {
-                        Toast.makeText(
-                            application,
-                            "Can't access Accountable directory!",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@let
-                    }
-                    if (!docFile.canRead()) {
-                        Toast.makeText(
-                            application,
-                            "Can't access Accountable directory!",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@let
-                    }
+        data?.data?.let { uri ->
+            val request = OneTimeWorkRequestBuilder<BackupWorker>()
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setInputData(workDataOf(
+                    "uri" to uri.toString()
+                ))
+                .build()
 
-                    val dbFile: File = application.getDatabasePath("accountable_database")
-                    val fileName = "Backup (${getDateTimeFromMillis()})"
-                    var saveFile = docFile.findFile(fileName)
-                    saveFile?.delete()
-                    saveFile = docFile.createDirectory(fileName)
-                    saveFile?.createFile("application/x-sqlite3", dbFile.name + ".db")
-                        ?.let { outputFile ->
-                            application.contentResolver.openOutputStream(outputFile.uri)
-                                .use { output ->
-                                    application.contentResolver.openInputStream(dbFile.toUri())
-                                        .use { input ->
-                                            if (output != null) {
-                                                input?.copyTo(output)
-                                            }
-                                        }
-                                }
-                        }
-
-                    val imageFile =
-                        DocumentFile.fromFile(File(application.filesDir.toString() + File.separator + AppResources.ImageResource.DESTINATION_FOLDER))
-                    val videoFile =
-                        DocumentFile.fromFile(File(application.filesDir.toString() + File.separator + AppResources.VideoResource.DESTINATION_FOLDER))
-                    val audioFile =
-                        DocumentFile.fromFile(File(application.filesDir.toString() + File.separator + AppResources.AudioResource.DESTINATION_FOLDER))
-                    val documentFile =
-                        DocumentFile.fromFile(File(application.filesDir.toString() + File.separator + AppResources.DocumentResource.DESTINATION_FOLDER))
-                    val itemsSaved = AtomicInteger(0)
-                    val totalItems = imageFile.listFiles().size.plus(
-                        videoFile.listFiles().size.plus(
-                            audioFile.listFiles().size.plus(
-                                documentFile.listFiles().size
-                            )
-                        )
-                    )
-                    AccountableNotification.createProgressNotification(
-                        application,
-                        "Backing Up",
-                        pushNotificationPermissionLauncher,
-                        pushNotificationUnit
-                    ) { notification ->
-                        repositoryScope.launch {
-                            withContext(MainActivity.IO) {
-                                copyAppMediaToExternalFolder(
-                                    AppResources.ImageResource.DESTINATION_FOLDER,
-                                    imageFile,
-                                    saveFile,
-                                    notification,
-                                    itemsSaved,
-                                    totalItems
-                                )
-                                copyAppMediaToExternalFolder(
-                                    AppResources.VideoResource.DESTINATION_FOLDER,
-                                    videoFile,
-                                    saveFile,
-                                    notification,
-                                    itemsSaved,
-                                    totalItems
-                                )
-                                copyAppMediaToExternalFolder(
-                                    AppResources.AudioResource.DESTINATION_FOLDER,
-                                    audioFile,
-                                    saveFile,
-                                    notification,
-                                    itemsSaved,
-                                    totalItems
-                                )
-                                copyAppMediaToExternalFolder(
-                                    AppResources.DocumentResource.DESTINATION_FOLDER,
-                                    documentFile,
-                                    saveFile,
-                                    notification,
-                                    itemsSaved,
-                                    totalItems
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            WorkManager.getInstance(application)
+                .enqueue(request)
         }
     }
 
     fun restoreAccountableDataFromBackup(
-        data: Intent?,
-        pushNotificationPermissionLauncher: ActivityResultLauncher<String>,
-        pushNotificationUnit: AtomicReference<(() -> Unit)?>
-    ) {
-        repositoryScope.launch {
-            withContext(MainActivity.IO) {
-                data?.data?.let { uri ->
-                    val docFile = DocumentFile.fromTreeUri(application, uri) ?: run {
-                        Toast.makeText(
-                            application,
-                            "Can't access Accountable directory!",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@let
-                    }
-                    if (!docFile.canRead()) {
-                        Toast.makeText(
-                            application,
-                            "Can't access Accountable directory!",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@let
-                    }
+        data: Intent?
+    ): UUID? {
+        data?.data?.let { uri ->
+            // Save Everything and close the App Settings View to show the restoration view
+            val request = OneTimeWorkRequestBuilder<RestoreBackupWorker>()
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setInputData(workDataOf(
+                    "uri" to uri.toString()
+                ))
+                .build()
 
-                    AccountableDatabase.closeDatabase()
-                    val inputDbFile = docFile.findFile("accountable_database.db")
-                    val dbFile: File = application.getDatabasePath("accountable_database")
-                    application.contentResolver.openOutputStream(dbFile.toUri()).use { output ->
-                        inputDbFile?.uri?.let { inputFile ->
-                            application.contentResolver.openInputStream(inputFile).use { input ->
-                                if (output != null) {
-                                    input?.copyTo(output)
-                                }
-                            }
-                        }
-                    }
-
-                    val saveFile = DocumentFile.fromFile(application.filesDir)
-                    val imageFile = docFile.findFile(AppResources.ImageResource.DESTINATION_FOLDER)
-                    val videoFile = docFile.findFile(AppResources.VideoResource.DESTINATION_FOLDER)
-                    val audioFile = docFile.findFile(AppResources.AudioResource.DESTINATION_FOLDER)
-                    val documentFile =
-                        docFile.findFile(AppResources.DocumentResource.DESTINATION_FOLDER)
-                    val itemsSaved = AtomicInteger(0)
-                    val totalItems = (
-                            imageFile?.listFiles()?.size?.plus(
-                                videoFile?.listFiles()?.size?.plus(
-                                    audioFile?.listFiles()?.size?.plus(
-                                        documentFile?.listFiles()?.size!!
-                                    ) ?: 0
-                                ) ?: 0
-                            ) ?: 0)
-                    AccountableNotification.createProgressNotification(
-                        application,
-                        "Restoring Back Up",
-                        pushNotificationPermissionLauncher,
-                        pushNotificationUnit
-                    ) { notification ->
-                        repositoryScope.launch {
-                            withContext(MainActivity.IO) {
-                                copyAppMediaToExternalFolder(
-                                    AppResources.ImageResource.DESTINATION_FOLDER,
-                                    imageFile,
-                                    saveFile,
-                                    notification,
-                                    itemsSaved,
-                                    totalItems
-                                )
-                                copyAppMediaToExternalFolder(
-                                    AppResources.VideoResource.DESTINATION_FOLDER,
-                                    videoFile,
-                                    saveFile,
-                                    notification,
-                                    itemsSaved,
-                                    totalItems
-                                )
-                                copyAppMediaToExternalFolder(
-                                    AppResources.AudioResource.DESTINATION_FOLDER,
-                                    audioFile,
-                                    saveFile,
-                                    notification,
-                                    itemsSaved,
-                                    totalItems
-                                )
-                                copyAppMediaToExternalFolder(
-                                    AppResources.DocumentResource.DESTINATION_FOLDER,
-                                    documentFile,
-                                    saveFile,
-                                    notification,
-                                    itemsSaved,
-                                    totalItems
-                                )
-                                dao = AccountableDatabase.getInstance(application).repositoryDao
-                            }
-                        }
-                    }
-                }
-            }
+            WorkManager.getInstance(application)
+                .enqueue(request)
+            return request.id
         }
-    }
-
-    private suspend fun copyAppMediaToExternalFolder(
-        inputFolder: String,
-        inputDocumentFile: DocumentFile?,
-        outputDocumentFile: DocumentFile?,
-        notification: AccountableNotification,
-        progress: AtomicInteger,
-        total: Int
-    ) {
-        outputDocumentFile?.findFile(inputFolder)?.delete()
-        outputDocumentFile?.createDirectory(inputFolder).let { imageDocFile ->
-            inputDocumentFile?.listFiles()?.forEach { inputImage ->
-                application.contentResolver.openInputStream(inputImage.uri).use { input ->
-                    inputImage.name.let { name ->
-                        if (name != null) {
-                            imageDocFile?.createFile("", name)?.let { outputFile ->
-                                application.contentResolver.openOutputStream(outputFile.uri)
-                                    .use { output ->
-                                        if (output != null) {
-                                            input?.copyTo(output)
-                                            withContext(MainActivity.Main) {
-                                                notification.updateNotification(
-                                                    progress.incrementAndGet(),
-                                                    total
-                                                )
-                                            }
-                                        }
-                                    }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun getDateTimeFromMillis(): String {
-        val simpleDateFormat =
-            SimpleDateFormat("dd-MM-yyyy-hh:mm", Locale.getDefault()).format(Date())
-        return simpleDateFormat.format(System.currentTimeMillis())
+        return null
     }
 
     fun setAppSettingsTextSize(textSize: Int) {
@@ -1692,9 +1516,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return dao.getContentListNow(scriptId)
     }
 
-    inner class GoalContentPreview(
-        val id: Long
-    ) {
+    inner class GoalContentPreview(val id: Long)
+    {
         private var numAudios: MutableStateFlow<Int> = MutableStateFlow(0)
         private var numImages: MutableStateFlow<Int> = MutableStateFlow(0)
         private var numVideos: MutableStateFlow<Int> = MutableStateFlow(0)
@@ -1808,9 +1631,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    inner class ContentPreview(
-        val id: Long
-    ) {
+    inner class ContentPreview(val id: Long)
+    {
         private var numAudios: MutableStateFlow<Int> = MutableStateFlow(0)
         private var numImages: MutableStateFlow<Int> = MutableStateFlow(0)
         private var numVideos: MutableStateFlow<Int> = MutableStateFlow(0)
@@ -2313,6 +2135,18 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 if (setCloneId) to.cloneId = from.taskId
 
                 if (to.taskId == null) to.taskId = saveTask(to)
+
+                // clone deliverables
+                // todo from.
+                /*val fromMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(deliverable.deliverableId))
+                val toMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(newDeliverable.deliverableId))
+                cloneDeliverableTo(
+                    fromMutable,
+                    toMutable,
+                    setCloneId,
+                    false
+                )*/
+
                 cloneTimesTo(
                     to.taskId,
                     from.times,
