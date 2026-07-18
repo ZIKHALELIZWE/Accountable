@@ -17,14 +17,19 @@ import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.addDeliverableCompanionObject
+import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.addTaskCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.addTimeBlockCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.deleteClickedDeliverable
+import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.deleteClickedTask
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.deleteDeliverableClickedCompanionObject
+import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.deleteTaskClickedCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.deleteTimeBlockCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.dismissBottomSheetCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.editClickedDeliverable
+import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.editClickedTask
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.processBottomSheetAddCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.saveClickedDeliverable
+import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.saveClickedTask
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showBottomSheetCompanionObject
 import com.thando.accountable.fragments.viewmodels.TaskViewModel.Companion.showInputError
 import com.thando.accountable.ui.MenuItemData
@@ -58,6 +63,10 @@ class EditGoalViewModel(
     val deliverable = deliverableState.flatMapLatest { it?:flowOf(null) }
     private val originalDeliverableState = MutableStateFlow<Flow<Deliverable?>?>(null)
     val originalDeliverable = originalDeliverableState.flatMapLatest { it?: flowOf(null) }
+    private val taskState: MutableStateFlow<Flow<Task?>?> = MutableStateFlow(null)
+    val task = taskState.flatMapLatest { it?:flowOf(null) }
+    val originalTaskState = MutableStateFlow<Flow<Task?>?>(null)
+    val originalTask = originalTaskState.flatMapLatest { it?:flowOf(null) }
     val triedToSaveBottomSheet = MutableStateFlow(false)
     val bottomSheetType = MutableStateFlow<Goal.GoalTab?>(null)
 
@@ -66,6 +75,8 @@ class EditGoalViewModel(
     val buttonTimePick = MutableStateFlow(false)
     val endTypeOptions = MutableStateFlow(listOf<MenuItemData>())
     val selectDeliverableDialog = MutableStateFlow(false)
+
+    val selectTaskDialog = MutableStateFlow(false)
 
     private fun showError(
         message: Int,
@@ -134,8 +145,8 @@ class EditGoalViewModel(
         else addTimeBlockCompanionObject(
             bottomSheetType = bottomSheetType,
             saveTime = ::saveTime,
-            task = null,
-            saveTask = null,
+            task = taskState,
+            saveTask = ::saveTask,
             deliverable = deliverable,
             saveDeliverable = ::saveDeliverable
         )
@@ -151,7 +162,7 @@ class EditGoalViewModel(
             repository = repository,
             bottomSheetType = bottomSheetType,
             timeBlock = timeBlock,
-            task = null,
+            task = taskState,
             deliverable = deliverableState
         )
     }
@@ -180,6 +191,25 @@ class EditGoalViewModel(
             repository.clearNewGoal()
             repository.goBackToGoalsFromEditGoal()
         }
+    }
+
+    suspend fun editTask(originalTaskInput: Task) {
+        originalTaskInput.taskId?.let { id ->
+            editTask(repository.getTask(id))
+        }
+    }
+
+    suspend fun editTask(originalTaskInput: Flow<Task?>) {
+        editClickedTask(
+            originalTaskInput = originalTaskInput,
+            repository = repository,
+            originalTask = originalTaskState,
+            originalDeliverable = null,
+            originalMarker = null,
+            task = taskState,
+            saveTask = ::saveTask,
+            showBottomSheet = ::showBottomSheet
+        )
     }
 
     suspend fun editDeliverable(originalDeliverableInput: Deliverable) {
@@ -214,12 +244,33 @@ class EditGoalViewModel(
         )
     }
 
+    suspend fun addTask() {
+        addTaskCompanionObject(
+            repository = repository,
+            goal = newGoal.first(),
+            saveTask = ::saveTask,
+            showBottomSheet = ::showBottomSheet,
+            task = taskState,
+            originalTask = originalTaskState,
+            originalDeliverable = null,
+            originalMarker = null
+        )
+    }
+
     fun selectDeliverable() {
         selectDeliverableDialog.value = true
     }
 
+    fun selectTask() {
+        selectTaskDialog.value = true
+    }
+
     fun closeSelectDeliverableDialog() {
         selectDeliverableDialog.value = false
+    }
+
+    fun closeSelectTaskDialog() {
+        selectTaskDialog.value = false
     }
 
     suspend fun saveDeliverable(){
@@ -246,16 +297,39 @@ class EditGoalViewModel(
         )
     }
 
+    suspend fun saveTask(){
+        saveClickedTask( repository, taskState)
+    }
+
+    suspend fun saveTask(task: Task) {
+        repository.saveTask(task)
+    }
+
+    suspend fun deleteTask() {
+        deleteClickedTask(
+            repository,
+            taskState
+        )
+    }
+
+    suspend fun deleteTaskClicked() {
+        deleteTaskClickedCompanionObject(
+            taskState,
+            originalTaskState,
+            ::deleteTask,
+            ::dismissBottomSheet
+        )
+    }
+
     suspend fun processBottomSheetAdd(){
         processBottomSheetAddCompanionObject(
             repository = repository,
             triedToSave = triedToSaveBottomSheet,
             bottomSheetType = bottomSheetType,
-            task = null,
-            originalTask = null,
-            deleteTask = null,
-            canSaveTask = null,
-            saveTask = null,
+            task = taskState,
+            originalTask = originalTaskState,
+            deleteTask = ::deleteTask,
+            saveTask = ::saveTask,
             deliverable = deliverableState,
             originalDeliverable = originalDeliverableState,
             deleteDeliverable = ::deleteDeliverable,
@@ -274,13 +348,13 @@ class EditGoalViewModel(
         dismissBottomSheetCompanionObject(
             triedToSave = triedToSaveBottomSheet,
             bottomSheetType = bottomSheetType,
-            task = null,
-            deleteTask = null,
+            task = taskState,
+            deleteTask = ::deleteTask,
             deliverable = deliverableState,
             deleteDeliverable = ::deleteDeliverable,
             marker = null,
             deleteMarker = null,
-            originalTask = null,
+            originalTask = originalTaskState,
             originalDeliverable = originalDeliverableState,
             originalMarker = null
         )

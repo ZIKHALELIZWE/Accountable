@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController
 import com.thando.accountable.AccountableRepository
+import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.Folder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -121,7 +122,7 @@ class BooksViewModel(
             repository.loadAndOpenScript(scriptId)
         }
         else{
-            repository.appendIntentStringToScript(scriptId,activity)
+            repository.processIntentStringToScript(scriptId,activity)
         }
     }
 
@@ -146,13 +147,19 @@ class BooksViewModel(
         initialized.value = false
     }
 
-    suspend fun addFolderScript(){
+    suspend fun addFolderScript(activity: Activity?){
         val id = INITIAL_FOLDER_ID
         showScripts.first().let {
             if (it) {
                 // Add a script
-                if (repository.folderIsScripts()) onScriptClick(id, null)
-                else onGoalEdit(id)
+                if (repository.intentString==null) {
+                    if (repository.folderIsScripts()) onScriptClick(id, null)
+                    else onGoalEdit(id)
+                }
+                else{
+                    repository.processIntentStringToScript(id,activity)
+                }
+
             } else {
                 // Add a folder
                 onFolderEdit(id)

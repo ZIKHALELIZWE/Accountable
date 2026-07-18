@@ -212,12 +212,13 @@ fun BooksView( viewModel : BooksViewModel, mainActivityViewModel: MainActivityVi
         }
 
         val image by result.collectAsStateWithLifecycle(null)
+        val activity = LocalActivity.current
         Scaffold(
-            floatingActionButton = if (viewModel.intentString == null) {
+            floatingActionButton = if (viewModel.intentString == null || showScripts) {
                 @Composable {
                     FloatingActionButton(
                         onClick = { coroutineScope.launch {
-                            viewModel.addFolderScript()
+                            viewModel.addFolderScript(activity)
                         } },
                         modifier = Modifier.padding(16.dp)
                             .testTag("BooksFloatingActionButton"),

@@ -99,7 +99,7 @@ data class Goal(
     }
 
     enum class GoalEndType {
-        UNDEFINED, DATE, DELIVERABLE
+        UNDEFINED, DATE, DELIVERABLE, TASK
     }
 
     enum class GoalTab(val stringRes:Int, val addStringRes:Int) {
@@ -169,6 +169,22 @@ data class Goal(
     }.flowOn(MainActivity.IO)
 
     @Ignore
+    private val selectedGoalTasksState: MutableStateFlow<Flow<List<Task>>?> = MutableStateFlow(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val selectedGoalTasks = selectedGoalTasksState.flatMapLatest {
+        it ?: flowOf(emptyList())
+    }.flowOn(MainActivity.IO)
+
+    @Ignore
+    private val notSelectedGoalTasksState: MutableStateFlow<Flow<List<Task>>?> = MutableStateFlow(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val notSelectedGoalTasks = notSelectedGoalTasksState.flatMapLatest {
+        it ?: flowOf(emptyList())
+    }.flowOn(MainActivity.IO)
+
+    @Ignore
     val imageResource = AppResources.ImageResource(goalPicture?:"")
 
     fun loadGoalTimes(dao: RepositoryDao){
@@ -189,6 +205,8 @@ data class Goal(
             }
             tasks
         }
+        selectedGoalTasksState.value = dao.getSelectedGoalTasks(id)
+        notSelectedGoalTasksState.value = dao.getNotSelectedGoalTasks(id)
     }
 
     fun loadMarkers(dao: RepositoryDao) {

@@ -154,23 +154,25 @@ class MainActivityViewModel(
 
     companion object {
         const val STORAGE_PERMISSION_CODE = 100
+    }
 
-        fun Factory(isIntentActivity: Boolean): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(
-                modelClass: Class<T>,
-                extras: CreationExtras
-            ): T {
-                // Get the Application object from extras
-                val application = checkNotNull(extras[APPLICATION_KEY])
+    class Factory(private val intentString: String? = null): ViewModelProvider.Factory {
+        @Suppress("UNCHECKED_CAST")
+        override fun <T : ViewModel> create(
+            modelClass: Class<T>,
+            extras: CreationExtras
+        ): T {
+            // Get the Application object from extras
+            val application = checkNotNull(extras[APPLICATION_KEY])
 
-                val accountableRepository = AccountableRepository.getInstance(application)
+            val accountableRepository = AccountableRepository.getInstance(application)
 
-                return MainActivityViewModel(
-                    accountableRepository,
-                    isIntentActivity
-                ) as T
-            }
+            accountableRepository.intentString = intentString
+
+            return MainActivityViewModel(
+                accountableRepository,
+                intentString != null
+            ) as T
         }
     }
 }

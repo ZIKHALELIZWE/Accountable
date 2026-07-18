@@ -36,7 +36,10 @@ data class TaskDeliverable (
     var streak: Long? = null,
 
     @ColumnInfo(name = "workType")
-    var workType: String = WorkType.RepeatingTaskTimes.name
+    var workType: String = WorkType.RepeatingTaskTimes.name,
+
+    @ColumnInfo (name = "cloneId")
+    var cloneId: Long? = null
 ) {
     enum class WorkType(val resString: Int) {
         RepeatingTaskTimes(R.string.task_accumulation),

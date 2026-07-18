@@ -139,7 +139,7 @@ class SearchViewModel(
             }
         }
         else{
-            repository.appendIntentStringToScript(scriptId,activity)
+            repository.processIntentStringToScript(scriptId,activity)
         }
     }
 

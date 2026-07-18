@@ -14,6 +14,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
@@ -85,7 +86,10 @@ data class Task(
     var numScripts: Int = 0,
 
     @ColumnInfo (name = "task_clone_id")
-    var cloneId: Long? = null
+    var cloneId: Long? = null,
+
+    @ColumnInfo (name = "task_goal_id")
+    var goalId: Long? = null,
 
 ) {
     enum class TaskParentType {
@@ -145,6 +149,12 @@ data class Task(
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val deliverableTimeList = deliverableTimeListState.flatMapLatest { it }.flowOn(MainActivity.IO)
+
+    @Ignore
+    val taskDeliverableListState = MutableStateFlow<Flow<List<TaskDeliverable>>>(emptyFlow())
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Ignore
+    val taskDeliverableList = taskDeliverableListState.flatMapLatest { it }.flowOn(MainActivity.IO)
 
     @Ignore
     val taskTextFocusRequester = FocusRequester()
@@ -238,5 +248,6 @@ data class Task(
                 TaskDeliverable.WorkType.CompleteTasks.name
             )
         )
+        taskDeliverableListState.value = dao.getTaskTaskDeliverables(taskId)
     }
 }

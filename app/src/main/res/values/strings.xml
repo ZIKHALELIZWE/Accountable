@@ -310,10 +310,13 @@
     <string name="please_enter_a_quantity">Please Enter A Quantity</string>
     <string name="task_with_time">Task With Time</string>
     <string name="select_deliverable">Select Deliverable</string>
+    <string name="select_task">Select Task</string>
     <string name="edit_goal">Edit Goal</string>
     <string name="required_to_complete_goal">Required to Complete Goal:</string>
     <string name="pick_deliverable">Pick Deliverable</string>
+    <string name="pick_task">Pick Task</string>
     <string name="select_deliverables">Select Deliverables</string>
+    <string name="select_tasks">Select Tasks</string>
     <string name="delete_deliverable">Delete Deliverable</string>
     <string name="image_not_found">Image Not Found</string>
     <string name="once">Once</string>

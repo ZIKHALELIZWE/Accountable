@@ -75,7 +75,7 @@ interface RepositoryDao {
     suspend fun insert(marker: Marker): Long
 
     @Upsert
-    suspend fun upsert(taskDeliverable: TaskDeliverable): Long
+    suspend fun upsert(taskDeliverable: TaskDeliverable)
 
     @Update
     suspend fun update(folder: Folder)
@@ -464,6 +464,9 @@ interface RepositoryDao {
     @Query("SELECT * FROM TaskDeliverable WHERE deliverableId = :deliverableId")
     fun getDeliverableTaskDeliverables(deliverableId: Long?): Flow<List<TaskDeliverable>>
 
+    @Query("SELECT * FROM TaskDeliverable WHERE taskId = :taskId")
+    fun getTaskTaskDeliverables(taskId: Long?): Flow<List<TaskDeliverable>>
+
     @Query("SELECT * FROM folder_table WHERE folder_parent = :parent AND folder_type = :folderType ORDER BY folder_position ASC")
     fun getFolders(parent:Long?, folderType: Folder.FolderType?): Flow<List<Folder>>
 
@@ -585,6 +588,12 @@ interface RepositoryDao {
 
     @Query("SELECT * FROM deliverable_table WHERE deliverable_goal_id IS NULL AND deliverable_parent = :goalId")
     fun getNotGoalDeliverables(goalId: Long?): Flow<List<Deliverable>>
+
+    @Query("SELECT * FROM task_table WHERE task_goal_id = :goalId AND task_parent = :goalId")
+    fun getSelectedGoalTasks(goalId: Long?): Flow<List<Task>>
+
+    @Query("SELECT * FROM task_table WHERE task_goal_id IS NULL AND task_parent = :goalId")
+    fun getNotSelectedGoalTasks(goalId: Long?): Flow<List<Task>>
 
     @Transaction
     suspend fun appSettings(): AppSettings {

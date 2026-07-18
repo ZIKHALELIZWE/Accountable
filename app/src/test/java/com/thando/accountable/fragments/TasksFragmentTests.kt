@@ -28,9 +28,7 @@ import com.thando.accountable.AccountableComposeRobolectricTest
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
-import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
-import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.fragments.viewmodels.BooksViewModel
@@ -41,7 +39,6 @@ import com.thando.accountable.input_forms.DateAndTimePickerTest
 import com.thando.accountable.input_forms.TimeBlockTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -668,6 +665,33 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         var markersList = goal.goalMarkers.first()
         assertNotNull(markersList)
         assertEquals(1,markersList.size)
+        val oldMarker = markersList[0]
+
+        withTag("TasksFragmentMarkerCardView-${markersList[0].id}") {
+            performLongPressWithScroll()
+        }
+
+        markersList = goal.goalMarkers.first()
+        assertEquals(2,markersList.size)
+
+        markersAreEqual(
+            oldMarker,
+            taskViewModel.marker.first()!!,
+            idsEqual = false,
+            editing = true
+        )
+
+        withTag("TasksFragmentMarkerBackButton") {
+            performPressWithoutScroll()
+        }
+
+        markersList = goal.goalMarkers.first()
+        assertEquals(1,markersList.size)
+
+        markersAreEqual(
+            oldMarker,
+            markersList[0]
+        )
 
         withTag("TasksFragmentMarkerCardView-${markersList[0].id}") {
             performLongPressWithScroll()
@@ -777,45 +801,6 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         )
     }
 
-    private fun setMarkerDateAndTime(
-        activity: TestMainActivity,
-        date: LocalDate,
-        time: LocalTime,
-        openPickerDialog: suspend TestScope.() -> TestResult
-    ) = runMainTest {
-        activity.setDate(LocalDateTime.of(date,time))
-
-        openPickerDialog()
-
-        withTag(
-            "EditGoalFragmentDatePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalDatePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        withTag(
-            "EditGoalFragmentTimePickerDialog"
-        ) {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "EditGoalTimePickerDialogOKButton"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        activity.setDate(null)
-    }
-
     @Test
     fun `08 Adding 3 Markers`() = runMainTest {
         val activity = getTestMainActivity()
@@ -893,21 +878,21 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
 
         var tasksList = goal.goalTasks.first()
         assertNotNull(tasksList)
-        assertEquals(0,tasksList.size)
+        assertEquals(0, tasksList.size)
 
-        assertEquals(Goal.GoalTab.MARKERS,Goal.GoalTab.valueOf(goal.selectedTab))
-        switchToTab(Goal.GoalTab.TASKS,taskViewModel, activity)
+        assertEquals(Goal.GoalTab.MARKERS, Goal.GoalTab.valueOf(goal.selectedTab))
+        switchToTab(Goal.GoalTab.TASKS, taskViewModel, activity)
         goal = taskViewModel.goal.first()!!
-        assertEquals(Goal.GoalTab.TASKS,Goal.GoalTab.valueOf(goal.selectedTab))
+        assertEquals(Goal.GoalTab.TASKS, Goal.GoalTab.valueOf(goal.selectedTab))
 
-        withTag("TasksFragmentAddTextButton"){
+        withTag("TasksFragmentAddTextButton") {
             assertExists()
             assertTextContains(activity.getString(Goal.GoalTab.TASKS.addStringRes))
             performPressWithoutScroll()
         }
 
-        assertEquals(Goal.GoalTab.TASKS,taskViewModel.bottomSheetType.value)
-        withTag("TasksFragmentAddTaskView"){
+        assertEquals(Goal.GoalTab.TASKS, taskViewModel.bottomSheetType.value)
+        withTag("TasksFragmentAddTaskView") {
             assertExists()
             assertIsDisplayed()
         }
@@ -986,10 +971,10 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         }
 
         assertNotNull(taskViewModel.task.first()?.colour)
-        val taskColour = taskViewModel.task.first()!!.colour
+        var taskColour = taskViewModel.task.first()!!.colour
         withTag("TasksFragmentAddTaskColourBox") {
             if (taskColour == -1) assertDoesNotExist()
-            else{
+            else {
                 assertExists()
                 performScrollTo()
                 assertIsDisplayed()
@@ -998,6 +983,40 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                     fetchSemanticsNode().config[BackgroundColorKey].toArgb()
                 )
             }
+        }
+
+        withTag("TasksFragmentAddTaskColourButton") {
+            performPressWithScroll()
+        }
+
+        withTag("ColourPickerDialogCanvas") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            performTouchInput { click(Offset(60f, 60f)) }
+        }
+        finishProcesses()
+
+        withTag("ColourPickerDialogOKButton") {
+            performPressWithScroll()
+        }
+
+        withTag("ColourPickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.colour)
+        assertNotEquals(-1, taskViewModel.task.first()?.colour)
+        val taskColourSixty = taskViewModel.task.first()!!.colour
+        taskColour = taskViewModel.task.first()!!.colour
+        withTag("TasksFragmentAddTaskColourBox") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertEquals(
+                taskColour,
+                fetchSemanticsNode().config[BackgroundColorKey].toArgb()
+            )
         }
 
         withTag("TasksFragmentAddTaskColourButton") {
@@ -1021,7 +1040,40 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         }
 
         assertNotNull(taskViewModel.task.first()?.colour)
-        assertNotEquals(-1, taskViewModel.task.first()?.colour)
+        assertNotEquals(taskColourSixty, taskViewModel.task.first()?.colour)
+        taskColour = taskViewModel.task.first()!!.colour
+        withTag("TasksFragmentAddTaskColourBox") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertEquals(
+                taskColour,
+                fetchSemanticsNode().config[BackgroundColorKey].toArgb()
+            )
+        }
+
+        withTag("TasksFragmentAddTaskColourButton") {
+            performPressWithScroll()
+        }
+
+        withTag("ColourPickerDialogCanvas") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            performTouchInput { click(Offset(60f, 60f)) }
+        }
+        finishProcesses()
+
+        withTag("ColourPickerDialogDismissButton") {
+            performPressWithScroll()
+        }
+
+        withTag("ColourPickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.colour)
+        assertNotEquals(taskColourSixty, taskViewModel.task.first()?.colour)
         withTag("TasksFragmentAddTaskColourBox") {
             assertExists()
             performScrollTo()
@@ -1044,9 +1096,9 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             getTimeAsLong = { taskViewModel.task.first()?.endDateTime },
             getExpectedEndType = { Task.TaskEndType.DATE.name },
             getActualEndType = { taskViewModel.task.first()?.endType },
-            endTypeButtonTag = {"TasksFragmentAddTaskEndTypeButton"},
+            endTypeButtonTag = { "TasksFragmentAddTaskEndTypeButton" },
             dropDownMenuTag = { "TasksFragmentAddViewDropdownMenu" },
-            dropDownMenuItemTag = {"TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.DATE.name}"},
+            dropDownMenuItemTag = { "TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.DATE.name}" },
             selectDateAndTimeButtonTag = null,
             parentParameters = Triple(
                 instantTaskExecutorRule,
@@ -1078,13 +1130,13 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         val times = task.times.first()
         val deliverablesLists = getTaskDeliverablesLists(task)
 
-        withTag("TasksFragmentTaskSaveButton"){
+        withTag("TasksFragmentTaskSaveButton") {
             performPressWithoutScroll()
         }
 
         assertNotNull(taskViewModel.goal.first()?.goalTasks?.first())
         tasksList = taskViewModel.goal.first()!!.goalTasks.first()
-        assertEquals(1,tasksList.size)
+        assertEquals(1, tasksList.size)
 
         tasksAreEqual(
             taskOne = task,
@@ -1093,211 +1145,6 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             times = times,
             deliverablesLists = deliverablesLists
         )
-    }
-
-    private suspend fun getTaskDeliverablesLists(
-        task: Task
-    ): Triple<List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>> {
-        val deliverablesNormal = task.deliverableNormalList.first()
-        val deliverablesQuantity = task.deliverableQuantityList.first()
-        val deliverablesTime = task.deliverableTimeList.first()
-
-        val deliverableTimesNormal = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
-        deliverablesNormal.forEach { deliverableTimesNormal.add(it to it.times.first()) }
-
-        val deliverableTimesQuantity = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
-        deliverablesQuantity.forEach { deliverableTimesQuantity.add(it to it.times.first()) }
-
-        val deliverableTimesTime = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
-        deliverablesTime.forEach { deliverableTimesTime.add(it to it.times.first()) }
-
-        return Triple(
-            deliverableTimesNormal.toList(),
-            deliverableTimesQuantity.toList(),
-            deliverableTimesTime.toList()
-        )
-    }
-
-    private fun tasksAreEqual(
-        taskOne:Task,
-        taskTwo: Task,
-        idsEqual:Boolean = true,
-        times:List<GoalTaskDeliverableTime>? = null,
-        deliverablesLists:Triple<List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>>? = null
-    ) = runMainTest {
-        val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
-            {objectA, objectB -> assertEquals(objectA,objectB)}
-        else {objectA, objectB -> assertNotEquals(objectA,objectB)}
-
-        assertionFunction(
-            taskOne.taskId,
-            taskTwo.taskId
-        )
-
-        assertEquals(
-            taskOne.parent,
-            taskTwo.parent
-        )
-
-        assertEquals(
-            taskOne.parentType,
-            taskTwo.parentType
-        )
-        assertEquals(
-            taskOne.position,
-            taskTwo.position
-        )
-        assertEquals(
-            taskOne.initialDateTime,
-            taskTwo.initialDateTime
-        )
-        assertEquals(
-            taskOne.endDateTime,
-            taskTwo.endDateTime
-        )
-        assertEquals(
-            taskOne.endType,
-            taskTwo.endType
-        )
-        assertEquals(
-            taskOne.scrollPosition,
-            taskTwo.scrollPosition
-        )
-        assertEquals(
-            taskOne.task,
-            taskTwo.task
-        )
-        assertEquals(
-            taskOne.type,
-            taskTwo.type
-        )
-        assertEquals(
-            taskOne.quantity,
-            taskTwo.quantity
-        )
-        assertEquals(
-            taskOne.time,
-            taskTwo.time
-        )
-        assertEquals(
-            taskOne.status,
-            taskTwo.status
-        )
-        assertEquals(
-            taskOne.colour,
-            taskTwo.colour
-        )
-        assertEquals(
-            taskOne.location,
-            taskTwo.location
-        )
-
-        assertEquals(
-            (times?:taskOne.times.first()).size,
-            taskTwo.times.first().size
-        )
-
-        assertEquals(
-            (deliverablesLists?.first?:taskOne.deliverableNormalList.first()).size,
-            taskTwo.deliverableNormalList.first().size
-        )
-
-        assertEquals(
-            (deliverablesLists?.second?:taskOne.deliverableQuantityList.first()).size,
-            taskTwo.deliverableQuantityList.first().size
-        )
-
-        assertEquals(
-            (deliverablesLists?.third?:taskOne.deliverableTimeList.first()).size,
-            taskTwo.deliverableTimeList.first().size
-        )
-
-        if (!idsEqual && times == null) {
-            assertEquals(taskOne.taskId, taskTwo.cloneId)
-        }
-
-        val timesTwoList = taskTwo.times.first()
-        (times?:taskOne.times.first()).forEachIndexed { index, timeOne ->
-            val timeTwo = timesTwoList[index]
-            timesAreEqual(
-                timeOne,
-                timeTwo,
-                idsEqual = idsEqual,
-                parentsEqual = idsEqual
-            )
-        }
-
-        val deliverablesNormalTwoList = taskTwo.deliverableNormalList.first()
-        if (deliverablesLists?.first != null) {
-            deliverablesLists.first.forEachIndexed { index, pair ->
-                val deliverableTwo = deliverablesNormalTwoList[index]
-                deliverablesAreEqual(
-                    pair.first,
-                    deliverableTwo,
-                    idsEqual = idsEqual,
-                    parentsEqual = idsEqual,
-                    times = pair.second
-                )
-            }
-        } else {
-            taskOne.deliverableNormalList.first().forEachIndexed { index, deliverableOne ->
-                val deliverableTwo = deliverablesNormalTwoList[index]
-                deliverablesAreEqual(
-                    deliverableOne,
-                    deliverableTwo,
-                    idsEqual = idsEqual,
-                    parentsEqual = idsEqual
-                )
-            }
-        }
-
-        val deliverablesQuantityTwoList = taskTwo.deliverableQuantityList.first()
-        if (deliverablesLists?.second != null) {
-            deliverablesLists.second.forEachIndexed { index, pair ->
-                val deliverableTwo = deliverablesQuantityTwoList[index]
-                deliverablesAreEqual(
-                    pair.first,
-                    deliverableTwo,
-                    idsEqual = idsEqual,
-                    parentsEqual = idsEqual,
-                    times = pair.second
-                )
-            }
-        } else {
-            taskOne.deliverableQuantityList.first().forEachIndexed { index, deliverableOne ->
-                val deliverableTwo = deliverablesQuantityTwoList[index]
-                deliverablesAreEqual(
-                    deliverableOne,
-                    deliverableTwo,
-                    idsEqual = idsEqual,
-                    parentsEqual = idsEqual
-                )
-            }
-        }
-
-        val deliverablesTimeTwoList = taskTwo.deliverableTimeList.first()
-        if (deliverablesLists?.third != null) {
-            deliverablesLists.third.forEachIndexed { index, pair ->
-                val deliverableTwo = deliverablesTimeTwoList[index]
-                deliverablesAreEqual(
-                    pair.first,
-                    deliverableTwo,
-                    idsEqual = idsEqual,
-                    parentsEqual = idsEqual,
-                    times = pair.second
-                )
-            }
-        } else {
-            taskOne.deliverableTimeList.first().forEachIndexed { index, deliverableOne ->
-                val deliverableTwo = deliverablesTimeTwoList[index]
-                deliverablesAreEqual(
-                    deliverableOne,
-                    deliverableTwo,
-                    idsEqual = idsEqual,
-                    parentsEqual = idsEqual
-                )
-            }
-        }
     }
 
     @Test
@@ -1469,6 +1316,9 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         assertNotNull(tasksList)
         assertEquals(1,tasksList.size)
 
+        val taskDeliverablesList = tasksList[0].taskDeliverableList.first()
+        val taskTimesList = tasksList[0].times.first()
+
         withTag("TasksFragmentTaskCardView-${tasksList[0].taskId}") {
             performLongPressWithScroll()
         }
@@ -1486,6 +1336,17 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         tasksList = goal.goalTasks.first()
         assertNotNull(tasksList)
         assertEquals(0,tasksList.size)
+
+        taskDeliverablesList.forEach {
+            val taskDeliverable = activity.viewModel.repository.getTaskDeliverable(it.taskId,it.deliverableId)
+            assertNull(taskDeliverable.first())
+        }
+
+        taskTimesList.forEach {
+            assertNull(
+                activity.viewModel.repository.getGoalTaskDeliverableTime(it.id).first()
+            )
+        }
     }
 
     @Test
@@ -2073,7 +1934,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 "Jump 2 times",
                 substring = true
             )
-            performTextReplacement("Jump 2 times")
+            performTextReplacement("Jump 3 times")
             assertTextContains(
                 "Jump 3 times",
                 substring = true
@@ -2101,8 +1962,6 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 substring = true
             )
         }
-
-
 
         val task = taskViewModel.task.first()
         val taskTimes = task?.times?.first()
@@ -2147,5 +2006,51 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         )
 
         assertEquals(oldTask.taskId,tasksList[0].taskId)
+    }
+
+    @Test
+    fun `14 Deleting Quantity Deliverable Task`() = runMainTest {
+        val activity = getTestMainActivity()
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        val goal = taskViewModel.goal.first()!!
+        var tasksList = goal.goalTasks.first()
+        assertNotNull(tasksList)
+        assertEquals(1,tasksList.size)
+
+        val taskDeliverablesList = tasksList[0].taskDeliverableList.first()
+        val taskTimesList = tasksList[0].times.first()
+
+        withTag("TasksFragmentTaskCardView-${tasksList[0].taskId}") {
+            performLongPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddTaskViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskDeleteButton")
+        }
+
+        withTag("TasksFragmentAddTaskDeleteButton"){
+            performPressWithScroll()
+        }
+
+        tasksList = goal.goalTasks.first()
+        assertNotNull(tasksList)
+        assertEquals(0,tasksList.size)
+
+        taskDeliverablesList.forEach {
+            val taskDeliverable = activity.viewModel.repository.getTaskDeliverable(it.taskId,it.deliverableId)
+            assertNull(taskDeliverable.first())
+        }
+
+        taskTimesList.forEach {
+            assertNull(
+                activity.viewModel.repository.getGoalTaskDeliverableTime(
+                    it.id
+                ).first()
+            )
+        }
     }
 }

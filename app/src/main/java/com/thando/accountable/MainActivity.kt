@@ -1,5 +1,6 @@
 package com.thando.accountable
 
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
@@ -77,7 +78,11 @@ import java.util.concurrent.atomic.AtomicReference
 
 open class MainActivity : ComponentActivity() {
 
-    val viewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory(false) }
+    val viewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory(
+        if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
+            intent.getStringExtra(Intent.EXTRA_TEXT)
+        } else null
+    ) }
     private val galleryLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
     ) { galleryUri ->

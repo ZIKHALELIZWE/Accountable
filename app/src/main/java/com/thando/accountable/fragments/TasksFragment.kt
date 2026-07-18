@@ -495,7 +495,14 @@ fun TasksFragmentView(
         when (GoalTab.valueOf(goal.selectedTab)) {
             GoalTab.TASKS -> {
                 items(items = tasksList){ task ->
-                    TaskCardView(task, viewModel::editTask)
+                    TaskCardView(
+                        task,
+                        viewModel::editTask,
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(3.dp)
+                            .wrapContentHeight()
+                    )
                 }
             }
             GoalTab.DELIVERABLES -> {
@@ -545,14 +552,17 @@ fun TaskCardViewPreview() {
             colour = Color.Red.toArgb(),
             location = "My Normal Date Location"
         ),
-        editTask = {}
+        editTask = {},
+        modifier = Modifier
     )
 }
 
 @Composable
 fun TaskCardView(
     task: Task,
-    editTask: suspend (Task) -> Unit
+    editTask: suspend (Task) -> Unit,
+    modifier: Modifier,
+    editOnClick: Boolean = false
 ){
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -570,17 +580,15 @@ fun TaskCardView(
     val location = remember { TextFieldState(task.location) }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .testTag("TasksFragmentTaskCardView-${task.taskId}")
-            .fillMaxWidth()
             .padding(3.dp)
-            .wrapContentHeight()
             .combinedClickable(
                 onClick = {
-
+                    if (editOnClick) scope.launch { editTask(task) }
                 },
                 onLongClick = {
-                    scope.launch { editTask(task) }
+                    if (!editOnClick) scope.launch { editTask(task) }
                 }),
         elevation = CardDefaults.cardElevation(),
         colors = CardColors(
@@ -1295,6 +1303,31 @@ fun AddTaskView(
                                         tint = Color.Black
                                     )
                                 }
+                            }
+                        }
+                    }
+                    item {
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
+                    item(key = "TasksFragmentTaskSwitch"){
+                        if (Task.TaskEndType.valueOf(task.endType) !=
+                            Task.TaskEndType.GOAL
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(3.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = stringResource(R.string.required_to_complete_goal))
+                                Switch(
+                                    modifier = Modifier.testTag("TasksFragmentTaskSwitch"),
+                                    checked = task.goalId!=null,
+                                    onCheckedChange = { checked -> scope.launch {
+                                        updateTask(task.copy(goalId = if (checked) task.parent else null))
+                                    }}
+                                )
                             }
                         }
                     }
@@ -2430,9 +2463,12 @@ fun AddMarkerView(
                             color = Color.Black
                         ) },
                         navigationIcon = {
-                            IconButton(onClick = {
-                                scope.launch { dismissBottomSheet() }
-                            }) {
+                            IconButton(
+                                modifier = Modifier.testTag("TasksFragmentMarkerBackButton"),
+                                onClick = {
+                                    scope.launch { dismissBottomSheet() }
+                                }
+                            ) {
                                 MainActivity.Icon(
                                     Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = stringResource(R.string.back_button)

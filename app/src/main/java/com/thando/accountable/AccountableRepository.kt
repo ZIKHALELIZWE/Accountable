@@ -784,10 +784,34 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    fun appendIntentStringToScript(scriptId: Long, activity: Activity?) {
+    fun processIntentStringToScript(scriptId: Long, activity: Activity?) {
         repositoryScope.launch {
             withContext(MainActivity.IO) {
-                if (scriptId != INITIAL_FOLDER_ID) {
+                if (scriptId == INITIAL_FOLDER_ID) {
+                    val parentId = folder.value?.folderId ?: INITIAL_FOLDER_ID
+                    val scripts = dao.getScripts(parentId).first()
+                    withContext(MainActivity.Main) {
+                        script.value = Script(
+                            scriptParentType = Script.ScriptParentType.FOLDER,
+                            scriptParent = parentId,
+                            scriptPosition = scripts.size.toLong(),
+                        )
+                        intentString?.let { intentString ->
+                            script.value!!.scriptTitle.edit {
+                                replace(
+                                    0,
+                                    length,
+                                    intentString
+                                )
+                            }
+                        }
+                        scriptMarkupLanguage.value = null
+                        isEditingScript.value = false
+                        script.value!!.scriptId =
+                            withContext(MainActivity.IO) { dao.insert(script.value!!) }
+                        scriptContentList.clear()
+                    }
+                } else {
                     withContext(MainActivity.Main) {
                         isEditingScript.value = false
                         script.value = withContext(MainActivity.IO) {
@@ -804,31 +828,35 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             dao.getContentList(scriptId)
                         })
                     }
-                }
-                if (script.value == null) {
-                    Toast.makeText(
-                        application,
-                        application.getString(R.string.script_does_not_exist),
-                        Toast.LENGTH_LONG
-                    ).show()
-                } else if (!intentString.isNullOrEmpty()) {
-                    if (scriptContentList.lastIndex == -1 || scriptContentList.last().type != ContentType.TEXT) {
-                        // Make a new TextProcessor and add the content's content
-                        if (script.value != null && script.value!!.scriptId != null) {
-                            scriptContentList.add(
-                                Content(
-                                    type = ContentType.TEXT,
-                                    script = script.value!!.scriptId!!,
-                                    position = scriptContentList.size.toLong()
+
+                    if (script.value == null) {
+                        Toast.makeText(
+                            application,
+                            application.getString(R.string.script_does_not_exist),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else if (!intentString.isNullOrEmpty()) {
+                        if (scriptContentList.lastIndex == -1 || scriptContentList.last().type != ContentType.TEXT) {
+                            // Make a new TextProcessor and add the content's content
+                            if (script.value != null && script.value!!.scriptId != null) {
+                                scriptContentList.add(
+                                    Content(
+                                        type = ContentType.TEXT,
+                                        script = script.value!!.scriptId!!,
+                                        position = scriptContentList.size.toLong()
+                                    )
                                 )
-                            )
+                            }
                         }
-                    }
-                    withContext(MainActivity.Main) {
-                        scriptContentList.last().content.edit { append("\n$intentString") }
-                    }
-                    saveScript {
-                        activity?.finishAndRemoveTask()
+                        withContext(MainActivity.Main) {
+                            scriptContentList.last().content.edit { append(
+                                if (originalText.isEmpty()) intentString
+                                else "\n\n$intentString"
+                            ) }
+                        }
+                        saveScript {
+                            activity?.finishAndRemoveTask()
+                        }
                     }
                 }
                 intentString = null
@@ -2029,6 +2057,52 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         }
                     }
                 }
+
+                from.goalTasks.first().let { fromTasks ->
+                    to.goalTasks.first().forEach { toTask ->
+                        // Delete the ones that are not in from (originally in to)
+                        if (
+                            !fromTasks.any { fromTask ->
+                                toTask.taskId == fromTask.cloneId
+                            }
+                        ) {
+                            dao.delete(toTask)
+                        }
+                    }
+
+                    for (task in fromTasks) {
+                        to.id?.let { id ->
+                            var newTask = to.goalTasks.first()
+                                .find { toTask -> toTask.taskId == task.cloneId }
+                            if (newTask == null) {
+                                newTask = Task(
+                                    parent = id,
+                                    parentType = task.parentType,
+                                    position = task.position,
+                                    type = task.type,
+                                )
+                                newTask.taskId = saveTask(newTask)
+                            } else {
+                                newTask.parent = id
+                                newTask.position = task.position
+                                newTask.parentType = task.parentType
+                                newTask.type = task.type
+                            }
+
+                            val fromMutable: MutableStateFlow<Flow<Task?>?> = MutableStateFlow(
+                                getTask(task.taskId)
+                            )
+                            val toMutable: MutableStateFlow<Flow<Task?>?> = MutableStateFlow(
+                                getTask(newTask.taskId)
+                            )
+                            cloneTaskTo(
+                                fromMutable,
+                                toMutable,
+                                setCloneId
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -2131,21 +2205,51 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.numAudios = from.numAudios
                 to.numDocuments = from.numDocuments
                 to.numScripts = from.numScripts
+                to.goalId = from.goalId
 
                 if (setCloneId) to.cloneId = from.taskId
 
                 if (to.taskId == null) to.taskId = saveTask(to)
 
-                // clone deliverables
-                // todo from.
-                /*val fromMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(deliverable.deliverableId))
-                val toMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(newDeliverable.deliverableId))
-                cloneDeliverableTo(
-                    fromMutable,
-                    toMutable,
-                    setCloneId,
-                    false
-                )*/
+                // clone TaskDeliverables
+                from.taskDeliverableList.first().let { fromTaskDeliverables ->
+                    to.taskDeliverableList.first().forEach { toTaskDeliverable ->
+                        // Delete the ones that are not in from (originally in to)
+                        if (
+                            !fromTaskDeliverables.any { fromDeliverable ->
+                                toTaskDeliverable.deliverableId == fromDeliverable.cloneId
+                            }
+                        ) {
+                            dao.delete(toTaskDeliverable)
+                        }
+                    }
+
+                    for (taskDeliverable in fromTaskDeliverables) {
+                        to.taskId?.let { id ->
+                            var newTaskDeliverable = to.taskDeliverableList.first()
+                                .find { toTaskDeliverable ->
+                                    toTaskDeliverable.taskId == taskDeliverable.cloneId
+                                            && toTaskDeliverable.deliverableId == taskDeliverable.deliverableId
+                                }
+                            if (newTaskDeliverable == null) {
+                                newTaskDeliverable = TaskDeliverable(
+                                    taskId = id,
+                                    deliverableId = taskDeliverable.deliverableId
+                                )
+                                upsert(newTaskDeliverable)
+                            }
+
+                            val fromMutable: MutableStateFlow<Flow<TaskDeliverable?>?> = MutableStateFlow(getTaskDeliverable( taskDeliverable.taskId, taskDeliverable.deliverableId))
+                            val toMutable: MutableStateFlow<Flow<TaskDeliverable?>?> = MutableStateFlow(getTaskDeliverable( newTaskDeliverable.taskId, newTaskDeliverable.deliverableId))
+                            cloneTaskDeliverableTo(
+                                fromMutable,
+                                toMutable,
+                                setCloneId,
+                                true
+                            )
+                        }
+                    }
+                }
 
                 cloneTimesTo(
                     to.taskId,
@@ -2181,6 +2285,26 @@ class AccountableRepository(val application: Application): AutoCloseable {
             return mutableReturn.value
         }
         return null
+    }
+
+    suspend fun cloneTaskDeliverableTo(
+        from: MutableStateFlow<Flow<TaskDeliverable?>?>,
+        to: MutableStateFlow<Flow<TaskDeliverable?>?>,
+        setCloneId:Boolean,
+        useTaskIdForClone: Boolean
+    ) {
+        from.value?.first()?.let { from ->
+            to.value?.first()?.let { to ->
+                to.percentage = from.percentage
+                to.startDate = from.startDate
+                to.streak = from.streak
+                to.workType = from.workType
+
+                if (setCloneId) to.cloneId = if (useTaskIdForClone) from.taskId else from.deliverableId
+
+                upsert(to)
+            }
+        }
     }
 
     suspend fun cloneDeliverableTo(
@@ -2304,7 +2428,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
         return dao.upsert(goalTaskDeliverableTime)
     }
 
-    suspend fun upsert(taskDeliverable: TaskDeliverable): Long = dao.upsert(taskDeliverable)
+    suspend fun upsert(taskDeliverable: TaskDeliverable) = dao.upsert(taskDeliverable)
     suspend fun insert(task: Task): Long = dao.insert(task)
     suspend fun insert(marker: Marker): Long = dao.insert(marker)
     suspend fun insert(deliverable: Deliverable): Long = dao.insert(deliverable)
@@ -2397,6 +2521,15 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
+    fun getSelectedGoalTasks(goalId: Long?): Flow<List<Task>> =
+        dao.getSelectedGoalTasks(goalId).map { tasks ->
+            tasks.forEach { task ->
+                task.loadTimes(dao)
+                task.loadDeliverable(dao)
+            }
+            tasks
+        }
+
     fun getDeliverables(parentId: Long): Flow<List<Deliverable>> {
         return dao.getDeliverables(parentId).map { deliverables ->
             deliverables.forEach { deliverable ->
@@ -2414,4 +2547,6 @@ class AccountableRepository(val application: Application): AutoCloseable {
     fun getTaskDeliverable(taskId: Long, deliverableId: Long) = dao.getTaskDeliverable(
         taskId, deliverableId
     )
+
+    fun getGoalTaskDeliverableTime( goalTaskDeliverableId: Long?) = dao.getGoalTaskDeliverableTime(goalTaskDeliverableId)
 }

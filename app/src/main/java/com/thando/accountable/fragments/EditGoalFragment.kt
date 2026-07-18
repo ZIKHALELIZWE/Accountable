@@ -114,7 +114,7 @@ import java.time.temporal.TemporalAdjusters
 import kotlin.enums.EnumEntries
 import kotlin.random.Random
 
-// Custom semantics key for background color (used in test)
+// Custom semantics key for background colour (used in test)
 val BackgroundColorKey = SemanticsPropertyKey<Color>("BackgroundColor")
 var SemanticsPropertyReceiver.backgroundColor by BackgroundColorKey
 fun Modifier.testBackground(color: Color, shape: Shape = RectangleShape): Modifier =
@@ -181,6 +181,7 @@ fun EditGoalView(
 
     AccountableTheme {
         val editGoal by viewModel.editGoal.collectAsStateWithLifecycle()
+        val bottomSheetType by viewModel.bottomSheetType.collectAsStateWithLifecycle()
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
@@ -217,7 +218,7 @@ fun EditGoalView(
             }
         ) { innerPadding ->
             Column(modifier = Modifier.padding(innerPadding)) {
-                viewModel.colourPickerDialog.ColourPicker()
+                if (bottomSheetType == null) viewModel.colourPickerDialog.ColourPicker()
                 AnimatedVisibility(visible = showErrorMessage) {
                     Box(
                         modifier = Modifier
@@ -254,9 +255,9 @@ fun EditGoalView(
                     deleteTimeBlock = viewModel::deleteTimeBlock,
                     updateTimeBlock = viewModel::updateTimeBlock,
                     updateDeliverable = viewModel::updateDeliverable,
-                    deleteTaskClicked = null,
-                    originalTask = null,
-                    task = null,
+                    deleteTaskClicked = viewModel::deleteTaskClicked,
+                    originalTask = viewModel.originalTaskState,
+                    task = viewModel.task,
                     updateTask = viewModel::updateTask,
                     deleteDeliverableClicked = viewModel::deleteDeliverableClicked,
                     originalDeliverable = viewModel.originalDeliverable,
@@ -309,9 +310,15 @@ fun EditGoalFragmentView(
 
         val notSelectedGoalDeliverables by newGoal.notSelectedGoalDeliverables.collectAsStateWithLifecycle(emptyList())
 
+        val selectedGoalTasks by newGoal.selectedGoalTasks.collectAsStateWithLifecycle(emptyList())
+
+        val notSelectedGoalTasks by newGoal.notSelectedGoalTasks.collectAsStateWithLifecycle(emptyList())
+
         val times by newGoal.times.collectAsStateWithLifecycle(emptyList())
 
         val showSelectDeliverableDialog by viewModel.selectDeliverableDialog.collectAsStateWithLifecycle()
+
+        val showSelectTaskDialog by viewModel.selectTaskDialog.collectAsStateWithLifecycle()
 
         val triedToSave by viewModel.triedToSave.collectAsStateWithLifecycle()
         val goalFocusRequester = remember { viewModel.goalFocusRequester }
@@ -407,6 +414,95 @@ fun EditGoalFragmentView(
                                         MainActivity.Icon(
                                             imageVector = Icons.Default.Done,
                                             contentDescription = stringResource(R.string.pick_deliverable)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (showSelectTaskDialog){
+                LaunchedEffect(notSelectedGoalTasks.isEmpty()) {
+                    if (notSelectedGoalTasks.isEmpty()) viewModel.closeSelectTaskDialog()
+                }
+                Dialog(
+                    onDismissRequest = {
+                        viewModel.closeSelectTaskDialog()
+                    }
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(),
+                            colors = CardColors(
+                                containerColor = Color.White,
+                                contentColor = Color.Black,
+                                disabledContainerColor = Color.LightGray,
+                                disabledContentColor = Color.DarkGray
+                            ),
+                            shape = RectangleShape
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    if (notSelectedGoalTasks.size==1)
+                                        R.string.select_task
+                                    else R.string.select_tasks
+                                ),
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(5.dp),
+                                textAlign = TextAlign.Center,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black,
+                                fontSize = 16.sp
+                            )
+                        }
+                        LazyColumn(
+                            state = rememberLazyListState(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("EditGoalSelectTaskDialog")
+                        ) {
+                            items(
+                                items = notSelectedGoalTasks,
+                                key = { it.taskId ?: Random.nextLong() }
+                            ) { task ->
+                                Row(
+                                    modifier = Modifier
+                                        .testTag("EditGoalPickTaskRow-${task.taskId}")
+                                        .height(IntrinsicSize.Min)
+                                        .fillMaxWidth()
+                                        .padding(3.dp)
+                                ) {
+                                    TaskCardView(
+                                        task,
+                                        viewModel::editTask,
+                                        Modifier
+                                            .weight(4f).fillMaxWidth()
+                                            .wrapContentHeight(),
+                                        true
+                                    )
+                                    IconButton(
+                                        modifier = Modifier
+                                            .weight(1f).fillMaxWidth()
+                                            .testTag("EditGoalPickTaskButton-${task.taskId}")
+                                            .background(color = Color.Green),
+                                        onClick = {
+                                            scope.launch {
+                                                viewModel.saveTask(
+                                                    task.copy(
+                                                        goalId = newGoal.id
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    ) {
+                                        MainActivity.Icon(
+                                            imageVector = Icons.Default.Done,
+                                            contentDescription = stringResource(R.string.pick_task)
                                         )
                                     }
                                 }
@@ -614,6 +710,11 @@ fun EditGoalFragmentView(
                                     scope.launch {
                                         viewModel.updateEndType(Goal.GoalEndType.DELIVERABLE)
                                     }
+                                },
+                                MenuItemData(Goal.GoalEndType.TASK.name) {
+                                    scope.launch {
+                                        viewModel.updateEndType(Goal.GoalEndType.TASK)
+                                    }
                                 }
                             )
                             viewModel.showEndTypeOptions.value = true
@@ -689,6 +790,16 @@ fun EditGoalFragmentView(
                                     ).trim()
                                 )
                             }
+
+                            Goal.GoalEndType.TASK -> {
+                                Text(
+                                    modifier = Modifier.testTag("EditGoalEndTypeTaskText"),
+                                    text = stringResource(
+                                        R.string.end_type_1_arg,
+                                        stringResource(R.string.task)
+                                    ).trim()
+                                )
+                            }
                         }
                     }
                 }
@@ -751,6 +862,80 @@ fun EditGoalFragmentView(
                                     scope.launch {
                                         viewModel.saveDeliverable(
                                             deliverable.copy(
+                                                goalId = null
+                                            )
+                                        )
+                                    }
+                                }
+                            ) {
+                                MainActivity.Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.delete_deliverable)
+                                )
+                            }
+                        }
+                    }
+                }
+                if (Goal.GoalEndType.valueOf(newGoal.endType) == Goal.GoalEndType.TASK) {
+                    stickyHeader {
+                        Row(
+                            Modifier.fillMaxWidth()
+                        ) {
+                            Button(
+                                onClick = { scope.launch { viewModel.addTask() } },
+                                modifier = Modifier
+                                    .testTag("EditGoalAddTaskButton")
+                                    .fillMaxWidth()
+                                    .padding(8.dp)
+                                    .weight(1f)
+                            ) { Text(stringResource(R.string.add_task)) }
+                            Button(
+                                onClick = { scope.launch { viewModel.selectTask() } },
+                                modifier = Modifier
+                                    .testTag("EditGoalSelectTaskButton")
+                                    .fillMaxWidth()
+                                    .padding(8.dp)
+                                    .weight(1f),
+                                enabled = notSelectedGoalTasks.isNotEmpty()
+                            ) { Text(
+                                stringResource(R.string.select_task) +
+                                        if (notSelectedGoalTasks.isNotEmpty()) {
+                                            " (${notSelectedGoalTasks.size})"
+                                        } else {
+                                            ""
+                                        }
+                            ) }
+                        }
+                    }
+                    items(
+                        items = selectedGoalTasks,
+                        key = { it.taskId ?: Random.nextLong() }
+                    ) { task ->
+                        Row(
+                            modifier = Modifier
+                                .height(IntrinsicSize.Min)
+                                .fillMaxWidth()
+                                .padding(3.dp)
+                        ) {
+                            TaskCardView(
+                                task,
+                                viewModel::editTask,
+                                Modifier
+                                    .weight(4f).fillMaxSize()
+                                    .testTag("TasksFragmentTaskCardView-${task.taskId}")
+                                    .padding(3.dp)
+                                    .wrapContentHeight(),
+                                true
+                            )
+                            IconButton(
+                                modifier = Modifier
+                                    .weight(1f).fillMaxSize()
+                                    .testTag("EditGoalUnpickTaskButton-${task.taskId}")
+                                    .background(color = Color.Red),
+                                onClick = {
+                                    scope.launch {
+                                        viewModel.saveTask(
+                                            task.copy(
                                                 goalId = null
                                             )
                                         )
@@ -1363,7 +1548,7 @@ fun DurationPickerButton(
     }
 }
 
-// Custom semantics key for background color (used in test)
+// Custom semantics key for background colour (used in test)
 val SliderRangeKey = SemanticsPropertyKey<ClosedFloatingPointRange<Float>>("SliderRange")
 var SemanticsPropertyReceiver.sliderRange by SliderRangeKey
 fun Modifier.setSliderRange(range: ClosedFloatingPointRange<Float>): Modifier =

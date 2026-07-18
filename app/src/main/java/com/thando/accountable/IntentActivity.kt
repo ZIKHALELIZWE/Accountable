@@ -30,7 +30,13 @@ class IntentActivity : ComponentActivity() {
             } else null
         )
     }
-    val mainActivityViewModel: MainActivityViewModel by viewModels { MainActivityViewModel.Factory(true) }
+    val mainActivityViewModel: MainActivityViewModel by viewModels {
+        MainActivityViewModel.Factory(
+            if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
+                intent.getStringExtra(Intent.EXTRA_TEXT)
+            } else null
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

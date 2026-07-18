@@ -36,7 +36,7 @@ import java.time.LocalDateTime
     Deliverable::class,
     Marker::class,
     TaskDeliverable::class
-], version = 15, exportSchema = false)
+], version = 17, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AccountableDatabase: RoomDatabase() {
     abstract val repositoryDao : RepositoryDao
@@ -205,7 +205,13 @@ abstract class AccountableDatabase: RoomDatabase() {
                                   FOREIGN KEY (deliverableId) REFERENCES deliverable_table(deliverableId)
                               )
                               """.trimIndent())
-                        }
+                        },
+                        Migration(15,16) { db ->
+                            db.execSQL("ALTER TABLE TaskDeliverable ADD cloneId INTEGER NULL")
+                        },
+                        Migration(16,17) { db ->
+                            db.execSQL("ALTER TABLE task_table ADD task_goal_id INTEGER DEFAULT ${null} NULL")
+                        },
                     )
                     .build()
                 }

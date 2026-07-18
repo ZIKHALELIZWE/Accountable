@@ -31,11 +31,13 @@ import com.thando.accountable.MainActivityTest.FilteredPrintStream
 import com.thando.accountable.MainActivityTest.Log
 import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
+import com.thando.accountable.database.tables.Task
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -57,7 +59,9 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowLog
 import java.io.File
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneOffset
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
@@ -274,6 +278,250 @@ abstract class AccountableComposeRobolectricTest(
                 idsEqual = idsEqual,
                 parentsEqual = parentsEqual
             )
+        }
+    }
+
+    suspend fun getTaskDeliverablesLists(
+        task: Task
+    ): Triple<List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>> {
+        val deliverablesNormal = task.deliverableNormalList.first()
+        val deliverablesQuantity = task.deliverableQuantityList.first()
+        val deliverablesTime = task.deliverableTimeList.first()
+
+        val deliverableTimesNormal = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
+        deliverablesNormal.forEach { deliverableTimesNormal.add(it to it.times.first()) }
+
+        val deliverableTimesQuantity = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
+        deliverablesQuantity.forEach { deliverableTimesQuantity.add(it to it.times.first()) }
+
+        val deliverableTimesTime = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
+        deliverablesTime.forEach { deliverableTimesTime.add(it to it.times.first()) }
+
+        return Triple(
+            deliverableTimesNormal.toList(),
+            deliverableTimesQuantity.toList(),
+            deliverableTimesTime.toList()
+        )
+    }
+
+    fun setMarkerDateAndTime(
+        activity: TestMainActivity,
+        date: LocalDate,
+        time: LocalTime,
+        openPickerDialog: suspend TestScope.() -> TestResult
+    ) = runMainTest {
+        activity.setDate(LocalDateTime.of(date,time))
+
+        openPickerDialog()
+
+        withTag(
+            "EditGoalFragmentDatePickerDialog"
+        ) {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag(
+            "EditGoalDatePickerDialogOKButton"
+        ) {
+            performPressWithoutScroll()
+        }
+
+        withTag(
+            "EditGoalFragmentTimePickerDialog"
+        ) {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag(
+            "EditGoalTimePickerDialogOKButton"
+        ) {
+            performPressWithoutScroll()
+        }
+
+        activity.setDate(null)
+    }
+
+    fun tasksAreEqual(
+        taskOne: Task,
+        taskTwo: Task,
+        idsEqual: Boolean = true,
+        times: List<GoalTaskDeliverableTime>? = null,
+        deliverablesLists: Triple<List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>>? = null
+    ) = runMainTest {
+        val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
+            {objectA, objectB -> assertEquals(objectA,objectB)}
+        else {objectA, objectB -> assertNotEquals(objectA,objectB)}
+
+        assertionFunction(
+            taskOne.taskId,
+            taskTwo.taskId
+        )
+
+        assertEquals(
+            taskOne.parent,
+            taskTwo.parent
+        )
+
+        assertEquals(
+            taskOne.parentType,
+            taskTwo.parentType
+        )
+        assertEquals(
+            taskOne.position,
+            taskTwo.position
+        )
+        assertEquals(
+            taskOne.initialDateTime,
+            taskTwo.initialDateTime
+        )
+        assertEquals(
+            taskOne.endDateTime,
+            taskTwo.endDateTime
+        )
+        assertEquals(
+            taskOne.endType,
+            taskTwo.endType
+        )
+        assertEquals(
+            taskOne.scrollPosition,
+            taskTwo.scrollPosition
+        )
+        assertEquals(
+            taskOne.task,
+            taskTwo.task
+        )
+        assertEquals(
+            taskOne.type,
+            taskTwo.type
+        )
+        assertEquals(
+            taskOne.quantity,
+            taskTwo.quantity
+        )
+        assertEquals(
+            taskOne.time,
+            taskTwo.time
+        )
+        assertEquals(
+            taskOne.status,
+            taskTwo.status
+        )
+        assertEquals(
+            taskOne.colour,
+            taskTwo.colour
+        )
+        assertEquals(
+            taskOne.location,
+            taskTwo.location
+        )
+
+        assertEquals(
+            (times?:taskOne.times.first()).size,
+            taskTwo.times.first().size
+        )
+
+        assertEquals(
+            (deliverablesLists?.first?:taskOne.deliverableNormalList.first()).size,
+            taskTwo.deliverableNormalList.first().size
+        )
+
+        assertEquals(
+            (deliverablesLists?.second?:taskOne.deliverableQuantityList.first()).size,
+            taskTwo.deliverableQuantityList.first().size
+        )
+
+        assertEquals(
+            (deliverablesLists?.third?:taskOne.deliverableTimeList.first()).size,
+            taskTwo.deliverableTimeList.first().size
+        )
+
+        if (!idsEqual && times == null) {
+            assertEquals(taskOne.taskId, taskTwo.cloneId)
+        }
+
+        val timesTwoList = taskTwo.times.first()
+        (times?:taskOne.times.first()).forEachIndexed { index, timeOne ->
+            val timeTwo = timesTwoList[index]
+            timesAreEqual(
+                timeOne,
+                timeTwo,
+                idsEqual = idsEqual,
+                parentsEqual = idsEqual
+            )
+        }
+
+        val deliverablesNormalTwoList = taskTwo.deliverableNormalList.first()
+        if (deliverablesLists?.first != null) {
+            deliverablesLists.first.forEachIndexed { index, pair ->
+                val deliverableTwo = deliverablesNormalTwoList[index]
+                deliverablesAreEqual(
+                    pair.first,
+                    deliverableTwo,
+                    idsEqual = true,
+                    parentsEqual = true,
+                    times = pair.second
+                )
+            }
+        } else {
+            taskOne.deliverableNormalList.first().forEachIndexed { index, deliverableOne ->
+                val deliverableTwo = deliverablesNormalTwoList[index]
+                deliverablesAreEqual(
+                    deliverableOne,
+                    deliverableTwo,
+                    idsEqual = true,
+                    parentsEqual = true
+                )
+            }
+        }
+
+        val deliverablesQuantityTwoList = taskTwo.deliverableQuantityList.first()
+        if (deliverablesLists?.second != null) {
+            deliverablesLists.second.forEachIndexed { index, pair ->
+                val deliverableTwo = deliverablesQuantityTwoList[index]
+                deliverablesAreEqual(
+                    pair.first,
+                    deliverableTwo,
+                    idsEqual = true,
+                    parentsEqual = true,
+                    times = pair.second
+                )
+            }
+        } else {
+            taskOne.deliverableQuantityList.first().forEachIndexed { index, deliverableOne ->
+                val deliverableTwo = deliverablesQuantityTwoList[index]
+                deliverablesAreEqual(
+                    deliverableOne,
+                    deliverableTwo,
+                    idsEqual = true,
+                    parentsEqual = true
+                )
+            }
+        }
+
+        val deliverablesTimeTwoList = taskTwo.deliverableTimeList.first()
+        if (deliverablesLists?.third != null) {
+            deliverablesLists.third.forEachIndexed { index, pair ->
+                val deliverableTwo = deliverablesTimeTwoList[index]
+                deliverablesAreEqual(
+                    pair.first,
+                    deliverableTwo,
+                    idsEqual = true,
+                    parentsEqual = true,
+                    times = pair.second
+                )
+            }
+        } else {
+            taskOne.deliverableTimeList.first().forEachIndexed { index, deliverableOne ->
+                val deliverableTwo = deliverablesTimeTwoList[index]
+                deliverablesAreEqual(
+                    deliverableOne,
+                    deliverableTwo,
+                    idsEqual = true,
+                    parentsEqual = true
+                )
+            }
         }
     }
 
