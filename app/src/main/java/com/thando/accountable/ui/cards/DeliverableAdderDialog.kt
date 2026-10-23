@@ -108,6 +108,11 @@ class DeliverableAdderDialog {
                         deliverable.time
                     )
                 }
+                val deliverableInitialTime by remember {
+                    Converters().toLocalDateTime(
+                        deliverable.initialDateTime
+                    )
+                }
                 val triedToSave by triedToSave.collectAsStateWithLifecycle(false)
                 val updateDeliverable by updateDeliverableState.collectAsStateWithLifecycle()
                 val onDismiss by onDismiss.collectAsStateWithLifecycle()
@@ -181,7 +186,8 @@ class DeliverableAdderDialog {
                                 taskTime = deliverableTime,
                                 changeTaskTime = { newTaskTime ->
                                     deliverableTime = newTaskTime
-                                }
+                                },
+                                is24HourTimePickerInitialTime = deliverableInitialTime
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Row(

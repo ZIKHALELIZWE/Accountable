@@ -36,6 +36,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.Period
@@ -260,6 +261,28 @@ sealed class AppResources {
             return builder.toString()
         }
 
+        @Composable
+        fun getDurationString(initial: LocalDateTime, duration: LocalDateTime): String{
+            val duration = Duration.between(initial,duration)
+            val durationHours = duration.toHours()
+            val durationMinutes = duration.toMinutes() - duration.toHours()*60
+
+            val builder = StringBuilder()
+            builder.append(if (durationHours == 1L) stringResource(
+                R.string.hour_pre_arg,
+                durationHours
+            )
+            else if (durationHours != 0L) stringResource(R.string.hours_pre_arg, durationHours) else "")
+            builder.append(if (durationHours != 0L && durationMinutes != 0L) stringResource(R.string.and_with_spaces) else "")
+            builder.append(if (durationMinutes == 1L) stringResource(
+                R.string.minute_pre_arg,
+                durationMinutes
+            )
+            else if (durationMinutes != 0L) stringResource(R.string.minutes_pre_arg, durationMinutes) else "")
+            builder.append(if (durationHours==0L && durationMinutes==0L) stringResource(R.string.please_select_a_duration) else "")
+            return builder.toString()
+        }
+
         fun getDurationString(context: Context, duration: LocalDateTime): String{
             val builder = StringBuilder()
             builder.append(if (duration.hour == 1) context.getString(
@@ -274,6 +297,27 @@ sealed class AppResources {
             )
             else if (duration.minute != 0) context.getString(R.string.minutes_pre_arg, duration.minute) else "")
             builder.append(if (duration.hour==0 && duration.minute==0) context.getString(R.string.please_select_a_duration) else "")
+            return builder.toString()
+        }
+
+        fun getDurationString(context: Context, initial: LocalDateTime, duration: LocalDateTime): String{
+            val duration = Duration.between(initial,duration)
+            val durationHours = duration.toHours()
+            val durationMinutes = duration.toMinutes() - duration.toHours()*60
+
+            val builder = StringBuilder()
+            builder.append(if (durationHours == 1L) context.getString(
+                R.string.hour_pre_arg,
+                durationHours
+            )
+            else if (durationHours != 0L) context.getString(R.string.hours_pre_arg, durationHours) else "")
+            builder.append(if (durationHours != 0L && durationMinutes != 0L) context.getString(R.string.and_with_spaces) else "")
+            builder.append(if (durationMinutes == 1L) context.getString(
+                R.string.minute_pre_arg,
+                durationMinutes
+            )
+            else if (durationMinutes != 0L) context.getString(R.string.minutes_pre_arg, durationMinutes) else "")
+            builder.append(if (durationHours==0L && durationMinutes==0L) context.getString(R.string.please_select_a_duration) else "")
             return builder.toString()
         }
     }

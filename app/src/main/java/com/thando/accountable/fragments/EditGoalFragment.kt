@@ -24,12 +24,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
@@ -50,6 +52,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.getSelectedDate
@@ -61,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -81,7 +85,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -108,6 +114,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.time.Duration
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.temporal.TemporalAdjusters
@@ -1562,7 +1569,7 @@ fun TimeDurationPicker(
     val openDialog = remember { mutableStateOf(true) }
 
     if (openDialog.value) {
-        val selectableHours =23 - pickedTime.hour
+        val selectableHours = 23 - pickedTime.hour
 
         var selectedHours by remember {
             mutableIntStateOf(durationPicked?.hour?.let{
@@ -1584,26 +1591,25 @@ fun TimeDurationPicker(
             if (selectedMinutes>selectableMinutes) selectedMinutes = selectableMinutes
         }
 
-        Dialog(
+        AlertDialog(
             onDismissRequest = {
                 openDialog.value = false
                 onDurationSelected(selectedHours, selectedMinutes)
-            }
-        ) {
-            Box(
-                modifier = Modifier
-                    .testTag("EditGoalTimeInputDurationPickerDialog")
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        openDialog.value = false
+                        onDurationSelected(selectedHours, selectedMinutes)
+                    },
+                    modifier = Modifier.testTag("EditGoalDurationPickerSaveAndCloseIconButton")
                 ) {
+                    Text(stringResource(R.string.save))
+                }
+            },
+            title = { Text(stringResource(R.string.please_select_a_duration)) },
+            text = {
+                Column {
                     var textWidth by remember { mutableIntStateOf(0) }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -1697,7 +1703,164 @@ fun TimeDurationPicker(
                         )
                     }
                 }
+            },
+            modifier = Modifier
+                .testTag("EditGoalTimeInputDurationPickerDialog")
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+    }
+}
+
+@Composable
+fun TimeDurationPickerUnlimited(
+    durationPicked:LocalDateTime?,
+    initialTime:LocalDateTime,
+    onDurationSelected: (hours: Long, minutes: Long) -> Unit
+) {
+    val openDialog = remember { mutableStateOf(true) }
+
+    if (openDialog.value) {
+        var duration by remember {
+            mutableStateOf(durationPicked?.let {
+                Duration.between(initialTime,it)
+            } ?: Duration.ZERO)
+        }
+
+        var selectedHours by remember {
+            mutableLongStateOf(duration.toHours())
+        }
+
+        val hourValue = remember { TextFieldState(selectedHours.toString()) }
+
+        var selectedMinutes by remember {
+            mutableLongStateOf(duration.toMinutes() - duration.toHours()*60)
+        }
+
+        val minuteValue = remember { TextFieldState(selectedMinutes.toString()) }
+
+        LaunchedEffect(hourValue.text, minuteValue.text) {
+            hourValue.text.toString().toLongOrNull()?.let { hValue ->
+                minuteValue.text.toString().toLongOrNull()?.let { mValue ->
+                    duration = duration.multipliedBy(0).plusHours(hValue).plusMinutes(mValue)
+                    selectedHours = duration.toHours()
+                    selectedMinutes = duration.toMinutes() - duration.toHours()*60
+                }
             }
         }
+
+        AlertDialog(
+            onDismissRequest = {
+                openDialog.value = false
+                onDurationSelected(selectedHours, selectedMinutes)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        openDialog.value = false
+                        onDurationSelected(selectedHours, selectedMinutes)
+                    },
+                    modifier = Modifier.testTag("EditGoalDurationPickerUnlimitedSaveAndCloseIconButton")
+                ) {
+                    Text(stringResource(R.string.save))
+                }
+            },
+            title = { Text(stringResource(R.string.please_select_a_duration)) },
+            text = {
+                Column {
+                    var textWidth by remember { mutableIntStateOf(0) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Duration:",
+                            style = MaterialTheme.typography.titleMedium,
+                            onTextLayout = {
+                                if (it.size.width > textWidth) textWidth = it.size.width
+                            },
+                            modifier = Modifier.width(
+                                if (textWidth == 0) Dp.Unspecified else with(
+                                    LocalDensity.current
+                                ) { textWidth.toDp() })
+                        )
+                        if (selectedHours != 0L || selectedMinutes != 0L) {
+                            Text(
+                                (if (selectedHours == 1L) "$selectedHours Hour"
+                                else if (selectedHours != 0L) "$selectedHours Hours" else "")
+                                        +
+                                        (if (selectedHours != 0L && selectedMinutes != 0L) " and " else "")
+                                        +
+                                        (if (selectedMinutes == 1L) "$selectedMinutes Minute"
+                                        else if (selectedMinutes != 0L) "$selectedMinutes Minutes" else ""),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 8.dp)
+                                    .testTag("EditGoalDurationPickerUnlimitedDurationText")
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    // Hours Picker
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Hours: ",
+                            style = MaterialTheme.typography.bodyMedium,
+                            onTextLayout = {
+                                if (it.size.width > textWidth) textWidth = it.size.width
+                            },
+                            modifier = Modifier
+                                .width(
+                                    if (textWidth == 0) Dp.Unspecified else with(
+                                        LocalDensity.current
+                                    ) { textWidth.toDp() })
+                                .padding(start = 8.dp)
+                        )
+                        TextField(
+                            state = hourValue,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .testTag("EditGoalDurationPickerHourTextField"),
+                            textStyle = TextStyle(
+                                fontSize = 26.sp,
+                                color = Color.Black
+                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Minutes Picker
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Minutes: ",
+                            style = MaterialTheme.typography.bodyMedium,
+                            onTextLayout = {
+                                if (it.size.width > textWidth) textWidth = it.size.width
+                            },
+                            modifier = Modifier.width(
+                                if (textWidth == 0) Dp.Unspecified else with(
+                                    LocalDensity.current
+                                ) { textWidth.toDp() })
+                        )
+                        TextField(
+                            state = minuteValue,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .testTag("EditGoalDurationPickerMinuteTextField"),
+                            textStyle = TextStyle(
+                                fontSize = 26.sp,
+                                color = Color.Black
+                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                    }
+                }
+            },
+            modifier = Modifier
+                .testTag("EditGoalTimeInputDurationPickerUnlimitedDialog")
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        )
     }
 }

@@ -992,7 +992,8 @@ fun AddTaskView(
                                 updateTask(task.copy(time = newTime))
                             },
                             taskTime = taskTime,
-                            changeTaskTime = { newTaskTime -> taskTime = newTaskTime}
+                            changeTaskTime = { newTaskTime -> taskTime = newTaskTime },
+                            is24HourTimePickerInitialTime = null
                         )
                     }
                     item {
@@ -1024,7 +1025,7 @@ fun AddTaskView(
                     item {
                         Spacer(modifier = Modifier.width(2.dp))
                     }
-                    item {
+                    item(key = "TasksFragmentAddTaskColourBoxAndButton") {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1392,7 +1393,8 @@ fun NormalQuantityTimeTextField(
     updateTaskTask: suspend (String,Long) -> Unit,
     updateTaskTime: suspend (Long) -> Unit,
     taskTime: LocalDateTime,
-    changeTaskTime: (LocalDateTime) -> Unit
+    changeTaskTime: (LocalDateTime) -> Unit,
+    is24HourTimePickerInitialTime: LocalDateTime?
 ) {
     var initialized by remember { mutableStateOf(false) }
     LaunchedEffect(textFieldState.text) {
@@ -1445,7 +1447,8 @@ fun NormalQuantityTimeTextField(
                 supportingText = {styledText?.let { styledText -> Text(styledText)}},
                 label = { Text(stringResource(
                     if (isDeliverable) {
-                        R.string.deliverable_with_a_quantity
+                        if (taskType == Task.TaskType.QUANTITY) R.string.deliverable_with_a_quantity
+                        else R.string.deliverable
                     }
                     else {
                         if (taskType == Task.TaskType.QUANTITY) R.string.task_with_quantity
@@ -1504,19 +1507,39 @@ fun NormalQuantityTimeTextField(
                 textFieldState.edit {
                     replace(0, length,
                         "${firstText.text.trim()} ${
-                            AppResources.getDurationString(context, taskTime)
+                            is24HourTimePickerInitialTime?.let { initialTime ->
+                                AppResources.getDurationString(context, initialTime, taskTime)
+                            } ?: AppResources.getDurationString(context, taskTime)
                         } ${secondText.text.trim()}")
                 }
             }
 
             val buttonDurationPick = remember { mutableStateOf(false) }
             if (buttonDurationPick.value) {
-                TimeDurationPicker(datePicked, taskTime) { hours, minutes ->
-                    changeTaskTime(taskTime.withHour(hours).withMinute(minutes))
-                    scope.launch {
-                        updateTaskTime(Converters().fromLocalDateTime(taskTime))
+                is24HourTimePickerInitialTime?.let { initialTime ->
+                    TimeDurationPickerUnlimited(taskTime, initialTime) { hours, minutes ->
+                        changeTaskTime(initialTime.plusHours(hours).plusMinutes(minutes))
+                        scope.launch {
+                            updateTaskTime(
+                                Converters().fromLocalDateTime(
+                                    initialTime.plusHours(hours).plusMinutes(minutes)
+                                )
+                            )
+                        }
+                        buttonDurationPick.value = false
                     }
-                    buttonDurationPick.value = false
+                }?: run {
+                    TimeDurationPicker(datePicked, taskTime) { hours, minutes ->
+                        changeTaskTime(taskTime.withHour(hours).withMinute(minutes))
+                        scope.launch {
+                            updateTaskTime(
+                                Converters().fromLocalDateTime(
+                                    taskTime.withHour(hours).withMinute(minutes)
+                                )
+                            )
+                        }
+                        buttonDurationPick.value = false
+                    }
                 }
             }
             FlowRow(
@@ -1531,20 +1554,23 @@ fun NormalQuantityTimeTextField(
                     modifier = modifier.fillMaxWidth()
                 )
                 OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.testTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton")
+                        .fillMaxWidth(),
                     onClick = { buttonDurationPick.value = true },
                     shape = RectangleShape,
                     border = BorderStroke(1.dp,Color.DarkGray)
                 ) {
                     Text(
-                        text = AppResources.getDurationString(taskTime),
-                        modifier = Modifier
+                        text = is24HourTimePickerInitialTime?.let { initialTime ->
+                            AppResources.getDurationString(initialTime, taskTime)
+                        } ?: AppResources.getDurationString(taskTime)
                     )
                 }
                 OutlinedTextField(
                     state = secondText,
+                    modifier = Modifier.testTag("TasksFragmentNormalQuantityTimeTextFieldTimeSecondField")
+                        .fillMaxWidth(),
                     placeholder = { Text("Second part") },
-                    modifier = Modifier.fillMaxWidth(),
                     supportingText = {Text(textFieldState.text.toString())}
                 )
             }

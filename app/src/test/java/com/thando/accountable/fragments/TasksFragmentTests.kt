@@ -20,6 +20,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToKey
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
@@ -49,6 +50,7 @@ import org.junit.Assert.assertTrue
 import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runners.MethodSorters
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -2052,5 +2054,1122 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 ).first()
             )
         }
+    }
+
+    @Test
+    fun `15 Adding Time Deliverable Task`() = runMainTest {
+        val activity = getTestMainActivity()
+
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        var goal = taskViewModel.goal.first()!!
+
+        var tasksList = goal.goalTasks.first()
+        assertNotNull(tasksList)
+        assertEquals(0, tasksList.size)
+
+        assertEquals(Goal.GoalTab.DELIVERABLES, Goal.GoalTab.valueOf(goal.selectedTab))
+        switchToTab(Goal.GoalTab.TASKS, taskViewModel, activity)
+        goal = taskViewModel.goal.first()!!
+        assertEquals(Goal.GoalTab.TASKS, Goal.GoalTab.valueOf(goal.selectedTab))
+
+
+        withTag("TasksFragmentAddTextButton"){
+            assertExists()
+            assertTextContains(activity.getString(Goal.GoalTab.TASKS.addStringRes))
+            performPressWithoutScroll()
+        }
+        assertEquals(Goal.GoalTab.TASKS,taskViewModel.bottomSheetType.value)
+
+        withTag("TasksFragmentAddTaskView"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        assertNull(taskViewModel.originalTask.value)
+        assertNotNull(taskViewModel.task.first())
+
+        withTag("TasksFragmentAddTaskViewTaskTypeButton-${Task.TaskType.TIME.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performPressWithoutScroll()
+            assertEquals(
+                Color.Blue,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(Task.TaskType.TIME.stringRes))
+        }
+
+        withTag("TasksFragmentAddTaskViewTaskTypeButton-${Task.TaskType.NORMAL.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertEquals(
+                Color.LightGray,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(Task.TaskType.NORMAL.stringRes))
+        }
+
+        withTag("TasksFragmentAddTaskViewTaskTypeButton-${Task.TaskType.QUANTITY.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertEquals(
+                Color.LightGray,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(Task.TaskType.QUANTITY.stringRes))
+        }
+
+        assertEquals(
+            Task.TaskType.TIME.name,
+            taskViewModel.task.first()?.type
+        )
+
+        withTag("TasksFragmentAddTaskNormalQuantityTimeTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("Run a total of")
+            assertTextContains(
+                value = "Run a total of",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerDialog"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("EditGoalDurationPickerHourSlider"){
+            assertExists()
+            assertIsDisplayed()
+            assertEquals(
+                0f..23F,
+                fetchSemanticsNode().config[SliderRangeKey]
+            )
+            performSemanticsAction(SemanticsActions.SetProgress) { action ->
+                action(2F)
+            }
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerMinuteSlider"){
+            assertExists()
+            assertIsDisplayed()
+            assertEquals(
+                0f..59F,
+                fetchSemanticsNode().config[SliderRangeKey]
+            )
+            performSemanticsAction(SemanticsActions.SetProgress) { action ->
+                action(30F)
+            }
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerSaveAndCloseIconButton") {
+            assertExists()
+            assertIsDisplayed()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerDialog"){
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertTextContains(
+                value = "2 Hours and 30 Minutes",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeSecondField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("in the snow.")
+            assertTextContains(
+                value = "in the snow.",
+                substring = true,
+                ignoreCase = false
+            )
+            assertTextContains(
+                value = "Run a total of 2 Hours and 30 Minutes in the snow.",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        val newTime = Converters().toLocalDateTime(taskViewModel.task.first()?.time).value
+        assertNotNull(newTime)
+        assertEquals(2,newTime!!.hour)
+        assertEquals(30, newTime.minute)
+
+        withTag("TasksFragmentAddTaskLocationTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("At Home")
+            assertTextContains(
+                value = "At Home",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("TasksFragmentAddTaskViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskColourBoxAndButton")
+        }
+
+        assertNotNull(taskViewModel.task.first()?.colour)
+        val taskColour = taskViewModel.task.first()!!.colour
+        withTag("TasksFragmentAddTaskColourBox") {
+            if (taskColour == -1) assertDoesNotExist()
+            else{
+                assertExists()
+                performScrollTo()
+                assertIsDisplayed()
+                assertEquals(
+                    taskColour,
+                    fetchSemanticsNode().config[BackgroundColorKey].toArgb()
+                )
+            }
+        }
+
+        withTag("TasksFragmentAddTaskColourButton") {
+            performPressWithScroll()
+        }
+
+        withTag("ColourPickerDialogCanvas") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            performTouchInput { click(Offset(50f, 50f)) }
+        }
+        finishProcesses()
+
+        withTag("ColourPickerDialogOKButton") {
+            performPressWithScroll()
+        }
+
+        withTag("ColourPickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.colour)
+        assertNotEquals(-1, taskViewModel.task.first()?.colour)
+        withTag("TasksFragmentAddTaskColourBox") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertEquals(
+                taskColour,
+                fetchSemanticsNode().config[BackgroundColorKey].toArgb()
+            )
+        }
+
+        withTag("TasksFragmentAddTaskEndTypeButton") {
+            performPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.DELIVERABLE.name}") {
+            performPressWithoutScroll()
+        }
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskModifyDeliverableButtons")
+        }
+
+        withTag("TasksFragmentAddTaskAddDeliverableButton") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0])
+
+        withTag("DeliverableAdderDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("Run an accumulated total of")
+            assertTextContains(
+                value = "Run an accumulated total of",
+                substring = true,
+                ignoreCase = false
+            )
+            finishProcesses()
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerUnlimitedDialog"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("EditGoalDurationPickerHourTextField") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "0",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("100")
+            assertTextContains(
+                value = "100",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerMinuteTextField") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "0",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("121")
+            assertTextContains(
+                value = "121",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerUnlimitedDurationText") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "102 Hours and 1 Minute",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("EditGoalDurationPickerUnlimitedSaveAndCloseIconButton") {
+            assertExists()
+            assertIsDisplayed()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerUnlimitedDialog"){
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertTextContains(
+                value = "102 Hours and 1 Minute",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeSecondField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement(".")
+            assertTextContains(
+                value = ".",
+                substring = true,
+                ignoreCase = false
+            )
+            assertTextContains(
+                value = "Run an accumulated total of 102 Hours and 1 Minute .",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        assertEquals(2,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+
+        var deliverable = taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[1]
+        assertNotNull(deliverable)
+        var deliverableDuration = Duration.between(
+            Converters().toLocalDateTime(deliverable!!.initialDateTime).value,
+            Converters().toLocalDateTime(deliverable.time).value
+        )
+        assertEquals(
+            102L,
+            deliverableDuration.toHours()
+        )
+        assertEquals(
+            1L,
+            deliverableDuration.toMinutes() - deliverableDuration.toHours()*60
+        )
+
+        withTag("DeliverableAdderDialogDismissButton") {
+            performPressWithScroll()
+        }
+
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+
+        withTag("DeliverableAdderDialog") {
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentAddTaskAddDeliverableButton") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0])
+
+        withTag("DeliverableAdderDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("Run an accumulated total of")
+            assertTextContains(
+                value = "Run an accumulated total of",
+                substring = true,
+                ignoreCase = false
+            )
+            finishProcesses()
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerUnlimitedDialog"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("EditGoalDurationPickerHourTextField") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "0",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("100")
+            assertTextContains(
+                value = "100",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerMinuteTextField") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "0",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("121")
+            assertTextContains(
+                value = "121",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerUnlimitedDurationText") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "102 Hours and 1 Minute",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("EditGoalDurationPickerUnlimitedSaveAndCloseIconButton") {
+            assertExists()
+            assertIsDisplayed()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerUnlimitedDialog"){
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertTextContains(
+                value = "102 Hours and 1 Minute",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeSecondField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement(".")
+            assertTextContains(
+                value = ".",
+                substring = true,
+                ignoreCase = false
+            )
+            assertTextContains(
+                value = "Run an accumulated total of 102 Hours and 1 Minute .",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        assertEquals(2,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+
+        deliverable = taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[1]
+        assertNotNull(deliverable)
+        deliverableDuration = Duration.between(
+            Converters().toLocalDateTime(deliverable!!.initialDateTime).value,
+            Converters().toLocalDateTime(deliverable.time).value
+        )
+        assertEquals(
+            102L,
+            deliverableDuration.toHours()
+        )
+        assertEquals(
+            1L,
+            deliverableDuration.toMinutes() - deliverableDuration.toHours()*60
+        )
+
+        withTag("DeliverableAdderDialogOKButton") {
+            performPressWithScroll()
+        }
+
+        assertEquals(2,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+
+        withTag("DeliverableAdderDialog") {
+            assertDoesNotExist()
+        }
+/*
+        withTag("TasksFragmentAddTaskSelectDeliverableButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = activity.getString(R.string.select_deliverable) + " (${1})",
+                substring = true,
+                ignoreCase = false
+            )
+            performPressWithoutScroll()
+        }
+
+        withTag("DeliverablePickerDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
+        var deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+
+        withTag("DeliverablePickerDialogLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("DeliverablePickerDialogPickButton-${deliverableId}") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()!!.taskId)
+
+        assertNotNull(activity.viewModel.repository.getTaskDeliverable(
+            taskViewModel.task.first()!!.taskId!!,
+            deliverableId
+        ).first())
+
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("DeliverablePickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentAddTaskTaskDeliverableDeselectButton-${deliverableId}") {
+            performPressWithScroll()
+        }
+
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentAddTaskSelectDeliverableButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = activity.getString(R.string.select_deliverable) + " (${1})",
+                substring = true,
+                ignoreCase = false
+            )
+            performPressWithoutScroll()
+        }
+
+        withTag("DeliverablePickerDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+
+        withTag("DeliverablePickerDialogLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("DeliverablePickerDialogPickButton-${deliverableId}") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()!!.taskId)
+
+        assertNotNull(activity.viewModel.repository.getTaskDeliverable(
+            taskViewModel.task.first()!!.taskId!!,
+            deliverableId
+        ).first())
+
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("DeliverablePickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskEndTypeButton")
+        }
+
+        withTag("TasksFragmentAddTaskEndTypeButton") {
+            performPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.UNDEFINED.name}") {
+            performPressWithoutScroll()
+        }
+
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentAddTaskEndTypeButton") {
+            performPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.DELIVERABLE.name}") {
+            performPressWithoutScroll()
+        }
+
+        withTag("TasksFragmentAddTaskSelectDeliverableButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = activity.getString(R.string.select_deliverable) + " (${1})",
+                substring = true,
+                ignoreCase = false
+            )
+            performPressWithoutScroll()
+        }
+
+        withTag("DeliverablePickerDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+
+        withTag("DeliverablePickerDialogLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("DeliverablePickerDialogPickButton-${deliverableId}") {
+            performPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()!!.taskId)
+
+        assertNotNull(activity.viewModel.repository.getTaskDeliverable(
+            taskViewModel.task.first()!!.taskId!!,
+            deliverableId
+        ).first())
+
+        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+
+        withTag("DeliverablePickerDialog") {
+            assertDoesNotExist()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskAddTimeBlockButton")
+        }
+
+        assertNotNull(taskViewModel.task.first()?.times)
+        TimeBlockTest(
+            "TasksFragmentAddTaskAddTimeBlockButton",
+            taskViewModel.task.first()!!.times,
+            Triple(
+                instantTaskExecutorRule,
+                composeTestRule,
+                activity
+            ),
+            lazyColumnTag = "TasksFragmentAddTaskViewLazyColumn"
+        ).runTests(this@TasksFragmentTests::class)
+
+        withTag("TasksFragmentAddTaskDeleteButton").assertDoesNotExist()
+        val task = taskViewModel.task.first()!!
+        val deliverablesLists = getTaskDeliverablesLists(task)
+        val times = task.times.first()
+
+        withTag("TasksFragmentTaskSaveButton"){
+            performPressWithoutScroll()
+        }
+
+        assertNotNull(taskViewModel.goal.first()?.goalTasks?.first())
+        tasksList = taskViewModel.goal.first()!!.goalTasks.first()
+        assertEquals(1,tasksList.size)
+
+        tasksAreEqual(
+            taskOne = task,
+            taskTwo = tasksList[0],
+            idsEqual = true,
+            times = times,
+            deliverablesLists = deliverablesLists
+        )*/
+    }
+
+  /*  @Test
+    fun `13 Editing Quantity Deliverable Task`() = runMainTest {
+        val activity = getTestMainActivity()
+
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        val goal = taskViewModel.goal.first()!!
+
+        var tasksList = goal.goalTasks.first()
+        assertNotNull(tasksList)
+        assertEquals(1, tasksList.size)
+
+        val oldTask = tasksList[0]
+        val oldTimes = oldTask.times.first()
+        val oldDeliverablesLists = getTaskDeliverablesLists(oldTask)
+
+        withTag("TasksFragmentTaskCardView-${tasksList[0].taskId}") {
+            performLongPressWithScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first())
+        assertNotNull(taskViewModel.originalTask.value?.first())
+
+        assertEquals(Goal.GoalTab.TASKS,taskViewModel.bottomSheetType.value)
+        withTag("TasksFragmentAddTaskView"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        tasksAreEqual(
+            oldTask,
+            taskViewModel.task.first()!!,
+            idsEqual = false,
+            times = oldTimes,
+            deliverablesLists = oldDeliverablesLists
+        )
+
+        withTag("TasksFragmentTaskTitle"){
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(activity.getString(R.string.edit_with_arg,activity.getString(R.string.task)))
+        }
+
+        withTag("TasksFragmentTaskSaveButton"){
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+        }
+
+        assertEquals(2L,taskViewModel.task.first()?.quantity)
+        withTag("TasksFragmentAddTaskNormalQuantityTimeTextField"){
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                "Jump 2 times",
+                substring = true
+            )
+            performTextReplacement("Jump 3 times")
+            assertTextContains(
+                "Jump 3 times",
+                substring = true
+            )
+        }
+        assertEquals(3L,taskViewModel.task.first()?.quantity)
+
+        withTag("TasksFragmentAddTaskViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskLocationTextField")
+        }
+
+        withTag("TasksFragmentAddTaskLocationTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                "At Home",
+                substring = true
+            )
+            performTextReplacement("At Home Location")
+            assertTextContains(
+                "At Home Location",
+                substring = true
+            )
+        }
+
+        val task = taskViewModel.task.first()
+        val taskTimes = task?.times?.first()
+        val deliverablesLists = getTaskDeliverablesLists(task!!)
+
+        withTag("TasksFragmentAddTaskViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskDeleteButton")
+        }
+
+        withTag("TasksFragmentAddTaskDeleteButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentTaskSaveButton"){
+            performPressWithoutScroll()
+        }
+
+        assertNotNull(taskViewModel.goal.first()?.goalTasks?.first())
+        tasksList = taskViewModel.goal.first()?.goalTasks?.first()!!
+        assertEquals(1,tasksList.size)
+
+        tasksAreEqual(
+            task,
+            tasksList[0],
+            false,
+            taskTimes,
+            deliverablesLists = deliverablesLists
+        )
+
+        assertNotEquals(
+            oldTask.task,
+            tasksList[0].task
+        )
+
+        assertNotEquals(
+            oldTask.location,
+            tasksList[0].location
+        )
+
+        assertEquals(oldTask.taskId,tasksList[0].taskId)
+    }
+
+    @Test
+    fun `14 Deleting Quantity Deliverable Task`() = runMainTest {
+        val activity = getTestMainActivity()
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        val goal = taskViewModel.goal.first()!!
+        var tasksList = goal.goalTasks.first()
+        assertNotNull(tasksList)
+        assertEquals(1,tasksList.size)
+
+        val taskDeliverablesList = tasksList[0].taskDeliverableList.first()
+        val taskTimesList = tasksList[0].times.first()
+
+        withTag("TasksFragmentTaskCardView-${tasksList[0].taskId}") {
+            performLongPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddTaskViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddTaskDeleteButton")
+        }
+
+        withTag("TasksFragmentAddTaskDeleteButton"){
+            performPressWithScroll()
+        }
+
+        tasksList = goal.goalTasks.first()
+        assertNotNull(tasksList)
+        assertEquals(0,tasksList.size)
+
+        taskDeliverablesList.forEach {
+            val taskDeliverable = activity.viewModel.repository.getTaskDeliverable(it.taskId,it.deliverableId)
+            assertNull(taskDeliverable.first())
+        }
+
+        taskTimesList.forEach {
+            assertNull(
+                activity.viewModel.repository.getGoalTaskDeliverableTime(
+                    it.id
+                ).first()
+            )
+        }
+    }*/
+
+    /**
+     * <h2><b>Types of work:</b></h2>
+     *  1. Complete a certain repeating task x amount of times (including streak)
+     *  2. Complete a certain quantity/time once for a certain quantity/time task
+     *  (including streak)
+     *  3. Complete all tasks assigned to a deliverable
+     *  (Have boolean value for when no tasks have been assigned yet, have another for 'should
+     *  complete' when all tasks completed)
+     *  4. Work deliverables can have deadlines stored in endDateTime (when there is no deadline
+     *  it will be null)
+     */
+
+    @Test
+    fun `15 Adding Deliverable`() = runMainTest {
+        val activity = getTestMainActivity()
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        var goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.TASKS,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        switchToTab(Goal.GoalTab.DELIVERABLES, taskViewModel, activity)
+        goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.DELIVERABLES,Goal.GoalTab.valueOf(goal.selectedTab))
+        withTag("TasksFragmentAddTextButton"){
+            assertExists()
+            assertTextContains(activity.getString(Goal.GoalTab.DELIVERABLES.addStringRes))
+            performPressWithoutScroll()
+        }
+
+        assertEquals(Goal.GoalTab.DELIVERABLES,taskViewModel.bottomSheetType.value)
+        withTag("TasksFragmentAddDeliverableView"){
+            assertExists()
+            assertIsDisplayed()
+        }
+/*
+        assertNull(taskViewModel.originalMarker.value)
+        withTag("TasksFragmentMarkerTitle"){
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(activity.getString(R.string.add,activity.getString(R.string.marker)))
+        }
+
+        withTag("TasksFragmentMarkerSaveButton"){
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+        }
+
+        assertNotNull(taskViewModel.marker.first())
+
+        withTag("TasksFragmentMarkerMarkerText"){
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains("")
+            performTextReplacement("February Ends")
+            assertTextContains("February Ends")
+        }
+
+        withTag("TasksFragmentMarkerPickTimeButton"){
+            performPressWithScroll()
+        }
+
+        DateAndTimePickerTest(
+            getTimeAsLong = { taskViewModel.marker.first()?.dateTime },
+            getExpectedEndType = null,
+            getActualEndType = null,
+            endTypeButtonTag = null,
+            dropDownMenuTag = null,
+            dropDownMenuItemTag = null,
+            selectDateAndTimeButtonTag = "TasksFragmentMarkerPickTimeButton",
+            parentParameters = Triple(
+                instantTaskExecutorRule,
+                composeTestRule,
+                activity
+            )
+        ).runTests(this@TasksFragmentTests::class)
+
+        val marker = taskViewModel.marker.first()
+        assertNotNull(marker?.dateTime)
+        assertTrue(marker!!.dateTime>0)
+
+        withTag("TasksFragmentMarkerDeleteButton") {
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentMarkerSaveButton"){
+            performPressWithoutScroll()
+        }
+
+        var markersList = taskViewModel.goal.first()?.goalMarkers?.first()
+        assertNotNull(markersList)
+        markersList = markersList!!
+        assertEquals(1,markersList.size)
+
+        markersAreEqual(
+            marker,
+            markersList[0],
+            true
+        )*/
     }
 }
