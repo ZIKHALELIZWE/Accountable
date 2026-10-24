@@ -36,7 +36,7 @@ import java.time.LocalDateTime
     Deliverable::class,
     Marker::class,
     TaskDeliverable::class
-], version = 17, exportSchema = false)
+], version = 18, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AccountableDatabase: RoomDatabase() {
     abstract val repositoryDao : RepositoryDao
@@ -211,6 +211,9 @@ abstract class AccountableDatabase: RoomDatabase() {
                         },
                         Migration(16,17) { db ->
                             db.execSQL("ALTER TABLE task_table ADD task_goal_id INTEGER DEFAULT ${null} NULL")
+                        },
+                        Migration(17,18) { db ->
+                            db.execSQL("ALTER TABLE deliverable_table ADD deliverable_type TEXT DEFAULT NORMAL NOT NULL")
                         },
                     )
                     .build()

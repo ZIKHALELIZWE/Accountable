@@ -37,6 +37,7 @@ import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
+import com.thando.accountable.database.tables.Task
 import com.thando.accountable.database.tables.TaskDeliverable
 import com.thando.accountable.fragments.DeliverableCardView
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -168,7 +169,8 @@ fun DeliverablePickerDialogPreview() {
         endType = Deliverable.DeliverableEndType.WORK.name,
         deliverable = "Complete Task Deliverable Module 2 times",
         location = "At My Desk",
-        workType = TaskDeliverable.WorkType.QuantityTaskOnce.name
+        workType = TaskDeliverable.WorkType.QuantityTaskOnce.name,
+        type = Task.TaskType.QUANTITY.name
     ).apply {
         timesState.value = flowOf(listOf(
             GoalTaskDeliverableTime(
@@ -188,7 +190,8 @@ fun DeliverablePickerDialogPreview() {
         endType = Deliverable.DeliverableEndType.WORK.name,
         deliverable = "Jump 2 Times",
         location = "On My Desk",
-        workType = TaskDeliverable.WorkType.QuantityTaskOnce.name
+        workType = TaskDeliverable.WorkType.QuantityTaskOnce.name,
+        type = Task.TaskType.QUANTITY.name
     ).apply {
         timesState.value = flowOf(listOf(
             GoalTaskDeliverableTime(

@@ -36,6 +36,7 @@ import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.cards.ColourPickerDialog
 import com.thando.accountable.ui.cards.DeliverableAdderDialog
 import com.thando.accountable.ui.cards.DeliverablePickerDialog
+import com.thando.accountable.ui.cards.DeliverableWarningDialog
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,6 +60,7 @@ class EditGoalViewModel(
     val colourPickerDialog = ColourPickerDialog()
     val addDeliverableDialog = DeliverableAdderDialog()
     val pickDeliverableDialog = DeliverablePickerDialog()
+    val deliverableWarningDialog = DeliverableWarningDialog()
     private val deliverableState: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(null)
     val deliverable = deliverableState.flatMapLatest { it?:flowOf(null) }
     private val originalDeliverableState = MutableStateFlow<Flow<Deliverable?>?>(null)
@@ -173,6 +175,11 @@ class EditGoalViewModel(
 
     suspend fun updateDeliverable(deliverable: Deliverable) {
         repository.update(deliverable)
+    }
+
+    suspend fun updateDeliverableType(deliverable: Deliverable, newType: Task.TaskType) {
+        // TODO Add warnings for work relations
+        repository.update(deliverable.copy(type = newType.name))
     }
 
     suspend fun updateTask(task: Task) {

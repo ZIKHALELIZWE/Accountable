@@ -244,6 +244,7 @@ fun DeliverableAdderDialogPreview() {
         deliverableId = 1L,
         parent = 1L,
         position = 0L,
+        type = Task.TaskType.QUANTITY.name,
         endDateTime = Converters().fromLocalDateTime(LocalDateTime.now().plusDays(5)),
         endType = Deliverable.DeliverableEndType.WORK.name,
         deliverable = "Complete Task Deliverable Module 2 times",

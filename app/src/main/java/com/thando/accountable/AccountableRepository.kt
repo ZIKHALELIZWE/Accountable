@@ -2038,12 +2038,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
                             if (newDeliverable == null) {
                                 newDeliverable = Deliverable(
                                     parent = id,
-                                    position = deliverable.position
+                                    position = deliverable.position,
+                                    type = deliverable.type
                                 )
                                 newDeliverable.deliverableId = saveDeliverable(newDeliverable)
                             } else {
                                 newDeliverable.parent = id
                                 newDeliverable.position = deliverable.position
+                                newDeliverable.type = deliverable.type
                             }
 
                             val fromMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(deliverable.deliverableId))
@@ -2317,6 +2319,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
             to.value?.first()?.let { to ->
                 if (cloneParent) to.parent = from.parent
                 to.position = from.position
+                to.type = from.type
                 to.initialDateTime = from.initialDateTime
                 to.endDateTime = from.endDateTime
                 to.endType = from.endType
@@ -2358,7 +2361,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     insert(
                         Deliverable(
                             parent = deliverable.parent,
-                            position = deliverable.position
+                            position = deliverable.position,
+                            type = deliverable.type
                         )
                     )
                 )

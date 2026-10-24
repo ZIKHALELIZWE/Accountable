@@ -118,6 +118,7 @@ import com.thando.accountable.ui.MenuItemData
 import com.thando.accountable.ui.cards.ColourPickerDialog
 import com.thando.accountable.ui.cards.DeliverableAdderDialog
 import com.thando.accountable.ui.cards.DeliverablePickerDialog
+import com.thando.accountable.ui.cards.DeliverableWarningDialog
 import com.thando.accountable.ui.theme.AccountableTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -279,6 +280,7 @@ fun TaskView(
                     deleteTimeBlock = viewModel::deleteTimeBlock,
                     updateTimeBlock = viewModel::updateTimeBlock,
                     updateDeliverable = viewModel::updateDeliverable,
+                    updateDeliverableType = viewModel::updateDeliverableType,
                     deleteTaskClicked = viewModel::deleteTaskClicked,
                     originalTask = viewModel.originalTask,
                     task = viewModel.task,
@@ -292,10 +294,12 @@ fun TaskView(
                     updateMarker = viewModel::updateMarker,
                     addTaskDeliverable = viewModel::addTaskDeliverable,
                     addDeliverableDialog = viewModel.addDeliverableDialog,
+                    deliverableWarningDialog = viewModel.deliverableWarningDialog,
                     selectTaskDeliverable = viewModel::selectTaskDeliverable,
                     pickDeliverableDialog = viewModel.pickDeliverableDialog,
                     deselectTaskDeliverable = viewModel::deselectTaskDeliverable,
-                    deselectAllTaskDeliverables = viewModel::deselectAllTaskDeliverables
+                    deselectAllTaskDeliverables = viewModel::deselectAllTaskDeliverables,
+                    editTaskDeliverable = viewModel::editTaskDeliverable
                 )
             }
         }
@@ -331,10 +335,13 @@ fun TaskDeliverableMarkerBottomSheet(
     updateMarker: suspend (Marker) -> Unit,
     addTaskDeliverable: (suspend () -> Unit)?,
     addDeliverableDialog: DeliverableAdderDialog,
+    deliverableWarningDialog: DeliverableWarningDialog,
     selectTaskDeliverable: (suspend () -> Unit)?,
     pickDeliverableDialog: DeliverablePickerDialog,
     deselectTaskDeliverable: suspend (Deliverable) -> Unit,
-    deselectAllTaskDeliverables: suspend () -> Unit
+    deselectAllTaskDeliverables: suspend () -> Unit,
+    editTaskDeliverable: (suspend (Deliverable) -> Unit)?,
+    updateDeliverableType: suspend (Deliverable, Task.TaskType) -> Unit
 ){
     val scope = rememberCoroutineScope()
     val bottomSheetType by bottomSheetTypeState.collectAsStateWithLifecycle()
@@ -370,7 +377,8 @@ fun TaskDeliverableMarkerBottomSheet(
                         addDeliverable = addTaskDeliverable,
                         addDeliverableDialog = addDeliverableDialog,
                         selectDeliverable = selectTaskDeliverable,
-                        pickDeliverableDialog = pickDeliverableDialog
+                        pickDeliverableDialog = pickDeliverableDialog,
+                        editDeliverable = editTaskDeliverable
                     )
                 }
                 GoalTab.DELIVERABLES -> {
@@ -388,7 +396,9 @@ fun TaskDeliverableMarkerBottomSheet(
                         deleteDeliverableClicked = deleteDeliverableClicked,
                         updateTimeBlock = updateTimeBlock,
                         updateDeliverable = updateDeliverable,
-                        dismissBottomSheet = dismissBottomSheet
+                        updateDeliverableType = updateDeliverableType,
+                        dismissBottomSheet = dismissBottomSheet,
+                        deliverableWarningDialog = deliverableWarningDialog
                     )
                 }
                 GoalTab.MARKERS -> {
@@ -775,7 +785,8 @@ fun AddTaskViewPreview() {
         addDeliverableDialog = addDeliverableDialog,
         selectDeliverable = {},
         pickDeliverableDialog = pickDeliverableDialog,
-        deselectAllTaskDeliverables = {}
+        deselectAllTaskDeliverables = {},
+        editDeliverable = {}
     )
 }
 
@@ -801,7 +812,8 @@ fun AddTaskView(
     addDeliverableDialog: DeliverableAdderDialog,
     selectDeliverable: (suspend () -> Unit)?,
     pickDeliverableDialog: DeliverablePickerDialog,
-    deselectAllTaskDeliverables: suspend () -> Unit
+    deselectAllTaskDeliverables: suspend () -> Unit,
+    editDeliverable: (suspend (Deliverable) -> Unit)?
 ) {
     val scope = rememberCoroutineScope()
     val originalTask by originalTask.collectAsStateWithLifecycle()
@@ -1277,7 +1289,7 @@ fun AddTaskView(
                             ) {
                                 DeliverableCardView(
                                     deliverable,
-                                    {},
+                                    { deliverableToEdit -> scope.launch { editDeliverable?.invoke(deliverableToEdit) } },
                                     Modifier
                                 )
                                 Button(
@@ -1493,7 +1505,9 @@ fun NormalQuantityTimeTextField(
             val datePicked = LocalDateTime.now().withHour(0).withMinute(0)
 
             LaunchedEffect(Unit) {
-                val initialTime = AppResources.getDurationString(context, taskTime)
+                val initialTime = is24HourTimePickerInitialTime?.let { initialTime ->
+                    AppResources.getDurationString(context, initialTime, taskTime)
+                } ?: AppResources.getDurationString(context, taskTime)
                 val index = textFieldState.text.toString().indexOf(initialTime)
                 if (index != -1) {
                     val before = textFieldState.text.toString().substring(0, index)
@@ -1570,7 +1584,6 @@ fun NormalQuantityTimeTextField(
                     state = secondText,
                     modifier = Modifier.testTag("TasksFragmentNormalQuantityTimeTextFieldTimeSecondField")
                         .fillMaxWidth(),
-                    placeholder = { Text("Second part") },
                     supportingText = {Text(textFieldState.text.toString())}
                 )
             }
@@ -1586,6 +1599,7 @@ fun DeliverableCardViewPreview() {
             deliverableId = 1L,
             parent = 1L,
             position = 0L,
+            type = Task.TaskType.NORMAL.name,
             endDateTime = Converters().fromLocalDateTime(LocalDateTime.now().plusDays(5)),
             endType = Deliverable.DeliverableEndType.DATE.name,
             deliverable = "Complete Task Deliverable Module",
@@ -1772,6 +1786,7 @@ fun AddDeliverableViewPreview() {
         deliverableId = 1L,
         parent = 1L,
         position = 0L,
+        type = Task.TaskType.NORMAL.name,
         endDateTime = Converters().fromLocalDateTime(LocalDateTime.now().plusDays(5)),
         endType = Deliverable.DeliverableEndType.WORK.name,
         deliverable = "Complete Task Deliverable Module",
@@ -1802,6 +1817,8 @@ fun AddDeliverableViewPreview() {
     val showErrorMessage = mutableStateOf(false)
     val errorMessage = mutableIntStateOf(0)
 
+    val deliverableWarningDialog = DeliverableWarningDialog()
+
     AddDeliverableView(
         originalDeliverableStateFlow = originalDeliverable,
         deliverableStateFlow = deliverableFlow,
@@ -1815,7 +1832,9 @@ fun AddDeliverableViewPreview() {
         deleteDeliverableClicked = {},
         updateTimeBlock = {},
         updateDeliverable = {},
-        dismissBottomSheet = {}
+        dismissBottomSheet = {},
+        updateDeliverableType = { _, _ -> },
+        deliverableWarningDialog = deliverableWarningDialog
     )
 }
 
@@ -1834,7 +1853,9 @@ fun AddDeliverableView(
     deleteDeliverableClicked: suspend () -> Unit,
     updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateDeliverable: suspend (Deliverable) -> Unit,
-    dismissBottomSheet: suspend () -> Unit
+    dismissBottomSheet: suspend () -> Unit,
+    updateDeliverableType: suspend (Deliverable,Task.TaskType) -> Unit,
+    deliverableWarningDialog: DeliverableWarningDialog
 ) {
     val scope = rememberCoroutineScope()
     val originalDeliverable by originalDeliverableStateFlow.collectAsStateWithLifecycle(null)
@@ -1885,6 +1906,7 @@ fun AddDeliverableView(
             }
 
             Column(modifier = Modifier.fillMaxSize()) {
+                deliverableWarningDialog.DeliverableWarningDialogView()
                 AnimatedVisibility(visible = showErrorMessage) {
                     Box(
                         modifier = Modifier
@@ -1962,6 +1984,44 @@ fun AddDeliverableView(
                             .fillMaxSize()
                             .padding(innerPadding)
                     ) {
+                        item { // Normal | Quantity | Time buttons
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(3.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                Task.TaskType.entries.forEach { boxType ->
+                                    Box(
+                                        modifier = Modifier
+                                            .testTag("TasksFragmentAddDeliverableViewTaskTypeButton-${boxType.name}")
+                                            .fillMaxWidth()
+                                            .weight(1f)
+                                            .height(TopAppBarDefaults.MediumAppBarCollapsedHeight) // makes it a big square
+                                            .testBackground(
+                                                if (Task.TaskType.valueOf(deliverable.type) == boxType) Color.Blue
+                                                else Color.LightGray,
+                                                shape = RectangleShape
+                                            )
+                                            .clickable {
+                                                scope.launch {
+                                                    updateDeliverableType(deliverable,boxType)
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = stringResource(boxType.stringRes),
+                                            color = Color.White,
+                                            fontSize = 16.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        item {
+                            Spacer(modifier = Modifier.width(2.dp))
+                        }
                         item {
                             OutlinedTextField(
                                 state = deliverableText,
@@ -2191,7 +2251,131 @@ fun AddDeliverableView(
                             }
                         }
                         item {
-                            Spacer(modifier = Modifier.width(2.dp))
+                            if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) !=
+                                Deliverable.DeliverableEndType.WORK
+                            ) {
+                                Spacer(modifier = Modifier.width(2.dp))
+                            }
+                        }
+                        item {// First Select The Work Type
+                            if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) !=
+                                Deliverable.DeliverableEndType.WORK
+                            ) {
+                                var showWorkTypeOptions by remember { mutableStateOf(false) }
+                                var workTypeOptions by remember { mutableStateOf(listOf<MenuItemData>()) }
+                                OutlinedButton(
+                                    modifier = Modifier
+                                        .testTag("TasksFragmentDeliverableWorkTypeButton")
+                                        .fillMaxWidth()
+                                        .padding(4.dp),
+                                    onClick = {
+                                        workTypeOptions = listOf(
+                                            MenuItemData(TaskDeliverable.WorkType.QuantityTaskOnce.name) {
+                                                scope.launch {
+                                                    updateDeliverable(
+                                                        deliverable.copy(
+                                                            workType = TaskDeliverable.WorkType.QuantityTaskOnce.name
+                                                        )
+                                                    )
+                                                }
+                                            },
+                                            MenuItemData(TaskDeliverable.WorkType.TimeTaskOnce.name) {
+                                                scope.launch {
+                                                    updateDeliverable(
+                                                        deliverable.copy(
+                                                            workType = TaskDeliverable.WorkType.TimeTaskOnce.name
+                                                        )
+                                                    )
+                                                }
+                                            },
+                                            MenuItemData(TaskDeliverable.WorkType.RepeatingTaskTimes.name) {
+                                                scope.launch {
+                                                    updateDeliverable(
+                                                        deliverable.copy(
+                                                            workType = TaskDeliverable.WorkType.RepeatingTaskTimes.name
+                                                        )
+                                                    )
+                                                }
+                                            },
+                                            MenuItemData(TaskDeliverable.WorkType.CompleteTasks.name) {
+                                                scope.launch {
+                                                    updateDeliverable(
+                                                        deliverable.copy(
+                                                            workType = TaskDeliverable.WorkType.CompleteTasks.name
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                        )
+                                        showWorkTypeOptions = true
+                                    },
+                                    shape = RectangleShape,
+                                    border = BorderStroke(1.dp, Color.DarkGray)
+                                ) {
+                                    if (showWorkTypeOptions) {
+                                        DropdownMenu(
+                                            expanded = true,
+                                            onDismissRequest = { showWorkTypeOptions = false },
+                                            modifier = Modifier.testTag("TasksFragmentDeliverableWorkTypeDropDownMenu")
+                                        ) {
+                                            workTypeOptions.forEach { option ->
+                                                DropdownMenuItem(
+                                                    modifier = Modifier.testTag("TasksFragmentDeliverableDropdownMenuItem-${option.text}"),
+                                                    text = { Text(option.text) },
+                                                    onClick = {
+                                                        option.onClick.invoke()
+                                                        showWorkTypeOptions = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                    when (TaskDeliverable.WorkType.valueOf(deliverable.workType)) {
+                                        TaskDeliverable.WorkType.QuantityTaskOnce -> {
+                                            Text(
+                                                stringResource(
+                                                    R.string.work_type_1_arg,
+                                                    TaskDeliverable.WorkType.QuantityTaskOnce.name
+                                                )
+                                            )
+                                        }
+
+                                        TaskDeliverable.WorkType.TimeTaskOnce -> {
+                                            Text(
+                                                stringResource(
+                                                    R.string.work_type_1_arg,
+                                                    TaskDeliverable.WorkType.TimeTaskOnce.name
+                                                )
+                                            )
+                                        }
+
+                                        TaskDeliverable.WorkType.RepeatingTaskTimes -> {
+                                            Text(
+                                                stringResource(
+                                                    R.string.work_type_1_arg,
+                                                    TaskDeliverable.WorkType.RepeatingTaskTimes.name
+                                                )
+                                            )
+                                        }
+
+                                        TaskDeliverable.WorkType.CompleteTasks -> {
+                                            Text(
+                                                stringResource(
+                                                    R.string.work_type_1_arg,
+                                                    TaskDeliverable.WorkType.CompleteTasks.name
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        item {
+                            if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) !=
+                                Deliverable.DeliverableEndType.GOAL
+                            ) {
+                                Spacer(modifier = Modifier.width(2.dp))
+                            }
                         }
                         item{
                             if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) !=

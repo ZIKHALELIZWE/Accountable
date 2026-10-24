@@ -29,6 +29,7 @@ import com.thando.accountable.AccountableComposeRobolectricTest
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
+import com.thando.accountable.database.tables.Deliverable
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.Task
@@ -39,6 +40,7 @@ import com.thando.accountable.fragments.viewmodels.TaskViewModel
 import com.thando.accountable.input_forms.DateAndTimePickerTest
 import com.thando.accountable.input_forms.TimeBlockTest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import org.junit.Assert.assertEquals
@@ -1530,7 +1532,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0])
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0])
 
         withTag("DeliverableAdderDialog") {
             assertExists()
@@ -1554,7 +1556,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             )
             finishProcesses()
         }
-        assertEquals(6L,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.quantity)
+        assertEquals(6L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.quantity)
         withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
             performTextReplacement("Jump a total of 20 times33")
             assertTextContains(
@@ -1564,13 +1566,13 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             )
             finishProcesses()
         }
-        assertEquals(20L,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.quantity)
+        assertEquals(20L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.quantity)
 
         withTag("DeliverableAdderDialogDismissButton") {
             performPressWithScroll()
         }
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
 
         withTag("DeliverableAdderDialog") {
             assertDoesNotExist()
@@ -1580,7 +1582,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0])
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0])
 
         withTag("DeliverableAdderDialog") {
             assertExists()
@@ -1603,7 +1605,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 ignoreCase = false
             )
         }
-        assertEquals(6L,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.quantity)
+        assertEquals(6L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.quantity)
         withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
             performTextReplacement("Jump a total of 20 times33")
             assertTextContains(
@@ -1612,13 +1614,13 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 ignoreCase = false
             )
         }
-        assertEquals(20L,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.quantity)
+        assertEquals(20L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.quantity)
 
         withTag("DeliverableAdderDialogOKButton") {
             performPressWithScroll()
         }
 
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
 
         withTag("DeliverableAdderDialog") {
             assertDoesNotExist()
@@ -1641,8 +1643,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
-        var deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
+        var deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -1661,15 +1663,15 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             deliverableId
         ).first())
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("DeliverablePickerDialog") {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -1686,8 +1688,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
             assertDoesNotExist()
@@ -1710,8 +1712,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -1730,15 +1732,15 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             deliverableId
         ).first())
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("DeliverablePickerDialog") {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -1765,7 +1767,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(emptyFlow<List<Deliverable>>(),taskViewModel.task.first()?.getDeliverablesList())
 
         withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
             assertDoesNotExist()
@@ -1778,6 +1780,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         withTag("TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.DELIVERABLE.name}") {
             performPressWithoutScroll()
         }
+
+        assertEquals(0,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("TasksFragmentAddTaskSelectDeliverableButton") {
             assertExists()
@@ -1796,8 +1800,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -1816,15 +1820,15 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             deliverableId
         ).first())
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("DeliverablePickerDialog") {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -2069,11 +2073,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         assertNotNull(tasksList)
         assertEquals(0, tasksList.size)
 
-        assertEquals(Goal.GoalTab.DELIVERABLES, Goal.GoalTab.valueOf(goal.selectedTab))
-        switchToTab(Goal.GoalTab.TASKS, taskViewModel, activity)
         goal = taskViewModel.goal.first()!!
         assertEquals(Goal.GoalTab.TASKS, Goal.GoalTab.valueOf(goal.selectedTab))
-
 
         withTag("TasksFragmentAddTextButton"){
             assertExists()
@@ -2324,7 +2325,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0])
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0])
 
         withTag("DeliverableAdderDialog") {
             assertExists()
@@ -2451,9 +2452,9 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         }
         finishProcesses()
 
-        assertEquals(2,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
 
-        var deliverable = taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[1]
+        var deliverable = taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]
         assertNotNull(deliverable)
         var deliverableDuration = Duration.between(
             Converters().toLocalDateTime(deliverable!!.initialDateTime).value,
@@ -2472,7 +2473,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
 
         withTag("DeliverableAdderDialog") {
             assertDoesNotExist()
@@ -2482,7 +2483,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0])
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0])
 
         withTag("DeliverableAdderDialog") {
             assertExists()
@@ -2609,9 +2610,9 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         }
         finishProcesses()
 
-        assertEquals(2,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
 
-        deliverable = taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[1]
+        deliverable = taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]
         assertNotNull(deliverable)
         deliverableDuration = Duration.between(
             Converters().toLocalDateTime(deliverable!!.initialDateTime).value,
@@ -2630,12 +2631,12 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertEquals(2,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
 
         withTag("DeliverableAdderDialog") {
             assertDoesNotExist()
         }
-/*
+
         withTag("TasksFragmentAddTaskSelectDeliverableButton") {
             assertExists()
             performScrollTo()
@@ -2653,8 +2654,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
-        var deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
+        var deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -2673,15 +2674,15 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             deliverableId
         ).first())
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("DeliverablePickerDialog") {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -2698,8 +2699,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithScroll()
         }
 
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
             assertDoesNotExist()
@@ -2722,8 +2723,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -2742,15 +2743,15 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             deliverableId
         ).first())
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("DeliverablePickerDialog") {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -2777,7 +2778,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             performPressWithoutScroll()
         }
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(emptyFlow<List<Deliverable>>(),taskViewModel.task.first()?.getDeliverablesList())
 
         withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
             assertDoesNotExist()
@@ -2790,6 +2791,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         withTag("TasksFragmentAddViewDropdownMenuItem-${Task.TaskEndType.DELIVERABLE.name}") {
             performPressWithoutScroll()
         }
+
+        assertEquals(0,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("TasksFragmentAddTaskSelectDeliverableButton") {
             assertExists()
@@ -2808,8 +2811,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityListNotSelected.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -2828,15 +2831,15 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             deliverableId
         ).first())
 
-        assertEquals(0,taskViewModel.task.first()?.deliverableQuantityListNotSelected?.first()?.size)
-        assertEquals(1,taskViewModel.task.first()?.deliverableQuantityList?.first()?.size)
+        assertEquals(0,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()?.size)
+        assertEquals(1,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
 
         withTag("DeliverablePickerDialog") {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.deliverableQuantityList?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.deliverableQuantityList.first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -2886,11 +2889,11 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             idsEqual = true,
             times = times,
             deliverablesLists = deliverablesLists
-        )*/
+        )
     }
 
-  /*  @Test
-    fun `13 Editing Quantity Deliverable Task`() = runMainTest {
+    @Test
+    fun `16 Editing Time Deliverable Task`() = runMainTest {
         val activity = getTestMainActivity()
 
         val taskViewModel: TaskViewModel = getViewModel(activity)
@@ -2939,22 +2942,109 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertHasClickAction()
         }
 
-        assertEquals(2L,taskViewModel.task.first()?.quantity)
-        withTag("TasksFragmentAddTaskNormalQuantityTimeTextField"){
+        withTag("TasksFragmentAddTaskNormalQuantityTimeTextField") {
             assertExists()
             performScrollTo()
             assertIsDisplayed()
             assertTextContains(
-                "Jump 2 times",
-                substring = true
+                value = "Run a total of",
+                substring = true,
+                ignoreCase = false
             )
-            performTextReplacement("Jump 3 times")
+            performTextReplacement("Walk a total of")
             assertTextContains(
-                "Jump 3 times",
-                substring = true
+                value = "Walk a total of",
+                substring = true,
+                ignoreCase = false
             )
         }
-        assertEquals(3L,taskViewModel.task.first()?.quantity)
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerDialog"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("EditGoalDurationPickerHourSlider"){
+            assertExists()
+            assertIsDisplayed()
+            assertEquals(
+                0f..23F,
+                fetchSemanticsNode().config[SliderRangeKey]
+            )
+            performSemanticsAction(SemanticsActions.SetProgress) { action ->
+                action(4F)
+            }
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerMinuteSlider"){
+            assertExists()
+            assertIsDisplayed()
+            assertEquals(
+                0f..59F,
+                fetchSemanticsNode().config[SliderRangeKey]
+            )
+            performSemanticsAction(SemanticsActions.SetProgress) { action ->
+                action(44F)
+            }
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerSaveAndCloseIconButton") {
+            assertExists()
+            assertIsDisplayed()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerDialog"){
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertTextContains(
+                value = "4 Hours and 44 Minutes",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeSecondField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "in the snow.",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("in the sand.")
+            assertTextContains(
+                value = "in the sand.",
+                substring = true,
+                ignoreCase = false
+            )
+            assertTextContains(
+                value = "Walk a total of 4 Hours and 44 Minutes in the sand.",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        val newTime = Converters().toLocalDateTime(taskViewModel.task.first()?.time).value
+        assertNotNull(newTime)
+        assertEquals(4,newTime!!.hour)
+        assertEquals(44, newTime.minute)
 
         withTag("TasksFragmentAddTaskViewLazyColumn"){
             assertExists()
@@ -2975,6 +3065,179 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 "At Home Location",
                 substring = true
             )
+        }
+
+        val deliverable = taskViewModel.task.first()?.getDeliverablesList()?.first()[0]
+        assertNotNull(deliverable)
+        val deliverableDuration = Duration.between(
+            Converters().toLocalDateTime(deliverable!!.initialDateTime).value,
+            Converters().toLocalDateTime(deliverable.time).value
+        )
+        assertEquals(
+            102L,
+            deliverableDuration.toHours()
+        )
+        assertEquals(
+            1L,
+            deliverableDuration.toMinutes() - deliverableDuration.toHours()*60
+        )
+
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
+        val deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
+
+        withTag("TasksFragmentAddTaskViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(deliverableId)
+        }
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverableId}") {
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performPressWithoutScroll()
+        }
+
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0])
+
+        withTag("DeliverableAdderDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "Run an accumulated total of",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("Walk an accumulated total of")
+            assertTextContains(
+                value = "Walk an accumulated total of",
+                substring = true,
+                ignoreCase = false
+            )
+            finishProcesses()
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerUnlimitedDialog"){
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("EditGoalDurationPickerHourTextField") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "102",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("0")
+            assertTextContains(
+                value = "0",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerMinuteTextField") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "1",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("62")
+            assertTextContains(
+                value = "62",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        withTag("EditGoalDurationPickerUnlimitedDurationText") {
+            assertExists()
+            assertIsDisplayed()
+            assertTextContains(
+                value = "1 Hour and 2 Minutes",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("EditGoalDurationPickerUnlimitedSaveAndCloseIconButton") {
+            assertExists()
+            assertIsDisplayed()
+            performPressWithoutScroll()
+        }
+
+        withTag("EditGoalTimeInputDurationPickerUnlimitedDialog"){
+            assertDoesNotExist()
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertTextContains(
+                value = "1 Hour and 2 Minutes",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+
+        withTag("TasksFragmentNormalQuantityTimeTextFieldTimeSecondField") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertTextContains(
+                value = ".",
+                substring = true,
+                ignoreCase = false
+            )
+            performTextReplacement("")
+            assertTextContains(
+                value = "",
+                substring = true,
+                ignoreCase = false
+            )
+            assertTextContains(
+                value = "Walk an accumulated total of 1 Hour and 2 Minutes",
+                substring = true,
+                ignoreCase = false
+            )
+        }
+        finishProcesses()
+
+        withTag("DeliverableAdderDialog") {
+            assertExists()
+            assertIsDisplayed()
+        }
+
+        withTag("DeliverableAdderDialogOKButton") {
+            performPressWithScroll()
+        }
+
+        assertEquals(1,taskViewModel.task.first()?.getDeliverablesList()?.first()?.size)
+
+        withTag("DeliverableAdderDialog") {
+            assertDoesNotExist()
         }
 
         val task = taskViewModel.task.first()
@@ -3023,7 +3286,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `14 Deleting Quantity Deliverable Task`() = runMainTest {
+    fun `17 Deleting Time Deliverable Task`() = runMainTest {
         val activity = getTestMainActivity()
         val taskViewModel: TaskViewModel = getViewModel(activity)
         assertNotNull(taskViewModel)
@@ -3066,7 +3329,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 ).first()
             )
         }
-    }*/
+    }
 
     /**
      * <h2><b>Types of work:</b></h2>
@@ -3081,7 +3344,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
      */
 
     @Test
-    fun `15 Adding Deliverable`() = runMainTest {
+    fun `18 Adding Deliverable`() = runMainTest {
         val activity = getTestMainActivity()
         val taskViewModel: TaskViewModel = getViewModel(activity)
         assertNotNull(taskViewModel)

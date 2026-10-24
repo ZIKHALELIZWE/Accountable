@@ -294,6 +294,7 @@
     <string name="end_type_2_arg">End Type: %1$s\n%2$s</string>
     <string name="end_type_without_args">End Type:</string>
     <string name="work">Work</string>
+    <string name="work_type_1_arg">Work Type: %1$s</string>
     <string name="edit_with_arg">Edit %1$s</string>
     <string name="time_created">Time Created:</string>
     <string name="days_ago">%1$s Days Ago</string>

@@ -19,9 +19,11 @@ import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.database.tables.TaskDeliverable
+import com.thando.accountable.database.tables.TaskDeliverable.WorkType
 import com.thando.accountable.ui.cards.ColourPickerDialog
 import com.thando.accountable.ui.cards.DeliverableAdderDialog
 import com.thando.accountable.ui.cards.DeliverablePickerDialog
+import com.thando.accountable.ui.cards.DeliverableWarningDialog
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +43,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     val colourPickerDialog = ColourPickerDialog()
     val addDeliverableDialog = DeliverableAdderDialog()
     val pickDeliverableDialog = DeliverablePickerDialog()
+    val deliverableWarningDialog = DeliverableWarningDialog()
 
     val originalTask = MutableStateFlow<Flow<Task?>?>(null)
     private val originalDeliverableState = MutableStateFlow<Flow<Deliverable?>?>(null)
@@ -286,6 +289,66 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         repository.update(deliverable)
     }
 
+    suspend fun updateDeliverableType(deliverable: Deliverable, newType: Task.TaskType) {
+        if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) == Deliverable.DeliverableEndType.WORK) {
+            when (newType) {
+                Task.TaskType.NORMAL -> { // End Type Is Quantity Or Time Work
+                    when(WorkType.valueOf(deliverable.workType)) {
+                        WorkType.QuantityTaskOnce,
+                        WorkType.TimeTaskOnce -> {
+                            val warningTaskDeliverables = mutableListOf<TaskDeliverable>()
+                            deliverable.taskDeliverables.first().forEach { taskDeliverable ->
+                                when(WorkType.valueOf(taskDeliverable.workType)){
+                                    WorkType.QuantityTaskOnce,
+                                    WorkType.TimeTaskOnce -> {
+                                        warningTaskDeliverables.add(taskDeliverable)
+                                    }
+                                    else -> {}
+                                }
+                            }
+                            if (warningTaskDeliverables.isNotEmpty()) {
+                                // TODO add warningTaskDeliverables list to showWarning params
+                                deliverableWarningDialog.showWarning(
+                                    repository.getDeliverable(deliverable.deliverableId),
+                                    newType,
+                                    ::updateDeliverable
+                                )
+                            }
+                            else repository.update(deliverable.copy(type = newType.name))
+                        }
+                        else -> repository.update(deliverable.copy(type = newType.name))
+                    }
+                }
+
+                Task.TaskType.QUANTITY -> { // End Type Is Time Work
+                    when(WorkType.valueOf(deliverable.workType)) {
+                        WorkType.TimeTaskOnce -> {
+                            deliverableWarningDialog.showWarning(
+                                repository.getDeliverable(deliverable.deliverableId),
+                                newType,
+                                ::updateDeliverable
+                            )
+                        }
+                        else -> repository.update(deliverable.copy(type = newType.name))
+                    }
+                }
+
+                Task.TaskType.TIME -> { // End Type Is Quantity Work
+                    when(WorkType.valueOf(deliverable.workType)) {
+                        WorkType.QuantityTaskOnce -> {
+                            deliverableWarningDialog.showWarning(
+                                repository.getDeliverable(deliverable.deliverableId),
+                                newType,
+                                ::updateDeliverable
+                            )
+                        }
+                        else -> repository.update(deliverable.copy(type = newType.name))
+                    }
+                }
+            }
+        }
+    }
+
     suspend fun updateTask(task: Task) {
         repository.update(task)
     }
@@ -310,10 +373,15 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                     position = repository.getDeliverables(
                         task.parent
                     ).first().size.toLong(),
+                    type = task.type,
                     location = task.location,
                     taskId = task.taskId,
                     endType = Deliverable.DeliverableEndType.WORK.name,
-                    workType = TaskDeliverable.WorkType.QuantityTaskOnce.name
+                    workType = when(Task.TaskType.valueOf(task.type)){
+                        Task.TaskType.NORMAL -> WorkType.RepeatingTaskTimes.name
+                        Task.TaskType.QUANTITY -> WorkType.QuantityTaskOnce.name
+                        Task.TaskType.TIME -> WorkType.TimeTaskOnce.name
+                    }
                 )
             ))
             addDeliverableDialog.addDeliverable(
@@ -321,7 +389,20 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                 deliverable = inputDeliverable,
                 updateDeliverable = ::updateDeliverable,
                 triedToSave = triedToSave,
-                deleteDeliverable = ::deleteDeliverable,
+                deleteDeliverable = ::deleteDeliverable
+            )
+        }
+    }
+
+    suspend fun editTaskDeliverable(deliverableToEdit: Deliverable) {
+        task.first()?.let { task ->
+            val inputDeliverable = repository.getDeliverable(deliverableToEdit.deliverableId)
+            addDeliverableDialog.addDeliverable(
+                inputTaskType = Task.TaskType.valueOf(task.type),
+                deliverable = inputDeliverable,
+                updateDeliverable = ::updateDeliverable,
+                triedToSave = triedToSave,
+                deleteDeliverable = ::deleteDeliverable
             )
         }
     }
@@ -760,7 +841,8 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                     position = repository.getDeliverables(
                         goal.id?:return
                     ).first().size.toLong(),
-                    location = goal.location
+                    location = goal.location,
+                    type = Task.TaskType.NORMAL.name
                 )))
             }?:return
             saveDeliverable()

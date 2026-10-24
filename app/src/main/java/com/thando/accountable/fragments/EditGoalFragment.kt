@@ -262,6 +262,7 @@ fun EditGoalView(
                     deleteTimeBlock = viewModel::deleteTimeBlock,
                     updateTimeBlock = viewModel::updateTimeBlock,
                     updateDeliverable = viewModel::updateDeliverable,
+                    updateDeliverableType = viewModel::updateDeliverableType,
                     deleteTaskClicked = viewModel::deleteTaskClicked,
                     originalTask = viewModel.originalTaskState,
                     task = viewModel.task,
@@ -278,7 +279,9 @@ fun EditGoalView(
                     selectTaskDeliverable = null,
                     pickDeliverableDialog = viewModel.pickDeliverableDialog,
                     deselectTaskDeliverable = {},
-                    deselectAllTaskDeliverables = {}
+                    deselectAllTaskDeliverables = {},
+                    editTaskDeliverable = null,
+                    deliverableWarningDialog = viewModel.deliverableWarningDialog
                 )
             }
         }

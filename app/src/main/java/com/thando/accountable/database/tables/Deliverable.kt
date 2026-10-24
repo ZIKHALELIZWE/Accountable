@@ -88,7 +88,10 @@ data class Deliverable (
     var workType: String = TaskDeliverable.WorkType.CompleteTasks.name,
 
     @ColumnInfo (name = "deliverable_should_complete_work")
-    var shouldCompleteWork: Boolean = true
+    var shouldCompleteWork: Boolean = true,
+
+    @ColumnInfo (name = "deliverable_type")
+    var type: String //TaskType
 ) {
     enum class DeliverableEndType(val resString: Int) {
         UNDEFINED(R.string.undefined),
