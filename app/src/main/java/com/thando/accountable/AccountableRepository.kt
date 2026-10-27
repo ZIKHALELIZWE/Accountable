@@ -2155,6 +2155,61 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
+    suspend fun cloneTaskDeliverablesTo(
+        toId: Long?,
+        fromTaskDeliverables : List<TaskDeliverable>,
+        toTaskDeliverables : List<TaskDeliverable>,
+        isTask:Boolean,
+        setCloneId: Boolean
+    ) {
+        fromTaskDeliverables.let { fromTaskDeliverables ->
+            toTaskDeliverables.forEach { toTaskDeliverable ->
+                // Delete the ones that are not in from (originally in to)
+                if (
+                    !fromTaskDeliverables.any { fromTaskDeliverable ->
+                        if (isTask) toTaskDeliverable.taskId == fromTaskDeliverable.cloneId
+                        else toTaskDeliverable.deliverableId == fromTaskDeliverable.cloneId
+                    }
+                ) {
+                    dao.delete(toTaskDeliverable)
+                }
+            }
+
+            for (taskDeliverable in fromTaskDeliverables) {
+                toId?.let { id ->
+                    var newTaskDeliverable = toTaskDeliverables
+                        .find { toTaskDeliverable -> if (isTask) {
+                            toTaskDeliverable.taskId == taskDeliverable.cloneId
+                        }
+                        else {
+                            toTaskDeliverable.deliverableId == taskDeliverable.cloneId
+                        }
+                    }
+                    if (newTaskDeliverable == null) {
+                        newTaskDeliverable = TaskDeliverable(
+                            taskId = if (isTask) id else taskDeliverable.taskId,
+                            deliverableId = if (isTask) taskDeliverable.deliverableId else id,
+                        )
+                    } else {
+                        newTaskDeliverable.taskId = if (isTask) id else taskDeliverable.taskId
+                        newTaskDeliverable.deliverableId = if (isTask) taskDeliverable.deliverableId else id
+                    }
+
+                    newTaskDeliverable.percentage = taskDeliverable.percentage
+                    newTaskDeliverable.startDate = taskDeliverable.startDate
+                    newTaskDeliverable.streak = taskDeliverable.streak
+                    newTaskDeliverable.workType = taskDeliverable.workType
+
+                    if (setCloneId) {
+                        newTaskDeliverable.cloneId = if (isTask) taskDeliverable.taskId else taskDeliverable.deliverableId
+                    }
+
+                    upsert(newTaskDeliverable)
+                }
+            }
+        }
+    }
+
     suspend fun clearNewGoal() {
         withContext(MainActivity.IO) {
             newGoal.value?.first()?.let {
@@ -2214,51 +2269,19 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                 if (to.taskId == null) to.taskId = saveTask(to)
 
-                // clone TaskDeliverables
-                from.taskDeliverableList.first().let { fromTaskDeliverables ->
-                    to.taskDeliverableList.first().forEach { toTaskDeliverable ->
-                        // Delete the ones that are not in from (originally in to)
-                        if (
-                            !fromTaskDeliverables.any { fromDeliverable ->
-                                toTaskDeliverable.deliverableId == fromDeliverable.cloneId
-                            }
-                        ) {
-                            dao.delete(toTaskDeliverable)
-                        }
-                    }
-
-                    for (taskDeliverable in fromTaskDeliverables) {
-                        to.taskId?.let { id ->
-                            var newTaskDeliverable = to.taskDeliverableList.first()
-                                .find { toTaskDeliverable ->
-                                    toTaskDeliverable.taskId == taskDeliverable.cloneId
-                                            && toTaskDeliverable.deliverableId == taskDeliverable.deliverableId
-                                }
-                            if (newTaskDeliverable == null) {
-                                newTaskDeliverable = TaskDeliverable(
-                                    taskId = id,
-                                    deliverableId = taskDeliverable.deliverableId
-                                )
-                                upsert(newTaskDeliverable)
-                            }
-
-                            val fromMutable: MutableStateFlow<Flow<TaskDeliverable?>?> = MutableStateFlow(getTaskDeliverable( taskDeliverable.taskId, taskDeliverable.deliverableId))
-                            val toMutable: MutableStateFlow<Flow<TaskDeliverable?>?> = MutableStateFlow(getTaskDeliverable( newTaskDeliverable.taskId, newTaskDeliverable.deliverableId))
-                            cloneTaskDeliverableTo(
-                                fromMutable,
-                                toMutable,
-                                setCloneId,
-                                true
-                            )
-                        }
-                    }
-                }
-
                 cloneTimesTo(
                     to.taskId,
                     from.times.first(),
                     to.times.first(),
                     GoalTaskDeliverableTime.TimesType.TASK,
+                    setCloneId
+                )
+
+                cloneTaskDeliverablesTo(
+                    to.taskId,
+                    from.taskDeliverableList.first(),
+                    to.taskDeliverableList.first(),
+                    true,
                     setCloneId
                 )
 
@@ -2321,6 +2344,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 if (cloneParent) to.parent = from.parent
                 to.position = from.position
                 to.type = from.type
+                to.workType = from.workType
                 to.initialDateTime = from.initialDateTime
                 to.endDateTime = from.endDateTime
                 to.endType = from.endType
@@ -2329,6 +2353,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.status = from.status
                 to.location = from.location
                 to.size = from.size
+                to.time = from.time
                 to.numImages = from.numImages
                 to.numVideos = from.numVideos
                 to.numAudios = from.numAudios
@@ -2345,6 +2370,14 @@ class AccountableRepository(val application: Application): AutoCloseable {
                     inputFrom.value!!.first()!!.times,
                     inputTo.value!!.first()!!.times,
                     GoalTaskDeliverableTime.TimesType.DELIVERABLE,
+                    setCloneId
+                )
+
+                cloneTaskDeliverablesTo(
+                    to.deliverableId,
+                    inputFrom.value!!.first()!!.taskDeliverables,
+                    inputTo.value!!.first()!!.taskDeliverables,
+                    false,
                     setCloneId
                 )
 
@@ -2463,6 +2496,12 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun deleteTaskDeliverable(taskId: Long, deliverableId: Long) {
         getTaskDeliverable(taskId,deliverableId).first()?.let { dao.delete(it) }
+    }
+
+    suspend fun deleteTaskDeliverable(taskId: Long?) {
+        dao.getTaskTaskDeliverables(taskId).first().forEach {
+            dao.delete(it)
+        }
     }
 
     fun getGoal(goalId: Long?): Flow<Goal?> = dao.getGoal(goalId).map { goal ->

@@ -517,7 +517,10 @@ fun TasksFragmentView(
                 }
             }
             GoalTab.DELIVERABLES -> {
-                items(items = deliverablesList) { deliverable ->
+                items(
+                    items = deliverablesList,
+                    key = {"TasksFragmentDeliverableCardViewCard-${it.deliverable.deliverableId}"}
+                ) { deliverable ->
                     DeliverableCardView(
                         deliverable,
                         viewModel::editDeliverable,
@@ -1638,7 +1641,6 @@ fun DeliverableCardView(
     onClick: suspend (Deliverable) -> Unit = { _ -> }
 ){
     val scope = rememberCoroutineScope()
-    //val taskDeliverables by deliverable.taskDeliverableList.collectAsStateWithLifecycle(emptyList())
 
     Card(
         modifier = modifier
@@ -1965,7 +1967,9 @@ fun AddDeliverableView(
                                 )
                             },
                             navigationIcon = {
-                                IconButton(onClick = {
+                                IconButton(
+                                    modifier = Modifier.testTag("TasksFragmentDeliverableBackButton"),
+                                    onClick = {
                                     scope.launch { dismissBottomSheet() }
                                 }) {
                                     MainActivity.Icon(
@@ -2391,7 +2395,7 @@ fun AddDeliverableView(
                                 Spacer(modifier = Modifier.width(2.dp))
                             }
                         }
-                        item{
+                        item(key = "TasksFragmentDeliverableSwitch"){
                             if (Deliverable.DeliverableEndType.valueOf(deliverable.deliverable.endType) !=
                                 Deliverable.DeliverableEndType.GOAL
                             ) {
@@ -2416,7 +2420,7 @@ fun AddDeliverableView(
                         item {
                             Spacer(modifier = Modifier.width(2.dp))
                         }
-                        stickyHeader {
+                        stickyHeader(key = "TasksFragmentDeliverableAddTimeBlockButton") {
                             Button(
                                 onClick = { scope.launch { addTimeBlock() } },
                                 modifier = Modifier

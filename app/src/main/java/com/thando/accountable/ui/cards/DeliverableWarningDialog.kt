@@ -102,6 +102,7 @@ class DeliverableWarningDialog {
             )) }
             showDeliverableWarningDialog.value = false
         }
+        showDeliverableWarningDialog.value = true
     }
 
     @Composable
@@ -116,6 +117,7 @@ class DeliverableWarningDialog {
             val onDismiss by onDismiss.collectAsStateWithLifecycle()
             val saveAndClose by saveAndClose.collectAsStateWithLifecycle()
             val scope = rememberCoroutineScope()
+
             Dialog(
                 onDismissRequest = {
                     scope.launch {

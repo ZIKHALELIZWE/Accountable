@@ -41,6 +41,13 @@ class TimeBlockTest(
 ) {
     @Test
     fun `01 Add Time Button Exists`() = runMainTest {
+        lazyColumnTag?.let { lazyColumnTag ->
+            withTag(lazyColumnTag) {
+                assertExists()
+                assertIsDisplayed()
+                performScrollToKey(addTimeBlockButtonTag)
+            }
+        }
         withTag(addTimeBlockButtonTag){
             assertExists()
             performScrollTo()

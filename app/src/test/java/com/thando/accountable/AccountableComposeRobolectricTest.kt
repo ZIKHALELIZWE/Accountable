@@ -32,6 +32,7 @@ import com.thando.accountable.MainActivityTest.Log
 import com.thando.accountable.database.tables.DeliverableWithLists
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Task
+import com.thando.accountable.database.tables.TaskDeliverable
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -213,12 +214,42 @@ abstract class AccountableComposeRobolectricTest(
         }
     }
 
+    fun taskDeliverablesAreEqual(
+        timeOne: TaskDeliverable,
+        timeTwo: TaskDeliverable,
+        idsEqual:Boolean = true,
+        parentsEqual: Boolean = true
+    ) = runMainTest {
+        val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
+            {objectA, objectB -> assertEquals(objectA,objectB)}
+        else {objectA, objectB -> assertNotEquals(objectA,objectB)}
+
+        if (parentsEqual) assertionFunction(timeOne.taskId,timeTwo.taskId)
+        else assertNotEquals(timeOne.taskId,timeTwo.taskId)
+
+        if (idsEqual) assertionFunction(timeOne.deliverableId,timeTwo.deliverableId)
+        else assertNotEquals(timeOne.deliverableId,timeTwo.deliverableId)
+
+        assertEquals(timeOne.percentage,timeTwo.percentage)
+
+        assertEquals(timeOne.startDate,timeTwo.startDate)
+
+        assertEquals(timeOne.streak,timeTwo.streak)
+
+        assertEquals(timeOne.workType,timeTwo.workType)
+
+        if (!idsEqual && parentsEqual) {
+            assertEquals(timeOne.taskId,timeTwo.cloneId)
+        }
+    }
+
     fun deliverablesAreEqual(
         deliverableOne: DeliverableWithLists,
         deliverableTwo: DeliverableWithLists,
         idsEqual:Boolean = true,
         parentsEqual:Boolean = true,
-        times:List<GoalTaskDeliverableTime>? = null
+        times:List<GoalTaskDeliverableTime>? = null,
+        taskIdsEqual: Boolean
     ) = runMainTest {
         val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
             {objectA, objectB -> assertEquals(objectA,objectB)}
@@ -235,8 +266,8 @@ abstract class AccountableComposeRobolectricTest(
         )
 
         assertEquals(
-            deliverableOne.deliverable,
-            deliverableTwo.deliverable
+            deliverableOne.deliverable.deliverable,
+            deliverableTwo.deliverable.deliverable
         )
         assertEquals(
             deliverableOne.deliverable.location,
@@ -247,12 +278,24 @@ abstract class AccountableComposeRobolectricTest(
             deliverableTwo.deliverable.endDateTime
         )
         assertEquals(
+            deliverableOne.deliverable.time,
+            deliverableTwo.deliverable.time
+        )
+        assertEquals(
             deliverableOne.deliverable.status,
             deliverableTwo.deliverable.status
         )
         assertEquals(
             deliverableOne.deliverable.endType,
             deliverableTwo.deliverable.endType
+        )
+        assertEquals(
+            deliverableOne.deliverable.type,
+            deliverableTwo.deliverable.type
+        )
+        assertEquals(
+            deliverableOne.deliverable.workType,
+            deliverableTwo.deliverable.workType
         )
         if (parentsEqual) assertEquals(
             deliverableOne.deliverable.parent,
@@ -279,23 +322,57 @@ abstract class AccountableComposeRobolectricTest(
                 parentsEqual = parentsEqual
             )
         }
+
+        if (taskIdsEqual) { // Do not test if being fetched from edit task. nested complications
+            assertEquals(
+                deliverableOne.taskDeliverables.size,
+                deliverableTwo.taskDeliverables.size
+            )
+
+            val taskDeliverablesTwoList = deliverableTwo.taskDeliverables
+
+            (deliverableOne.taskDeliverables).forEachIndexed { index, taskDeliverableOne ->
+                val taskDeliverableTwo = taskDeliverablesTwoList[index]
+                taskDeliverablesAreEqual(
+                    taskDeliverableOne,
+                    taskDeliverableTwo,
+                    idsEqual = idsEqual,
+                    parentsEqual = taskIdsEqual
+                )
+            }
+        }
     }
 
     suspend fun getTaskDeliverablesLists(
         task: Task
-    ): Triple<List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>, List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>, List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>> {
+    ): Triple<List<DeliverableWithLists>, List<DeliverableWithLists>, List<DeliverableWithLists>> {
         val deliverablesNormal = task.deliverableNormalList.first()
         val deliverablesQuantity = task.deliverableQuantityList.first()
         val deliverablesTime = task.deliverableTimeList.first()
 
-        val deliverableTimesNormal = mutableListOf<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>()
-        deliverablesNormal.forEach { deliverableTimesNormal.add(it to it.times) }
+        val deliverableTimesNormal = mutableListOf<DeliverableWithLists>()
+        deliverablesNormal.forEach {
+            val newList = it.taskDeliverables.filter { tD -> tD.taskId == task.taskId }
+            it.taskDeliverables.clear()
+            it.taskDeliverables.addAll(newList)
+            deliverableTimesNormal.add(it)
+        }
 
-        val deliverableTimesQuantity = mutableListOf<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>()
-        deliverablesQuantity.forEach { deliverableTimesQuantity.add(it to it.times) }
+        val deliverableTimesQuantity = mutableListOf<DeliverableWithLists>()
+        deliverablesQuantity.forEach {
+            val newList = it.taskDeliverables.filter { tD -> tD.taskId == task.taskId }
+            it.taskDeliverables.clear()
+            it.taskDeliverables.addAll(newList)
+            deliverableTimesQuantity.add(it)
+        }
 
-        val deliverableTimesTime = mutableListOf<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>()
-        deliverablesTime.forEach { deliverableTimesTime.add(it to it.times) }
+        val deliverableTimesTime = mutableListOf<DeliverableWithLists>()
+        deliverablesTime.forEach {
+            val newList = it.taskDeliverables.filter { tD -> tD.taskId == task.taskId }
+            it.taskDeliverables.clear()
+            it.taskDeliverables.addAll(newList)
+            deliverableTimesTime.add(it)
+        }
 
         return Triple(
             deliverableTimesNormal.toList(),
@@ -348,7 +425,7 @@ abstract class AccountableComposeRobolectricTest(
         taskTwo: Task,
         idsEqual: Boolean = true,
         times: List<GoalTaskDeliverableTime>? = null,
-        deliverablesLists: Triple<List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>, List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>, List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>>? = null
+        deliverablesLists: Triple<List<DeliverableWithLists>, List<DeliverableWithLists>, List<DeliverableWithLists>>? = null
     ) = runMainTest {
         val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
             {objectA, objectB -> assertEquals(objectA,objectB)}
@@ -454,14 +531,15 @@ abstract class AccountableComposeRobolectricTest(
 
         val deliverablesNormalTwoList = taskTwo.deliverableNormalList.first()
         if (deliverablesLists?.first != null) {
-            deliverablesLists.first.forEachIndexed { index, pair ->
+            deliverablesLists.first.forEachIndexed { index, deliverableWithLists ->
                 val deliverableTwo = deliverablesNormalTwoList[index]
                 deliverablesAreEqual(
-                    pair.first,
+                    deliverableWithLists,
                     deliverableTwo,
                     idsEqual = true,
                     parentsEqual = true,
-                    times = pair.second
+                    times = deliverableWithLists.times,
+                    taskIdsEqual = idsEqual
                 )
             }
         } else {
@@ -471,21 +549,23 @@ abstract class AccountableComposeRobolectricTest(
                     deliverableOne,
                     deliverableTwo,
                     idsEqual = true,
-                    parentsEqual = true
+                    parentsEqual = true,
+                    taskIdsEqual = idsEqual
                 )
             }
         }
 
         val deliverablesQuantityTwoList = taskTwo.deliverableQuantityList.first()
         if (deliverablesLists?.second != null) {
-            deliverablesLists.second.forEachIndexed { index, pair ->
+            deliverablesLists.second.forEachIndexed { index, deliverableWithLists ->
                 val deliverableTwo = deliverablesQuantityTwoList[index]
                 deliverablesAreEqual(
-                    pair.first,
+                    deliverableWithLists,
                     deliverableTwo,
                     idsEqual = true,
                     parentsEqual = true,
-                    times = pair.second
+                    times = deliverableWithLists.times,
+                    taskIdsEqual = idsEqual
                 )
             }
         } else {
@@ -495,21 +575,23 @@ abstract class AccountableComposeRobolectricTest(
                     deliverableOne,
                     deliverableTwo,
                     idsEqual = true,
-                    parentsEqual = true
+                    parentsEqual = true,
+                    taskIdsEqual = idsEqual
                 )
             }
         }
 
         val deliverablesTimeTwoList = taskTwo.deliverableTimeList.first()
         if (deliverablesLists?.third != null) {
-            deliverablesLists.third.forEachIndexed { index, pair ->
+            deliverablesLists.third.forEachIndexed { index, deliverableWithLists ->
                 val deliverableTwo = deliverablesTimeTwoList[index]
                 deliverablesAreEqual(
-                    pair.first,
+                    deliverableWithLists,
                     deliverableTwo,
                     idsEqual = true,
                     parentsEqual = true,
-                    times = pair.second
+                    times = deliverableWithLists.times,
+                    taskIdsEqual = idsEqual
                 )
             }
         } else {
@@ -519,7 +601,8 @@ abstract class AccountableComposeRobolectricTest(
                     deliverableOne,
                     deliverableTwo,
                     idsEqual = true,
-                    parentsEqual = true
+                    parentsEqual = true,
+                    taskIdsEqual = idsEqual
                 )
             }
         }

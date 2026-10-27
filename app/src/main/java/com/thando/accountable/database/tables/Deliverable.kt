@@ -108,7 +108,7 @@ data class DeliverableWithLists(
         parentColumn = "deliverableId",
         entityColumn = "deliverableId"
     )
-    val taskDeliverables: List<TaskDeliverable> = emptyList(),
+    val taskDeliverables: MutableList<TaskDeliverable> = mutableListOf(),
 
     @Relation(
         entity = GoalTaskDeliverableTime::class,

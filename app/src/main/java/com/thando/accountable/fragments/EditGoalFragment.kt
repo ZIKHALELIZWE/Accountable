@@ -861,7 +861,8 @@ fun EditGoalFragmentView(
                                     .weight(4f).fillMaxSize()
                                     .testTag("TasksFragmentDeliverableCard-${deliverable.deliverable.deliverableId}")
                                     .padding(3.dp)
-                                    .wrapContentHeight()
+                                    .wrapContentHeight(),
+                                editOnClick = true
                             )
                             IconButton(
                                 modifier = Modifier
@@ -963,7 +964,7 @@ fun EditGoalFragmentView(
                 item {
                     Spacer(modifier = Modifier.width(2.dp))
                 }
-                stickyHeader(key = "EditGoalFragmentStickyAddGoalTimeBlockButton") {
+                stickyHeader(key = "EditGoalAddTimeBlockButton") {
                     Button(
                         onClick = { scope.launch { viewModel.addTimeBlock() } },
                         modifier = Modifier

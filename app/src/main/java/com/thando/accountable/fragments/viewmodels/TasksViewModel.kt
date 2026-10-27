@@ -623,6 +623,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         ) {
             deliverable.value?.first()?.let { deliverable ->
                 deliverable.deliverable.deliverableId = repository.saveDeliverable(deliverable.deliverable)
+                deliverable.times.forEach { repository.saveGoalTaskDeliverableTime(it) }
             }
         }
 
@@ -641,6 +642,9 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>
         ) {
             deliverable.value?.first()?.let { deliverable ->
+                deliverable.taskDeliverables.forEach {
+                    repository.deleteTaskDeliverable(it.taskId,it.deliverableId)
+                }
                 deliverable.times.forEach {
                     repository.deleteGoalTaskDeliverableTime(it)
                 }
@@ -653,9 +657,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             task: MutableStateFlow<Flow<Task?>?>
         ) {
             task.value?.first()?.let { task ->
-                task.taskDeliverableList.first().forEach {
-                    repository.deleteTaskDeliverable(it.taskId,it.deliverableId)
-                }
+                repository.deleteTaskDeliverable(task.taskId)
                 task.times.first().forEach {
                     repository.deleteGoalTaskDeliverableTime(it)
                 }

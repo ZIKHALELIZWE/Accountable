@@ -1508,6 +1508,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.deliverable.first()?.deliverable?.endType
         )
 
+        withTag("TasksFragmentAddDeliverableViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentDeliverableSwitch")
+        }
+
         withTag("TasksFragmentDeliverableSwitch") {
             assertExists()
             performScrollTo()
@@ -1691,7 +1697,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
                 instantTaskExecutorRule,
                 composeTestRule,
                 activity
-            )
+            ),
+            lazyColumnTag = "TasksFragmentAddDeliverableViewLazyColumn"
         ).runTests(this@EditGoalTests::class)
     }
 
@@ -1746,7 +1753,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         deliverablesAreEqual(
             savedDeliverable,
             databaseDeliverable,
-            times = savedTimes
+            times = savedTimes,
+            taskIdsEqual = true
         )
         assertEquals(1, savedDeliverable.times.size)
     }
@@ -1839,7 +1847,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         deliverablesAreEqual(
             editGoalViewModel.originalDeliverable.first()!!,
             editGoalViewModel.deliverable.first()!!,
-            false
+            false,
+            taskIdsEqual = true
         )
 
         assertNotNull(editGoalViewModel.originalDeliverable.first()?.times[0])
@@ -1935,7 +1944,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         deliverablesAreEqual(
             editGoalViewModel.originalDeliverable.first()!!,
             editGoalViewModel.deliverable.first()!!,
-            false
+            false,
+            taskIdsEqual = true
         )
 
         assertNotNull(editGoalViewModel.deliverable.first()?.times[0])
@@ -1944,6 +1954,13 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNotNull(oldTime.id)
 
         finishProcesses()
+
+        withTag("TasksFragmentAddDeliverableViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey(oldTime.id!!)
+        }
+
         withTag("EditGoalTimeInputViewCard-${oldTime.id}"){
             assertExists()
             performScrollTo()
@@ -2051,7 +2068,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         deliverablesAreEqual(
             editGoalViewModel.originalDeliverable.first()!!,
             editGoalViewModel.deliverable.first()!!,
-            false
+            false,
+            taskIdsEqual = true
         )
 
         assertNotNull(editGoalViewModel.deliverable.first()!!.deliverable.goalId)
@@ -2164,12 +2182,6 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
 
         assertNotNull(editGoalViewModel.newGoal.first()?.times)
 
-        withTag("EditGoalLazyColumn") {
-            assertExists()
-            assertIsDisplayed()
-            performScrollToKey("EditGoalFragmentStickyAddGoalTimeBlockButton")
-        }
-
         TimeBlockTest(
             "EditGoalAddTimeBlockButton",
             {editGoalViewModel.newGoal.first()!!.times.first()},
@@ -2276,7 +2288,8 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
                 deliverableOne,
                 deliverableTwo,
                 idsEqual = idsEqual,
-                parentsEqual = idsEqual
+                parentsEqual = idsEqual,
+                taskIdsEqual = true
             )
         }
 

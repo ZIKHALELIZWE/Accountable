@@ -23,8 +23,8 @@ import java.time.LocalDateTime
     ],
 )
 data class TaskDeliverable (
-    val taskId: Long,
-    val deliverableId:Long,
+    var taskId: Long,
+    var deliverableId:Long,
 
     @ColumnInfo(name = "percentage")
     var percentage: Float? = null,
