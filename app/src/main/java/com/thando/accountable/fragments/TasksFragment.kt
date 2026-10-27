@@ -107,6 +107,7 @@ import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
+import com.thando.accountable.database.tables.DeliverableWithLists
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.Goal.GoalTab
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
@@ -326,8 +327,8 @@ fun TaskDeliverableMarkerBottomSheet(
     originalTask: MutableStateFlow<Flow<Task?>?>?=null,
     task: Flow<Task?>?=null,
     deleteDeliverableClicked: (suspend () -> Unit)?=null,
-    originalDeliverable: Flow<Deliverable?>?=null,
-    deliverable: Flow<Deliverable?>?=null,
+    originalDeliverable: Flow<DeliverableWithLists?>?=null,
+    deliverable: Flow<DeliverableWithLists?>?=null,
     parentGoal: Flow<Goal?>,
     deleteMarkerClicked: (suspend () -> Unit)?=null,
     originalMarker: MutableStateFlow<Flow<Marker?>?>?=null,
@@ -341,7 +342,7 @@ fun TaskDeliverableMarkerBottomSheet(
     deselectTaskDeliverable: suspend (Deliverable) -> Unit,
     deselectAllTaskDeliverables: suspend () -> Unit,
     editTaskDeliverable: (suspend (Deliverable) -> Unit)?,
-    updateDeliverableType: suspend (Deliverable, Task.TaskType) -> Unit
+    updateDeliverableType: suspend (DeliverableWithLists, Task.TaskType) -> Unit
 ){
     val scope = rememberCoroutineScope()
     val bottomSheetType by bottomSheetTypeState.collectAsStateWithLifecycle()
@@ -572,7 +573,8 @@ fun TaskCardView(
     task: Task,
     editTask: suspend (Task) -> Unit,
     modifier: Modifier,
-    editOnClick: Boolean = false
+    editOnClick: Boolean = false,
+    onClick: suspend (Task) -> Unit = { _ -> }
 ){
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -596,6 +598,7 @@ fun TaskCardView(
             .combinedClickable(
                 onClick = {
                     if (editOnClick) scope.launch { editTask(task) }
+                    else scope.launch { onClick(task) }
                 },
                 onLongClick = {
                     if (!editOnClick) scope.launch { editTask(task) }
@@ -853,11 +856,11 @@ fun AddTaskView(
             }
         }
 
-        var notSelectedTaskDeliverablesState by remember { mutableStateOf<Flow<List<Deliverable>>>(
+        var notSelectedTaskDeliverablesState by remember { mutableStateOf<Flow<List<DeliverableWithLists>>>(
             emptyFlow()
         ) }
 
-        var selectedTaskDeliverablesState by remember { mutableStateOf<Flow<List<Deliverable>>>(
+        var selectedTaskDeliverablesState by remember { mutableStateOf<Flow<List<DeliverableWithLists>>>(
             emptyFlow()
         ) }
 
@@ -1283,23 +1286,24 @@ fun AddTaskView(
                         item {
                             Spacer(modifier = Modifier.width(2.dp))
                         }
-                        items(items = selectedTaskDeliverables, key = {it.deliverableId?:Random.nextLong()}) { deliverable ->
+                        items(items = selectedTaskDeliverables, key = {it.deliverable.deliverableId?:Random.nextLong()}) { deliverable ->
                             Column(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 DeliverableCardView(
                                     deliverable,
                                     { deliverableToEdit -> scope.launch { editDeliverable?.invoke(deliverableToEdit) } },
-                                    Modifier
+                                    Modifier,
+                                    editOnClick = true
                                 )
                                 Button(
                                     onClick = {
                                         scope.launch {
-                                            deselectTaskDeliverable(deliverable)
+                                            deselectTaskDeliverable(deliverable.deliverable)
                                         }
                                     },
                                     modifier = Modifier
-                                        .testTag("TasksFragmentAddTaskTaskDeliverableDeselectButton-${deliverable.deliverableId}")
+                                        .testTag("TasksFragmentAddTaskTaskDeliverableDeselectButton-${deliverable.deliverable.deliverableId}")
                                         .fillMaxWidth()
                                         .padding(horizontal = 4.dp),
                                     shape = RectangleShape,
@@ -1383,7 +1387,7 @@ fun AddTaskView(
                             ) {
                                 MainActivity.Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = stringResource(R.string.delete_marker)
+                                    contentDescription = stringResource(R.string.delete_task)
                                 )
                             }
                         }
@@ -1568,7 +1572,8 @@ fun NormalQuantityTimeTextField(
                     modifier = modifier.fillMaxWidth()
                 )
                 OutlinedButton(
-                    modifier = Modifier.testTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton")
+                    modifier = Modifier
+                        .testTag("TasksFragmentNormalQuantityTimeTextFieldTimeTimeButton")
                         .fillMaxWidth(),
                     onClick = { buttonDurationPick.value = true },
                     shape = RectangleShape,
@@ -1582,7 +1587,8 @@ fun NormalQuantityTimeTextField(
                 }
                 OutlinedTextField(
                     state = secondText,
-                    modifier = Modifier.testTag("TasksFragmentNormalQuantityTimeTextFieldTimeSecondField")
+                    modifier = Modifier
+                        .testTag("TasksFragmentNormalQuantityTimeTextFieldTimeSecondField")
                         .fillMaxWidth(),
                     supportingText = {Text(textFieldState.text.toString())}
                 )
@@ -1595,7 +1601,7 @@ fun NormalQuantityTimeTextField(
 @Composable
 fun DeliverableCardViewPreview() {
     DeliverableCardView(
-        deliverable = Deliverable(
+        deliverable = DeliverableWithLists( Deliverable(
             deliverableId = 1L,
             parent = 1L,
             position = 0L,
@@ -1606,8 +1612,8 @@ fun DeliverableCardViewPreview() {
             location = "At My Desk",
             workType = TaskDeliverable.WorkType.QuantityTaskOnce.name,
             shouldCompleteWork = true,
-        ).apply {
-            timesState.value = flowOf(listOf(
+        ),
+            timesRaw = listOf(
                 GoalTaskDeliverableTime(
                     id = 1L,
                     parent = 1L,
@@ -1615,8 +1621,9 @@ fun DeliverableCardViewPreview() {
                     timeBlockType = Goal.TimeBlockType.DAILY.name,
                     duration = Converters().fromLocalDateTime(LocalDateTime.now().withHour(0).withMinute(1)),
                 )
-            ))
-        },
+            )
+        )
+        ,
         editDeliverable = {},
         modifier = Modifier
     )
@@ -1624,20 +1631,28 @@ fun DeliverableCardViewPreview() {
 
 @Composable
 fun DeliverableCardView(
-    deliverable: Deliverable,
+    deliverable: DeliverableWithLists,
     editDeliverable: suspend (Deliverable) -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
+    editOnClick: Boolean = false,
+    onClick: suspend (Deliverable) -> Unit = { _ -> }
 ){
     val scope = rememberCoroutineScope()
-    val taskDeliverables by deliverable.taskDeliverables.collectAsStateWithLifecycle(emptyList())
+    //val taskDeliverables by deliverable.taskDeliverableList.collectAsStateWithLifecycle(emptyList())
 
     Card(
         modifier = modifier
-            .testTag("TasksFragmentDeliverableCardViewCard-${deliverable.deliverableId}")
+            .testTag("TasksFragmentDeliverableCardViewCard-${deliverable.deliverable.deliverableId}")
             .padding(4.dp)
-            .combinedClickable(onClick = {
-                scope.launch { editDeliverable(deliverable) }
-            }),
+            .combinedClickable(
+                onClick = {
+                    if (editOnClick) scope.launch { editDeliverable(deliverable.deliverable) }
+                    else scope.launch { onClick(deliverable.deliverable) }
+                },
+                onLongClick = {
+                    if (!editOnClick) scope.launch { editDeliverable(deliverable.deliverable) }
+                }
+            ),
         elevation = CardDefaults.cardElevation(),
         colors = CardColors(
             containerColor = Color.White,
@@ -1654,7 +1669,7 @@ fun DeliverableCardView(
                 .padding(2.dp)
         ) {
             Text(
-                text = deliverable.deliverable,
+                text = deliverable.deliverable.deliverable,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1676,10 +1691,10 @@ fun DeliverableCardView(
                 Text(
                     AppResources.getTimeFullDate(
                         LocalContext.current,
-                        Converters().toLocalDateTime(deliverable.initialDateTime).value
+                        Converters().toLocalDateTime(deliverable.deliverable.initialDateTime).value
                     )
                     + " (" +AppResources.getDaysFromToday(
-                        Converters().toLocalDateTime(deliverable.initialDateTime).value
+                        Converters().toLocalDateTime(deliverable.deliverable.initialDateTime).value
                     ) + ")"
                 )
             }
@@ -1690,9 +1705,9 @@ fun DeliverableCardView(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(stringResource(R.string.end_type_without_args))
-                Text(stringResource(Deliverable.DeliverableEndType.valueOf(deliverable.endType).resString))
+                Text(stringResource(Deliverable.DeliverableEndType.valueOf(deliverable.deliverable.endType).resString))
             }
-            if (deliverable.endType == Deliverable.DeliverableEndType.WORK.name) {
+            if (deliverable.deliverable.endType == Deliverable.DeliverableEndType.WORK.name) {
                 Row(
                     modifier = Modifier
                         .height(IntrinsicSize.Min)
@@ -1700,7 +1715,7 @@ fun DeliverableCardView(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(stringResource(R.string.work_type))
-                    Text(stringResource(TaskDeliverable.WorkType.valueOf(deliverable.workType).resString))
+                    Text(stringResource(TaskDeliverable.WorkType.valueOf(deliverable.deliverable.workType).resString))
                 }
 
                 // Assigned Tasks
@@ -1711,7 +1726,7 @@ fun DeliverableCardView(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(stringResource(R.string.assigned_tasks))
-                    Text(taskDeliverables.size.toString())
+                    Text(deliverable.taskDeliverables.size.toString())
                 }
 
                 // Progress
@@ -1723,16 +1738,16 @@ fun DeliverableCardView(
                 ) {
                     Text(stringResource(R.string.progress))
                     Text( "Not yet coded/${
-                        when(TaskDeliverable.WorkType.valueOf(deliverable.workType)){
+                        when(TaskDeliverable.WorkType.valueOf(deliverable.deliverable.workType)){
                             TaskDeliverable.WorkType.RepeatingTaskTimes,
                             TaskDeliverable.WorkType.QuantityTaskOnce,
                             TaskDeliverable.WorkType.CompleteTasks -> {
-                                deliverable.quantity
+                                deliverable.deliverable.quantity
                             }
                             TaskDeliverable.WorkType.TimeTaskOnce -> {
                                 AppResources.getDurationString(
                                     LocalContext.current,
-                                    Converters().toLocalDateTime(deliverable.time).value
+                                    Converters().toLocalDateTime(deliverable.deliverable.time).value
                                 )
                             }
                         }
@@ -1748,12 +1763,12 @@ fun DeliverableCardView(
                 ) {
                     Text(stringResource(R.string.should_complete_work))
                     Text(
-                        if (deliverable.shouldCompleteWork) stringResource(R.string.yes)
+                        if (deliverable.deliverable.shouldCompleteWork) stringResource(R.string.yes)
                         else stringResource(R.string.no)
                     )
                 }
             }
-            else if (deliverable.endType == Deliverable.DeliverableEndType.DATE.name) {
+            else if (deliverable.deliverable.endType == Deliverable.DeliverableEndType.DATE.name) {
                 Row(
                     modifier = Modifier
                         .height(IntrinsicSize.Min)
@@ -1764,10 +1779,10 @@ fun DeliverableCardView(
                     Text(
                         AppResources.getTimeFullDate(
                             LocalContext.current,
-                            Converters().toLocalDateTime(deliverable.endDateTime).value?: LocalDateTime.now()
+                            Converters().toLocalDateTime(deliverable.deliverable.endDateTime).value?: LocalDateTime.now()
                         )+ " (" +AppResources.getDaysBetween(
-                            Converters().toLocalDateTime(deliverable.initialDateTime).value,
-                            Converters().toLocalDateTime(deliverable.endDateTime).value?: LocalDateTime.now()
+                            Converters().toLocalDateTime(deliverable.deliverable.initialDateTime).value,
+                            Converters().toLocalDateTime(deliverable.deliverable.endDateTime).value?: LocalDateTime.now()
                         ) + ")"
                     )
                 }
@@ -1781,8 +1796,8 @@ fun DeliverableCardView(
 @Composable
 fun AddDeliverableViewPreview() {
     // Fake state flows for preview
-    val originalDeliverable = flowOf<Deliverable?>(null)
-    val deliverableFlow = flowOf<Deliverable?>(Deliverable(
+    val originalDeliverable = flowOf<DeliverableWithLists?>(null)
+    val deliverableFlow = flowOf<DeliverableWithLists?>(DeliverableWithLists(Deliverable(
         deliverableId = 1L,
         parent = 1L,
         position = 0L,
@@ -1791,8 +1806,8 @@ fun AddDeliverableViewPreview() {
         endType = Deliverable.DeliverableEndType.WORK.name,
         deliverable = "Complete Task Deliverable Module",
         location = "At My Desk",
-    ).apply {
-        timesState.value = flowOf(listOf(
+    ),
+        timesRaw = listOf(
             GoalTaskDeliverableTime(
                 id = 1L,
                 parent = 1L,
@@ -1801,7 +1816,7 @@ fun AddDeliverableViewPreview() {
                 duration = Converters().fromLocalDateTime(LocalDateTime.now().withHour(0).withMinute(1)),
             )
         ))
-    })
+    )
     val goalFlow = flowOf<Goal?>(Goal(
         id = 1L,
         parent = 1L,
@@ -1841,8 +1856,8 @@ fun AddDeliverableViewPreview() {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalCoroutinesApi::class)
 @Composable
 fun AddDeliverableView(
-    originalDeliverableStateFlow: Flow<Deliverable?>,
-    deliverableStateFlow: Flow<Deliverable?>,
+    originalDeliverableStateFlow: Flow<DeliverableWithLists?>,
+    deliverableStateFlow: Flow<DeliverableWithLists?>,
     parentGoal: Flow<Goal?>,
     triedToSaveInput: MutableStateFlow<Boolean>,
     processBottomSheetAdd: suspend () -> Unit,
@@ -1854,7 +1869,7 @@ fun AddDeliverableView(
     updateTimeBlock: suspend (GoalTaskDeliverableTime) -> Unit,
     updateDeliverable: suspend (Deliverable) -> Unit,
     dismissBottomSheet: suspend () -> Unit,
-    updateDeliverableType: suspend (Deliverable,Task.TaskType) -> Unit,
+    updateDeliverableType: suspend (DeliverableWithLists,Task.TaskType) -> Unit,
     deliverableWarningDialog: DeliverableWarningDialog
 ) {
     val scope = rememberCoroutineScope()
@@ -1871,31 +1886,30 @@ fun AddDeliverableView(
             val errorMessage by remember { errorMessage }
 
             val bottomSheetLazyListState = remember {
-                Converters().fromScrollStateLazy(deliverable.scrollPosition)
+                Converters().fromScrollStateLazy(deliverable.deliverable.scrollPosition)
             }
             LaunchedEffect(bottomSheetLazyListState.isScrollInProgress) {
                 if (!bottomSheetLazyListState.isScrollInProgress) {
                     updateDeliverable(
-                        deliverable.copy(
+                        deliverable.deliverable.copy(
                             scrollPosition = Converters().toScrollStateLazy(bottomSheetLazyListState)
                         )
                     )
                 }
             }
 
-            val deliverableText = remember { TextFieldState(deliverable.deliverable) }
+            val deliverableText = remember { TextFieldState(deliverable.deliverable.deliverable) }
             val deliverableTextFocusRequester =
-                remember { deliverable.deliverableTextFocusRequester }
-            val location = remember { TextFieldState(deliverable.location) }
-            val locationFocusRequester = remember { deliverable.locationFocusRequester }
-            val times by deliverable.times.collectAsStateWithLifecycle(emptyList())
+                remember { deliverable.deliverable.deliverableTextFocusRequester }
+            val location = remember { TextFieldState(deliverable.deliverable.location) }
+            val locationFocusRequester = remember { deliverable.deliverable.locationFocusRequester }
 
             LaunchedEffect(deliverableText.text) {
-                updateDeliverable(deliverable.copy(deliverable = deliverableText.text.toString()))
+                updateDeliverable(deliverable.deliverable.copy(deliverable = deliverableText.text.toString()))
             }
 
             LaunchedEffect(location.text) {
-                updateDeliverable(deliverable.copy(location = location.text.toString()))
+                updateDeliverable(deliverable.deliverable.copy(location = location.text.toString()))
             }
 
             LaunchedEffect(showErrorMessage) {
@@ -1984,7 +1998,7 @@ fun AddDeliverableView(
                             .fillMaxSize()
                             .padding(innerPadding)
                     ) {
-                        item { // Normal | Quantity | Time buttons
+                        item(key = "TasksFragmentAddDeliverableNQTButtons") { // Normal | Quantity | Time buttons
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1999,13 +2013,13 @@ fun AddDeliverableView(
                                             .weight(1f)
                                             .height(TopAppBarDefaults.MediumAppBarCollapsedHeight) // makes it a big square
                                             .testBackground(
-                                                if (Task.TaskType.valueOf(deliverable.type) == boxType) Color.Blue
+                                                if (Task.TaskType.valueOf(deliverable.deliverable.type) == boxType) Color.Blue
                                                 else Color.LightGray,
                                                 shape = RectangleShape
                                             )
                                             .clickable {
                                                 scope.launch {
-                                                    updateDeliverableType(deliverable,boxType)
+                                                    updateDeliverableType(deliverable, boxType)
                                                 }
                                             },
                                         contentAlignment = Alignment.Center
@@ -2082,7 +2096,7 @@ fun AddDeliverableView(
                                     endTypeOptions = listOf(
                                         MenuItemData(Deliverable.DeliverableEndType.UNDEFINED.name){
                                             scope.launch {
-                                                updateDeliverable(deliverable.copy(
+                                                updateDeliverable(deliverable.deliverable.copy(
                                                     endType = Deliverable.DeliverableEndType.UNDEFINED.name,
                                                     endDateTime = null
                                                 ))
@@ -2090,13 +2104,13 @@ fun AddDeliverableView(
                                         },
                                         MenuItemData(Deliverable.DeliverableEndType.DATE.name){
                                             scope.launch {
-                                                updateDeliverable(deliverable.copy(endType = Deliverable.DeliverableEndType.DATE.name))
+                                                updateDeliverable(deliverable.deliverable.copy(endType = Deliverable.DeliverableEndType.DATE.name))
                                                 buttonDatePick = true
                                             }
                                         },
                                         MenuItemData(Deliverable.DeliverableEndType.GOAL.name){
                                             scope.launch {
-                                                updateDeliverable(deliverable.copy(
+                                                updateDeliverable(deliverable.deliverable.copy(
                                                     endType = Deliverable.DeliverableEndType.GOAL.name,
                                                     endDateTime = null,
                                                     goalId = null
@@ -2105,7 +2119,7 @@ fun AddDeliverableView(
                                         },
                                         MenuItemData(Deliverable.DeliverableEndType.WORK.name){
                                             scope.launch {
-                                                updateDeliverable(deliverable.copy(
+                                                updateDeliverable(deliverable.deliverable.copy(
                                                     endType = Deliverable.DeliverableEndType.WORK.name,
                                                     endDateTime = null
                                                 ))
@@ -2135,7 +2149,7 @@ fun AddDeliverableView(
                                         }
                                     }
                                 }
-                                when (Deliverable.DeliverableEndType.valueOf(deliverable.endType)) {
+                                when (Deliverable.DeliverableEndType.valueOf(deliverable.deliverable.endType)) {
                                     Deliverable.DeliverableEndType.UNDEFINED -> {
                                         Text(
                                             stringResource(
@@ -2146,10 +2160,10 @@ fun AddDeliverableView(
                                     }
 
                                     Deliverable.DeliverableEndType.DATE -> {
-                                        LaunchedEffect(deliverable.endDateTime) {
-                                            if (deliverable.endDateTime == null) {
+                                        LaunchedEffect(deliverable.deliverable.endDateTime) {
+                                            if (deliverable.deliverable.endDateTime == null) {
                                                 updateDeliverable(
-                                                    deliverable.copy(
+                                                    deliverable.deliverable.copy(
                                                         endDateTime = Converters().fromLocalDateTime(
                                                             LocalDateTime.now()
                                                         )
@@ -2157,7 +2171,7 @@ fun AddDeliverableView(
                                                 )
                                             }
                                         }
-                                        deliverable.endDateTime?.let { endDateTime ->
+                                        deliverable.deliverable.endDateTime?.let { endDateTime ->
                                             var pickedDate by remember {
                                                 Converters().toLocalDateTime(
                                                     endDateTime
@@ -2187,7 +2201,7 @@ fun AddDeliverableView(
                                                             .withMinute(stateTime.minute)
                                                     scope.launch {
                                                         updateDeliverable(
-                                                            deliverable.copy(
+                                                            deliverable.deliverable.copy(
                                                                 endDateTime = Converters().fromLocalDateTime(
                                                                     pickedDate
                                                                 )
@@ -2206,7 +2220,7 @@ fun AddDeliverableView(
                                                 )
                                                 scope.launch {
                                                     updateDeliverable(
-                                                        deliverable.copy(
+                                                        deliverable.deliverable.copy(
                                                             endDateTime = Converters().fromLocalDateTime(
                                                                 pickedDate
                                                             )
@@ -2251,14 +2265,14 @@ fun AddDeliverableView(
                             }
                         }
                         item {
-                            if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) !=
+                            if (Deliverable.DeliverableEndType.valueOf(deliverable.deliverable.endType) !=
                                 Deliverable.DeliverableEndType.WORK
                             ) {
                                 Spacer(modifier = Modifier.width(2.dp))
                             }
                         }
                         item {// First Select The Work Type
-                            if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) !=
+                            if (Deliverable.DeliverableEndType.valueOf(deliverable.deliverable.endType) !=
                                 Deliverable.DeliverableEndType.WORK
                             ) {
                                 var showWorkTypeOptions by remember { mutableStateOf(false) }
@@ -2273,7 +2287,7 @@ fun AddDeliverableView(
                                             MenuItemData(TaskDeliverable.WorkType.QuantityTaskOnce.name) {
                                                 scope.launch {
                                                     updateDeliverable(
-                                                        deliverable.copy(
+                                                        deliverable.deliverable.copy(
                                                             workType = TaskDeliverable.WorkType.QuantityTaskOnce.name
                                                         )
                                                     )
@@ -2282,7 +2296,7 @@ fun AddDeliverableView(
                                             MenuItemData(TaskDeliverable.WorkType.TimeTaskOnce.name) {
                                                 scope.launch {
                                                     updateDeliverable(
-                                                        deliverable.copy(
+                                                        deliverable.deliverable.copy(
                                                             workType = TaskDeliverable.WorkType.TimeTaskOnce.name
                                                         )
                                                     )
@@ -2291,7 +2305,7 @@ fun AddDeliverableView(
                                             MenuItemData(TaskDeliverable.WorkType.RepeatingTaskTimes.name) {
                                                 scope.launch {
                                                     updateDeliverable(
-                                                        deliverable.copy(
+                                                        deliverable.deliverable.copy(
                                                             workType = TaskDeliverable.WorkType.RepeatingTaskTimes.name
                                                         )
                                                     )
@@ -2300,7 +2314,7 @@ fun AddDeliverableView(
                                             MenuItemData(TaskDeliverable.WorkType.CompleteTasks.name) {
                                                 scope.launch {
                                                     updateDeliverable(
-                                                        deliverable.copy(
+                                                        deliverable.deliverable.copy(
                                                             workType = TaskDeliverable.WorkType.CompleteTasks.name
                                                         )
                                                     )
@@ -2330,7 +2344,7 @@ fun AddDeliverableView(
                                             }
                                         }
                                     }
-                                    when (TaskDeliverable.WorkType.valueOf(deliverable.workType)) {
+                                    when (TaskDeliverable.WorkType.valueOf(deliverable.deliverable.workType)) {
                                         TaskDeliverable.WorkType.QuantityTaskOnce -> {
                                             Text(
                                                 stringResource(
@@ -2371,14 +2385,14 @@ fun AddDeliverableView(
                             }
                         }
                         item {
-                            if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) !=
+                            if (Deliverable.DeliverableEndType.valueOf(deliverable.deliverable.endType) !=
                                 Deliverable.DeliverableEndType.GOAL
                             ) {
                                 Spacer(modifier = Modifier.width(2.dp))
                             }
                         }
                         item{
-                            if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) !=
+                            if (Deliverable.DeliverableEndType.valueOf(deliverable.deliverable.endType) !=
                                 Deliverable.DeliverableEndType.GOAL
                             ) {
                                 Row(
@@ -2391,9 +2405,9 @@ fun AddDeliverableView(
                                     Text(text = stringResource(R.string.required_to_complete_goal))
                                     Switch(
                                         modifier = Modifier.testTag("TasksFragmentDeliverableSwitch"),
-                                        checked = deliverable.goalId!=null,
+                                        checked = deliverable.deliverable.goalId!=null,
                                         onCheckedChange = { checked -> scope.launch {
-                                            updateDeliverable(deliverable.copy(goalId = if (checked) parentGoal.id else null))
+                                            updateDeliverable(deliverable.deliverable.copy(goalId = if (checked) parentGoal.id else null))
                                         }}
                                     )
                                 }
@@ -2411,14 +2425,14 @@ fun AddDeliverableView(
                                     .padding(8.dp)
                             ) { Text(stringResource(R.string.add_time_block)) }
                         }
-                        items(items = times, key = { it.id?:Random.nextLong() }) { item ->
+                        items(items = deliverable.times, key = { it.id?:Random.nextLong() }) { item ->
                             TimeInputView(
                                 item,
                                 triedToSaveInput,
                                 deleteTimeBlock,
                                 updateTimeBlock
                             )
-                            if (times.indexOf(item) != times.lastIndex) {
+                            if (deliverable.times.indexOf(item) != deliverable.times.lastIndex) {
                                 Spacer(modifier = Modifier.width(2.dp))
                             }
                         }
@@ -2426,17 +2440,18 @@ fun AddDeliverableView(
                             item {
                                 Spacer(modifier = Modifier.width(2.dp))
                             }
-                            item {
+                            item(key = "TasksFragmentAddDeliverableDeleteButton") {
                                 IconButton(
                                     modifier = Modifier
+                                        .testTag("TasksFragmentAddDeliverableDeleteButton")
                                         .fillMaxWidth()
                                         .padding(4.dp)
                                         .background(color = Color.Red),
                                     onClick = { scope.launch { deleteDeliverableClicked() } }
                                 ) {
-                                    Icon(
+                                    MainActivity.Icon(
                                         imageVector = Icons.Default.Delete,
-                                        contentDescription = stringResource(R.string.delete_marker)
+                                        contentDescription = stringResource(R.string.delete_deliverable)
                                     )
                                 }
                             }

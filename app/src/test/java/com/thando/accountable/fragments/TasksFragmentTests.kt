@@ -235,7 +235,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
 
         TimeBlockTest(
             "EditGoalAddTimeBlockButton",
-            editGoalViewModel.newGoal.first()!!.times,
+            {editGoalViewModel.newGoal.first()!!.times.first()},
             Triple(
                 instantTaskExecutorRule,
                 composeTestRule,
@@ -1120,7 +1120,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         assertNotNull(taskViewModel.task.first()?.times)
         TimeBlockTest(
             "TasksFragmentAddTaskAddTimeBlockButton",
-            taskViewModel.task.first()!!.times,
+            {taskViewModel.task.first()!!.times.first()},
             Triple(
                 instantTaskExecutorRule,
                 composeTestRule,
@@ -1362,6 +1362,14 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         assertNotNull(taskViewModel.goal.first())
         val goal = taskViewModel.goal.first()!!
 
+        addQuantityDeliverableTask(activity,taskViewModel,goal)
+    }
+
+    private fun addQuantityDeliverableTask(
+        activity: TestMainActivity,
+        taskViewModel: TaskViewModel,
+        goal: Goal
+    ) = runMainTest {
         var tasksList = goal.goalTasks.first()
         assertNotNull(tasksList)
         assertEquals(0, tasksList.size)
@@ -1556,7 +1564,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             )
             finishProcesses()
         }
-        assertEquals(6L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.quantity)
+        assertEquals(6L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.quantity)
         withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
             performTextReplacement("Jump a total of 20 times33")
             assertTextContains(
@@ -1566,7 +1574,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             )
             finishProcesses()
         }
-        assertEquals(20L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.quantity)
+        assertEquals(20L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.quantity)
 
         withTag("DeliverableAdderDialogDismissButton") {
             performPressWithScroll()
@@ -1605,7 +1613,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 ignoreCase = false
             )
         }
-        assertEquals(6L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.quantity)
+        assertEquals(6L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.quantity)
         withTag("TasksFragmentTaskDeliverableWorkInputTextField") {
             performTextReplacement("Jump a total of 20 times33")
             assertTextContains(
@@ -1614,7 +1622,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
                 ignoreCase = false
             )
         }
-        assertEquals(20L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.quantity)
+        assertEquals(20L,taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.quantity)
 
         withTag("DeliverableAdderDialogOKButton") {
             performPressWithScroll()
@@ -1643,8 +1651,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
-        var deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        var deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -1670,8 +1678,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -1712,8 +1720,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -1739,8 +1747,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -1800,8 +1808,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -1827,8 +1835,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -1850,7 +1858,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         assertNotNull(taskViewModel.task.first()?.times)
         TimeBlockTest(
             "TasksFragmentAddTaskAddTimeBlockButton",
-            taskViewModel.task.first()!!.times,
+            {taskViewModel.task.first()!!.times.first()},
             Triple(
                 instantTaskExecutorRule,
                 composeTestRule,
@@ -2061,7 +2069,67 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `15 Adding Time Deliverable Task`() = runMainTest {
+    fun `15 Deleting Quantity Deliverable`() = runMainTest {
+        val activity = getTestMainActivity()
+
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        var goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.TASKS,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        switchToTab(Goal.GoalTab.DELIVERABLES, taskViewModel, activity)
+        goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.DELIVERABLES,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        var deliverablesList = goal.goalDeliverables.first()
+        assertNotNull(deliverablesList)
+        assertEquals(1,deliverablesList.size)
+
+        val taskDeliverablesList = deliverablesList[0].taskDeliverables
+        val deliverableTimesList = deliverablesList[0].times
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverablesList[0].deliverable.deliverableId}") {
+            performLongPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddDeliverableViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddDeliverableDeleteButton")
+        }
+
+        withTag("TasksFragmentAddDeliverableDeleteButton"){
+            performPressWithScroll()
+        }
+
+        deliverablesList = goal.goalDeliverables.first()
+        assertNotNull(deliverablesList)
+        assertEquals(0,deliverablesList.size)
+
+        taskDeliverablesList.forEach {
+            val taskDeliverable = activity.viewModel.repository.getTaskDeliverable(it.taskId,it.deliverableId)
+            assertNull(taskDeliverable.first())
+        }
+
+        deliverableTimesList.forEach {
+            assertNull(
+                activity.viewModel.repository.getGoalTaskDeliverableTime(it.id).first()
+            )
+        }
+
+        assertEquals(Goal.GoalTab.DELIVERABLES,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        switchToTab(Goal.GoalTab.TASKS, taskViewModel, activity)
+        goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.TASKS,Goal.GoalTab.valueOf(goal.selectedTab))
+    }
+
+    @Test
+    fun `16 Adding Time Deliverable Task`() = runMainTest {
         val activity = getTestMainActivity()
 
         val taskViewModel: TaskViewModel = getViewModel(activity)
@@ -2457,8 +2525,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         var deliverable = taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]
         assertNotNull(deliverable)
         var deliverableDuration = Duration.between(
-            Converters().toLocalDateTime(deliverable!!.initialDateTime).value,
-            Converters().toLocalDateTime(deliverable.time).value
+            Converters().toLocalDateTime(deliverable!!.deliverable.initialDateTime).value,
+            Converters().toLocalDateTime(deliverable.deliverable.time).value
         )
         assertEquals(
             102L,
@@ -2615,8 +2683,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         deliverable = taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]
         assertNotNull(deliverable)
         deliverableDuration = Duration.between(
-            Converters().toLocalDateTime(deliverable!!.initialDateTime).value,
-            Converters().toLocalDateTime(deliverable.time).value
+            Converters().toLocalDateTime(deliverable!!.deliverable.initialDateTime).value,
+            Converters().toLocalDateTime(deliverable.deliverable.time).value
         )
         assertEquals(
             102L,
@@ -2654,8 +2722,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
-        var deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        var deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -2681,8 +2749,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -2723,8 +2791,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -2750,8 +2818,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -2811,8 +2879,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertIsDisplayed()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getNotSelectedDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getNotSelectedDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("DeliverablePickerDialogLazyColumn") {
             assertExists()
@@ -2838,8 +2906,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             assertDoesNotExist()
         }
 
-        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
-        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -2861,7 +2929,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         assertNotNull(taskViewModel.task.first()?.times)
         TimeBlockTest(
             "TasksFragmentAddTaskAddTimeBlockButton",
-            taskViewModel.task.first()!!.times,
+            {taskViewModel.task.first()!!.times.first()},
             Triple(
                 instantTaskExecutorRule,
                 composeTestRule,
@@ -2893,7 +2961,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `16 Editing Time Deliverable Task`() = runMainTest {
+    fun `17 Editing Time Deliverable Task`() = runMainTest {
         val activity = getTestMainActivity()
 
         val taskViewModel: TaskViewModel = getViewModel(activity)
@@ -3070,8 +3138,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         val deliverable = taskViewModel.task.first()?.getDeliverablesList()?.first()[0]
         assertNotNull(deliverable)
         val deliverableDuration = Duration.between(
-            Converters().toLocalDateTime(deliverable!!.initialDateTime).value,
-            Converters().toLocalDateTime(deliverable.time).value
+            Converters().toLocalDateTime(deliverable!!.deliverable.initialDateTime).value,
+            Converters().toLocalDateTime(deliverable.deliverable.time).value
         )
         assertEquals(
             102L,
@@ -3082,8 +3150,8 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
             deliverableDuration.toMinutes() - deliverableDuration.toHours()*60
         )
 
-        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverableId)
-        val deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverableId!!
+        assertNotNull(taskViewModel.task.first()?.getDeliverablesList()?.first()[0]?.deliverable?.deliverableId)
+        val deliverableId = taskViewModel.task.first()!!.getDeliverablesList().first()[0].deliverable.deliverableId!!
 
         withTag("TasksFragmentAddTaskViewLazyColumn") {
             assertExists()
@@ -3286,7 +3354,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
     }
 
     @Test
-    fun `17 Deleting Time Deliverable Task`() = runMainTest {
+    fun `18 Deleting Time Deliverable Task`() = runMainTest {
         val activity = getTestMainActivity()
         val taskViewModel: TaskViewModel = getViewModel(activity)
         assertNotNull(taskViewModel)
@@ -3331,6 +3399,168 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
         }
     }
 
+    @Test
+    fun `19 Deleting Time Deliverable`() = runMainTest {
+        val activity = getTestMainActivity()
+
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        var goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.TASKS,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        switchToTab(Goal.GoalTab.DELIVERABLES, taskViewModel, activity)
+        goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.DELIVERABLES,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        var deliverablesList = goal.goalDeliverables.first()
+        assertNotNull(deliverablesList)
+        assertEquals(1,deliverablesList.size)
+
+        val taskDeliverablesList = deliverablesList[0].taskDeliverables
+        val deliverableTimesList = deliverablesList[0].times
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverablesList[0].deliverable.deliverableId}") {
+            performLongPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddDeliverableViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddDeliverableDeleteButton")
+        }
+
+        withTag("TasksFragmentAddDeliverableDeleteButton"){
+            performPressWithScroll()
+        }
+
+        deliverablesList = goal.goalDeliverables.first()
+        assertNotNull(deliverablesList)
+        assertEquals(0,deliverablesList.size)
+
+        taskDeliverablesList.forEach {
+            val taskDeliverable = activity.viewModel.repository.getTaskDeliverable(it.taskId,it.deliverableId)
+            assertNull(taskDeliverable.first())
+        }
+
+        deliverableTimesList.forEach {
+            assertNull(
+                activity.viewModel.repository.getGoalTaskDeliverableTime(it.id).first()
+            )
+        }
+
+        assertEquals(Goal.GoalTab.DELIVERABLES,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        switchToTab(Goal.GoalTab.TASKS, taskViewModel, activity)
+        goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.TASKS,Goal.GoalTab.valueOf(goal.selectedTab))
+    }
+
+    @Test
+    fun `20 Changing Deliverable Type From Quantity Task Warning Dialog`() = runMainTest {
+        val activity = getTestMainActivity()
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        var goal = taskViewModel.goal.first()!!
+
+        addQuantityDeliverableTask(
+            activity,
+            taskViewModel,
+            goal
+        )
+
+        assertEquals(Goal.GoalTab.TASKS,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        switchToTab(Goal.GoalTab.DELIVERABLES, taskViewModel, activity)
+        goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.DELIVERABLES,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        val tasksList = goal.goalTasks.first()
+        assertNotNull(tasksList)
+        assertEquals(1,tasksList.size)
+
+        val taskTaskDeliverablesList = tasksList[0].taskDeliverableList.first()
+        assertNotNull(taskTaskDeliverablesList)
+        assertEquals(1,taskTaskDeliverablesList.size)
+
+        var deliverablesList = goal.goalDeliverables.first()
+        assertNotNull(deliverablesList)
+        assertEquals(1,deliverablesList.size)
+
+        val taskDeliverablesList = deliverablesList[0].taskDeliverables
+        val deliverableTimesList = deliverablesList[0].times
+
+        assertNotNull(taskDeliverablesList)
+        assertEquals(1,taskDeliverablesList.size)
+
+        withTag("TasksFragmentDeliverableCardViewCard-${deliverablesList[0].deliverable.deliverableId}") {
+            performLongPressWithScroll()
+        }
+
+        withTag("TasksFragmentAddDeliverableViewLazyColumn"){
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentAddDeliverableNQTButtons")
+        }
+
+        withTag("TasksFragmentAddDeliverableViewTaskTypeButton-${Task.TaskType.NORMAL.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertEquals(
+                Color.LightGray,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(Task.TaskType.NORMAL.stringRes))
+        }
+
+        withTag("TasksFragmentAddDeliverableViewTaskTypeButton-${Task.TaskType.QUANTITY.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertEquals(
+                Color.Blue,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(Task.TaskType.QUANTITY.stringRes))
+        }
+
+        withTag("TasksFragmentAddDeliverableViewTaskTypeButton-${Task.TaskType.TIME.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertEquals(
+                Color.LightGray,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(Task.TaskType.TIME.stringRes))
+        }
+    }
+
+    @Test
+    fun `21 Changing Deliverable Type From Time Task Warning Dialog`() = runMainTest {
+        val activity = getTestMainActivity()
+        val taskViewModel: TaskViewModel = getViewModel(activity)
+        assertNotNull(taskViewModel)
+        assertNotNull(taskViewModel.goal.first())
+        var goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.DELIVERABLES,Goal.GoalTab.valueOf(goal.selectedTab))
+
+        switchToTab(Goal.GoalTab.TASKS, taskViewModel, activity)
+        goal = taskViewModel.goal.first()!!
+
+        assertEquals(Goal.GoalTab.TASKS,Goal.GoalTab.valueOf(goal.selectedTab))
+    }
+
     /**
      * <h2><b>Types of work:</b></h2>
      *  1. Complete a certain repeating task x amount of times (including streak)
@@ -3344,7 +3574,7 @@ class TasksFragmentTests: AccountableComposeRobolectricTest() {
      */
 
     @Test
-    fun `18 Adding Deliverable`() = runMainTest {
+    fun `22 Adding Deliverable`() = runMainTest {
         val activity = getTestMainActivity()
         val taskViewModel: TaskViewModel = getViewModel(activity)
         assertNotNull(taskViewModel)

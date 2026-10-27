@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
+import com.thando.accountable.database.tables.DeliverableWithLists
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Task
@@ -52,7 +53,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 
 class DeliverableAdderDialog {
-    val deliverableState = MutableStateFlow<Flow<Deliverable?>>(emptyFlow())
+    val deliverableState = MutableStateFlow<Flow<DeliverableWithLists?>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
     val deliverable = deliverableState.flatMapLatest { it }
     val showDeliverableAdderDialog = mutableStateOf(false)
@@ -72,7 +73,7 @@ class DeliverableAdderDialog {
 
     fun addDeliverable(
         inputTaskType: Task.TaskType,
-        deliverable: Flow<Deliverable?>,
+        deliverable: Flow<DeliverableWithLists?>,
         updateDeliverable: suspend (Deliverable) -> Unit,
         deleteDeliverable: suspend (Deliverable) -> Unit,
         triedToSave: MutableStateFlow<Boolean>
@@ -82,11 +83,11 @@ class DeliverableAdderDialog {
         triedToSaveState.value = triedToSave
         updateDeliverableState.value = updateDeliverable
         onDismiss.value = {
-            deliverable.first()?.let { deleteDeliverable(it) }
+            deliverable.first()?.let { deleteDeliverable(it.deliverable) }
             showDeliverableAdderDialog.value = false
         }
         saveAndClose.value = {
-            deliverable.first()?.let { updateDeliverable(it) }
+            deliverable.first()?.let { updateDeliverable(it.deliverable) }
             showDeliverableAdderDialog.value = false
         }
         showDeliverableAdderDialog.value = true
@@ -100,17 +101,17 @@ class DeliverableAdderDialog {
 
             val deliverable by deliverable.collectAsStateWithLifecycle(null)
             deliverable?.let { deliverable ->
-                val deliverableWorkText = remember { TextFieldState(deliverable.deliverable) }
+                val deliverableWorkText = remember { TextFieldState(deliverable.deliverable.deliverable) }
                 val deliverableWorkTextFocusRequester =
-                    remember { deliverable.deliverableTextFocusRequester }
+                    remember { deliverable.deliverable.deliverableTextFocusRequester }
                 var deliverableTime by remember {
                     Converters().toLocalDateTime(
-                        deliverable.time
+                        deliverable.deliverable.time
                     )
                 }
                 val deliverableInitialTime by remember {
                     Converters().toLocalDateTime(
-                        deliverable.initialDateTime
+                        deliverable.deliverable.initialDateTime
                     )
                 }
                 val triedToSave by triedToSave.collectAsStateWithLifecycle(false)
@@ -155,9 +156,9 @@ class DeliverableAdderDialog {
                                 textFieldState = deliverableWorkText,
                                 triedToSave = triedToSave,
                                 updateTextFieldState = { newValue, newQuantity ->
-                                    if (newValue != deliverable.deliverable) {
+                                    if (newValue != deliverable.deliverable.deliverable) {
                                         updateDeliverable?.invoke(
-                                            deliverable.copy(
+                                            deliverable.deliverable.copy(
                                                 deliverable = newValue,
                                                 quantity = newQuantity
                                             )
@@ -174,14 +175,14 @@ class DeliverableAdderDialog {
                                 isDeliverable = true,
                                 updateTaskTask = { newTaskTask, newQuantity ->
                                     updateDeliverable?.invoke(
-                                        deliverable.copy(
+                                        deliverable.deliverable.copy(
                                             deliverable = newTaskTask,
                                             quantity = newQuantity
                                         )
                                     )
                                 },
                                 updateTaskTime = { newTime ->
-                                    updateDeliverable?.invoke(deliverable.copy(time = newTime))
+                                    updateDeliverable?.invoke(deliverable.deliverable.copy(time = newTime))
                                 },
                                 taskTime = deliverableTime,
                                 changeTaskTime = { newTaskTime ->
@@ -240,7 +241,7 @@ fun DeliverableAdderDialogPreview() {
     val dialog = DeliverableAdderDialog()
 
     // Fake deliverable for preview
-    val fakeDeliverable = Deliverable(
+    val fakeDeliverable = DeliverableWithLists(Deliverable(
         deliverableId = 1L,
         parent = 1L,
         position = 0L,
@@ -249,8 +250,8 @@ fun DeliverableAdderDialogPreview() {
         endType = Deliverable.DeliverableEndType.WORK.name,
         deliverable = "Complete Task Deliverable Module 2 times",
         location = "At My Desk",
-    ).apply {
-        timesState.value = flowOf(listOf(
+    ),
+        timesRaw = listOf(
             GoalTaskDeliverableTime(
                 id = 1L,
                 parent = 1L,
@@ -258,8 +259,8 @@ fun DeliverableAdderDialogPreview() {
                 timeBlockType = Goal.TimeBlockType.DAILY.name,
                 duration = Converters().fromLocalDateTime(LocalDateTime.now().withHour(0).withMinute(1)),
             )
-        ))
-    }
+        )
+    )
 
     // Set up preview state
     LaunchedEffect(Unit) {

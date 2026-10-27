@@ -29,7 +29,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableNavigationController.AccountableFragment
 import com.thando.accountable.MainActivityTest.FilteredPrintStream
 import com.thando.accountable.MainActivityTest.Log
-import com.thando.accountable.database.tables.Deliverable
+import com.thando.accountable.database.tables.DeliverableWithLists
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
@@ -214,8 +214,8 @@ abstract class AccountableComposeRobolectricTest(
     }
 
     fun deliverablesAreEqual(
-        deliverableOne:Deliverable,
-        deliverableTwo:Deliverable,
+        deliverableOne: DeliverableWithLists,
+        deliverableTwo: DeliverableWithLists,
         idsEqual:Boolean = true,
         parentsEqual:Boolean = true,
         times:List<GoalTaskDeliverableTime>? = null
@@ -225,13 +225,13 @@ abstract class AccountableComposeRobolectricTest(
         else {objectA, objectB -> assertNotEquals(objectA,objectB)}
 
         assertionFunction(
-            deliverableOne.deliverableId,
-            deliverableTwo.deliverableId
+            deliverableOne.deliverable.deliverableId,
+            deliverableTwo.deliverable.deliverableId
         )
 
         assertEquals(
-            deliverableOne.initialDateTime,
-            deliverableTwo.initialDateTime
+            deliverableOne.deliverable.initialDateTime,
+            deliverableTwo.deliverable.initialDateTime
         )
 
         assertEquals(
@@ -239,38 +239,38 @@ abstract class AccountableComposeRobolectricTest(
             deliverableTwo.deliverable
         )
         assertEquals(
-            deliverableOne.location,
-            deliverableTwo.location
+            deliverableOne.deliverable.location,
+            deliverableTwo.deliverable.location
         )
         assertEquals(
-            deliverableOne.endDateTime,
-            deliverableTwo.endDateTime
+            deliverableOne.deliverable.endDateTime,
+            deliverableTwo.deliverable.endDateTime
         )
         assertEquals(
-            deliverableOne.status,
-            deliverableTwo.status
+            deliverableOne.deliverable.status,
+            deliverableTwo.deliverable.status
         )
         assertEquals(
-            deliverableOne.endType,
-            deliverableTwo.endType
+            deliverableOne.deliverable.endType,
+            deliverableTwo.deliverable.endType
         )
         if (parentsEqual) assertEquals(
-            deliverableOne.parent,
-            deliverableTwo.parent
+            deliverableOne.deliverable.parent,
+            deliverableTwo.deliverable.parent
         )
-        else assertNotEquals(deliverableOne.parent,deliverableTwo.parent)
+        else assertNotEquals(deliverableOne.deliverable.parent,deliverableTwo.deliverable.parent)
 
         assertEquals(
-            (times?:deliverableOne.times.first()).size,
-            deliverableTwo.times.first().size
+            (times?:deliverableOne.times).size,
+            deliverableTwo.times.size
         )
 
         if (!idsEqual && parentsEqual) {
-            assertEquals(deliverableOne.deliverableId,deliverableTwo.cloneId)
+            assertEquals(deliverableOne.deliverable.deliverableId,deliverableTwo.deliverable.cloneId)
         }
 
-        val timesTwoList = deliverableTwo.times.first()
-        (times?:deliverableOne.times.first()).forEachIndexed { index, timeOne ->
+        val timesTwoList = deliverableTwo.times
+        (times?:deliverableOne.times).forEachIndexed { index, timeOne ->
             val timeTwo = timesTwoList[index]
             timesAreEqual(
                 timeOne,
@@ -283,19 +283,19 @@ abstract class AccountableComposeRobolectricTest(
 
     suspend fun getTaskDeliverablesLists(
         task: Task
-    ): Triple<List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>> {
+    ): Triple<List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>, List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>, List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>> {
         val deliverablesNormal = task.deliverableNormalList.first()
         val deliverablesQuantity = task.deliverableQuantityList.first()
         val deliverablesTime = task.deliverableTimeList.first()
 
-        val deliverableTimesNormal = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
-        deliverablesNormal.forEach { deliverableTimesNormal.add(it to it.times.first()) }
+        val deliverableTimesNormal = mutableListOf<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>()
+        deliverablesNormal.forEach { deliverableTimesNormal.add(it to it.times) }
 
-        val deliverableTimesQuantity = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
-        deliverablesQuantity.forEach { deliverableTimesQuantity.add(it to it.times.first()) }
+        val deliverableTimesQuantity = mutableListOf<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>()
+        deliverablesQuantity.forEach { deliverableTimesQuantity.add(it to it.times) }
 
-        val deliverableTimesTime = mutableListOf<Pair<Deliverable, List<GoalTaskDeliverableTime>>>()
-        deliverablesTime.forEach { deliverableTimesTime.add(it to it.times.first()) }
+        val deliverableTimesTime = mutableListOf<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>()
+        deliverablesTime.forEach { deliverableTimesTime.add(it to it.times) }
 
         return Triple(
             deliverableTimesNormal.toList(),
@@ -348,7 +348,7 @@ abstract class AccountableComposeRobolectricTest(
         taskTwo: Task,
         idsEqual: Boolean = true,
         times: List<GoalTaskDeliverableTime>? = null,
-        deliverablesLists: Triple<List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>, List<Pair<Deliverable, List<GoalTaskDeliverableTime>>>>? = null
+        deliverablesLists: Triple<List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>, List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>, List<Pair<DeliverableWithLists, List<GoalTaskDeliverableTime>>>>? = null
     ) = runMainTest {
         val assertionFunction: suspend TestScope.(Any?, Any?)->Unit = if (idsEqual)
             {objectA, objectB -> assertEquals(objectA,objectB)}

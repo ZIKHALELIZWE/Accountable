@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
+import com.thando.accountable.database.tables.DeliverableWithLists
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Task
@@ -54,7 +55,7 @@ import kotlin.random.Random
 class DeliverablePickerDialog {
 
     val showDeliverablePickerDialog = mutableStateOf(false)
-    val notSelectedListState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    val notSelectedListState = MutableStateFlow<Flow<List<DeliverableWithLists>>>(emptyFlow())
     val notSelectedList = notSelectedListState.flatMapLatest { it }
 
     val deliverablePickedState = MutableStateFlow<suspend (Deliverable) -> Unit> {}
@@ -63,7 +64,7 @@ class DeliverablePickerDialog {
     }
 
     fun pickDeliverable(
-        notSelectedList: Flow<List<Deliverable>>,
+        notSelectedList: Flow<List<DeliverableWithLists>>,
         deliverablePicked: suspend (Deliverable) -> Unit
     ) {
         notSelectedListState.value = notSelectedList
@@ -119,7 +120,7 @@ class DeliverablePickerDialog {
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
                         }
-                        items(items = notSelectedList, key = {it.deliverableId?:Random.nextLong()}) { deliverable ->
+                        items(items = notSelectedList, key = {it.deliverable.deliverableId?:Random.nextLong()}) { deliverable ->
                             Column(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -131,10 +132,10 @@ class DeliverablePickerDialog {
                                 Button(
                                     onClick = {
                                         scope.launch { 
-                                            deliverablePicked(deliverable)
+                                            deliverablePicked(deliverable.deliverable)
                                         }
                                     },
-                                    modifier = Modifier.testTag("DeliverablePickerDialogPickButton-${deliverable.deliverableId}")
+                                    modifier = Modifier.testTag("DeliverablePickerDialogPickButton-${deliverable.deliverable.deliverableId}")
                                         .fillMaxWidth().padding(horizontal = 4.dp),
                                     shape = RectangleShape,
                                     colors = ButtonColors(
@@ -161,7 +162,7 @@ fun DeliverablePickerDialogPreview() {
     val dialog = DeliverablePickerDialog()
 
     // Fake deliverable for preview
-    val fakeDeliverable = Deliverable(
+    val fakeDeliverable = DeliverableWithLists(Deliverable(
         deliverableId = 1L,
         parent = 1L,
         position = 0L,
@@ -171,8 +172,8 @@ fun DeliverablePickerDialogPreview() {
         location = "At My Desk",
         workType = TaskDeliverable.WorkType.QuantityTaskOnce.name,
         type = Task.TaskType.QUANTITY.name
-    ).apply {
-        timesState.value = flowOf(listOf(
+    ),
+        timesRaw = listOf(
             GoalTaskDeliverableTime(
                 id = 1L,
                 parent = 1L,
@@ -180,9 +181,10 @@ fun DeliverablePickerDialogPreview() {
                 timeBlockType = Goal.TimeBlockType.DAILY.name,
                 duration = Converters().fromLocalDateTime(LocalDateTime.now().withHour(0).withMinute(1)),
             )
-        ))
-    }
-    val fakeDeliverableTwo = Deliverable(
+        )
+    )
+
+    val fakeDeliverableTwo = DeliverableWithLists(Deliverable(
         deliverableId = 2L,
         parent = 1L,
         position = 1L,
@@ -192,8 +194,8 @@ fun DeliverablePickerDialogPreview() {
         location = "On My Desk",
         workType = TaskDeliverable.WorkType.QuantityTaskOnce.name,
         type = Task.TaskType.QUANTITY.name
-    ).apply {
-        timesState.value = flowOf(listOf(
+    ),
+    timesRaw = listOf(
             GoalTaskDeliverableTime(
                 id = 2L,
                 parent = 2L,
@@ -201,8 +203,9 @@ fun DeliverablePickerDialogPreview() {
                 timeBlockType = Goal.TimeBlockType.DAILY.name,
                 duration = Converters().fromLocalDateTime(LocalDateTime.now().withHour(0).withMinute(1)),
             )
-        ))
-    }
+        )
+    )
+
 
     // Set up preview state
     LaunchedEffect(Unit) {

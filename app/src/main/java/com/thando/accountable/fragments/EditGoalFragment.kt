@@ -390,11 +390,11 @@ fun EditGoalFragmentView(
                         ) {
                             items(
                                 items = notSelectedGoalDeliverables,
-                                key = { it.deliverableId ?: Random.nextLong() }
+                                key = { it.deliverable.deliverableId ?: Random.nextLong() }
                             ) { deliverable ->
                                 Row(
                                     modifier = Modifier
-                                        .testTag("EditGoalPickDeliverableRow-${deliverable.deliverableId}")
+                                        .testTag("EditGoalPickDeliverableRow-${deliverable.deliverable.deliverableId}")
                                         .height(IntrinsicSize.Min)
                                         .fillMaxWidth()
                                         .padding(3.dp)
@@ -409,12 +409,12 @@ fun EditGoalFragmentView(
                                     IconButton(
                                         modifier = Modifier
                                             .weight(1f).fillMaxWidth()
-                                            .testTag("EditGoalPickDeliverableButton-${deliverable.deliverableId}")
+                                            .testTag("EditGoalPickDeliverableButton-${deliverable.deliverable.deliverableId}")
                                             .background(color = Color.Green),
                                         onClick = {
                                             scope.launch {
                                                 viewModel.saveDeliverable(
-                                                    deliverable.copy(
+                                                    deliverable.deliverable.copy(
                                                         goalId = newGoal.id
                                                     )
                                                 )
@@ -493,7 +493,7 @@ fun EditGoalFragmentView(
                                         Modifier
                                             .weight(4f).fillMaxWidth()
                                             .wrapContentHeight(),
-                                        true
+                                        editOnClick = true
                                     )
                                     IconButton(
                                         modifier = Modifier
@@ -846,7 +846,7 @@ fun EditGoalFragmentView(
                     }
                     items(
                         items = selectedGoalDeliverables,
-                        key = { it.deliverableId ?: Random.nextLong() }
+                        key = { it.deliverable.deliverableId ?: Random.nextLong() }
                     ) { deliverable ->
                         Row(
                             modifier = Modifier
@@ -859,19 +859,19 @@ fun EditGoalFragmentView(
                                 viewModel::editDeliverable,
                                 Modifier
                                     .weight(4f).fillMaxSize()
-                                    .testTag("TasksFragmentDeliverableCard-${deliverable.deliverableId}")
+                                    .testTag("TasksFragmentDeliverableCard-${deliverable.deliverable.deliverableId}")
                                     .padding(3.dp)
                                     .wrapContentHeight()
                             )
                             IconButton(
                                 modifier = Modifier
                                     .weight(1f).fillMaxSize()
-                                    .testTag("EditGoalUnpickDeliverableButton-${deliverable.deliverableId}")
+                                    .testTag("EditGoalUnpickDeliverableButton-${deliverable.deliverable.deliverableId}")
                                     .background(color = Color.Red),
                                 onClick = {
                                     scope.launch {
                                         viewModel.saveDeliverable(
-                                            deliverable.copy(
+                                            deliverable.deliverable.copy(
                                                 goalId = null
                                             )
                                         )
@@ -935,7 +935,7 @@ fun EditGoalFragmentView(
                                     .testTag("TasksFragmentTaskCardView-${task.taskId}")
                                     .padding(3.dp)
                                     .wrapContentHeight(),
-                                true
+                                editOnClick = true
                             )
                             IconButton(
                                 modifier = Modifier

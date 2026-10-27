@@ -8,7 +8,6 @@ import androidx.room.PrimaryKey
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Goal.TimeBlockType
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 @Entity(tableName = "times_table")
 data class GoalTaskDeliverableTime (

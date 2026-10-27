@@ -15,6 +15,7 @@ import com.thando.accountable.MainActivity
 import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Deliverable
+import com.thando.accountable.database.tables.DeliverableWithLists
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
@@ -177,10 +178,10 @@ interface RepositoryDao {
     }
 
     @Transaction
-    suspend fun deleteDeliverable(deliverable: Deliverable){
-        val times = getTimes(deliverable.deliverableId, GoalTaskDeliverableTime.TimesType.GOAL).first()
-        times.forEach { time -> delete(time) }
-        delete(deliverable)
+    suspend fun deleteDeliverable(deliverable: DeliverableWithLists){
+        deliverable.times.forEach { time -> delete(time) }
+        deliverable.taskDeliverables.forEach { taskDeliverable -> delete(taskDeliverable) }
+        delete(deliverable.deliverable)
     }
 
     @Transaction
@@ -524,8 +525,9 @@ interface RepositoryDao {
     @Query("SELECT * FROM task_table WHERE task_parent = :parentId AND task_parent_type = :parentType")
     fun getTasks(parentId:Long?, parentType: Task.TaskParentType): Flow<List<Task>>
 
+    @Transaction
     @Query("SELECT * FROM deliverable_table WHERE deliverable_parent = :goalId")
-    fun getDeliverables(goalId:Long?): Flow<List<Deliverable>>
+    fun getDeliverables(goalId:Long?): Flow<List<DeliverableWithLists>>
 
     @Query("SELECT * FROM marker_table WHERE marker_parent = :goalId")
     fun getMarkers(goalId:Long?): Flow<List<Marker>>
@@ -533,9 +535,11 @@ interface RepositoryDao {
     @Query("SELECT * FROM task_table WHERE taskId = :taskId")
     fun getTask(taskId: Long?): Flow<Task?>
 
+    @Transaction
     @Query("SELECT * FROM deliverable_table WHERE deliverableId = :deliverableId")
-    fun getDeliverable(deliverableId: Long?): Flow<Deliverable?>
+    fun getDeliverable(deliverableId: Long?): Flow<DeliverableWithLists?>
 
+    @Transaction
     @Query("""
         SELECT * 
         FROM deliverable_table d 
@@ -554,8 +558,9 @@ interface RepositoryDao {
         taskId: Long?,
         workTypeList: List<String>,
         endType: String = Deliverable.DeliverableEndType.WORK.name
-    ): Flow<List<Deliverable>>
+    ): Flow<List<DeliverableWithLists>>
 
+    @Transaction
     @Query("""
         SELECT *
         FROM deliverable_table d
@@ -574,8 +579,7 @@ interface RepositoryDao {
         taskId: Long?,
         workTypeList: List<String>,
         endType: String = Deliverable.DeliverableEndType.WORK.name
-    ): Flow<List<Deliverable>>
-
+    ): Flow<List<DeliverableWithLists>>
 
     @Query("SELECT * FROM marker_table WHERE id = :markerId")
     fun getMarker(markerId: Long?): Flow<Marker?>
@@ -583,11 +587,13 @@ interface RepositoryDao {
     @Query("SELECT * FROM times_table WHERE id = :goalTaskDeliverableTimeId")
     fun getGoalTaskDeliverableTime(goalTaskDeliverableTimeId: Long?): Flow<GoalTaskDeliverableTime?>
 
+    @Transaction
     @Query("SELECT * FROM deliverable_table WHERE deliverable_goal_id = :goalId AND deliverable_parent = :goalId")
-    fun getGoalDeliverables(goalId: Long?): Flow<List<Deliverable>>
+    fun getGoalDeliverables(goalId: Long?): Flow<List<DeliverableWithLists>>
 
+    @Transaction
     @Query("SELECT * FROM deliverable_table WHERE deliverable_goal_id IS NULL AND deliverable_parent = :goalId")
-    fun getNotGoalDeliverables(goalId: Long?): Flow<List<Deliverable>>
+    fun getNotGoalDeliverables(goalId: Long?): Flow<List<DeliverableWithLists>>
 
     @Query("SELECT * FROM task_table WHERE task_goal_id = :goalId AND task_parent = :goalId")
     fun getSelectedGoalTasks(goalId: Long?): Flow<List<Task>>

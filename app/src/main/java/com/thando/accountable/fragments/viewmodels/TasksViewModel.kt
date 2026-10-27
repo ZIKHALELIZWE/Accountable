@@ -14,6 +14,7 @@ import com.thando.accountable.AccountableRepository
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
+import com.thando.accountable.database.tables.DeliverableWithLists
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
@@ -46,12 +47,12 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     val deliverableWarningDialog = DeliverableWarningDialog()
 
     val originalTask = MutableStateFlow<Flow<Task?>?>(null)
-    private val originalDeliverableState = MutableStateFlow<Flow<Deliverable?>?>(null)
+    private val originalDeliverableState = MutableStateFlow<Flow<DeliverableWithLists?>?>(null)
     val originalDeliverable = originalDeliverableState.flatMapLatest { it?:flowOf(null) }
     val originalMarker = MutableStateFlow<Flow<Marker?>?>(null)
     private val taskState: MutableStateFlow<Flow<Task?>?> = MutableStateFlow(null)
     val task = taskState.flatMapLatest { it?:flowOf(null) }
-    private val deliverableState: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(null)
+    private val deliverableState: MutableStateFlow<Flow<DeliverableWithLists?>?> = MutableStateFlow(null)
     val deliverable = deliverableState.flatMapLatest { it?: flowOf(null) }
     private val markerState: MutableStateFlow<Flow<Marker?>?> = MutableStateFlow(null)
     val marker = markerState.flatMapLatest { it?:flowOf(null) }
@@ -178,7 +179,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         }
     }
 
-    suspend fun editDeliverable(originalDeliverableInput: Flow<Deliverable?>){
+    suspend fun editDeliverable(originalDeliverableInput: Flow<DeliverableWithLists?>){
         editClickedDeliverable(
             originalDeliverableInput = originalDeliverableInput,
             repository = repository,
@@ -289,15 +290,15 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         repository.update(deliverable)
     }
 
-    suspend fun updateDeliverableType(deliverable: Deliverable, newType: Task.TaskType) {
-        if (Deliverable.DeliverableEndType.valueOf(deliverable.endType) == Deliverable.DeliverableEndType.WORK) {
+    suspend fun updateDeliverableType(deliverable: DeliverableWithLists, newType: Task.TaskType) {
+        if (Deliverable.DeliverableEndType.valueOf(deliverable.deliverable.endType) == Deliverable.DeliverableEndType.WORK) {
             when (newType) {
                 Task.TaskType.NORMAL -> { // End Type Is Quantity Or Time Work
-                    when(WorkType.valueOf(deliverable.workType)) {
+                    when(WorkType.valueOf(deliverable.deliverable.workType)) {
                         WorkType.QuantityTaskOnce,
                         WorkType.TimeTaskOnce -> {
                             val warningTaskDeliverables = mutableListOf<TaskDeliverable>()
-                            deliverable.taskDeliverables.first().forEach { taskDeliverable ->
+                            deliverable.taskDeliverables.forEach { taskDeliverable ->
                                 when(WorkType.valueOf(taskDeliverable.workType)){
                                     WorkType.QuantityTaskOnce,
                                     WorkType.TimeTaskOnce -> {
@@ -307,42 +308,74 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                                 }
                             }
                             if (warningTaskDeliverables.isNotEmpty()) {
-                                // TODO add warningTaskDeliverables list to showWarning params
                                 deliverableWarningDialog.showWarning(
-                                    repository.getDeliverable(deliverable.deliverableId),
+                                    repository.getDeliverable(deliverable.deliverable.deliverableId),
                                     newType,
-                                    ::updateDeliverable
+                                    warningTaskDeliverables,
+                                    ::updateDeliverable,
+                                    {repository.getTask(it)},
+                                    {repository.deleteTaskDeliverable(it.taskId,it.deliverableId)}
                                 )
                             }
-                            else repository.update(deliverable.copy(type = newType.name))
+                            else repository.update(deliverable.deliverable.copy(type = newType.name))
                         }
-                        else -> repository.update(deliverable.copy(type = newType.name))
+                        else -> repository.update(deliverable.deliverable.copy(type = newType.name))
                     }
                 }
 
                 Task.TaskType.QUANTITY -> { // End Type Is Time Work
-                    when(WorkType.valueOf(deliverable.workType)) {
+                    when(WorkType.valueOf(deliverable.deliverable.workType)) {
                         WorkType.TimeTaskOnce -> {
-                            deliverableWarningDialog.showWarning(
-                                repository.getDeliverable(deliverable.deliverableId),
-                                newType,
-                                ::updateDeliverable
-                            )
+                            val warningTaskDeliverables = mutableListOf<TaskDeliverable>()
+                            deliverable.taskDeliverables.forEach { taskDeliverable ->
+                                when(WorkType.valueOf(taskDeliverable.workType)){
+                                    WorkType.TimeTaskOnce -> {
+                                        warningTaskDeliverables.add(taskDeliverable)
+                                    }
+                                    else -> {}
+                                }
+                            }
+                            if (warningTaskDeliverables.isNotEmpty()) {
+                                deliverableWarningDialog.showWarning(
+                                    repository.getDeliverable(deliverable.deliverable.deliverableId),
+                                    newType,
+                                    warningTaskDeliverables,
+                                    ::updateDeliverable,
+                                    {repository.getTask(it)},
+                                    {repository.deleteTaskDeliverable(it.taskId,it.deliverableId)}
+                                )
+                            }
+                            else repository.update(deliverable.deliverable.copy(type = newType.name))
                         }
-                        else -> repository.update(deliverable.copy(type = newType.name))
+                        else -> repository.update(deliverable.deliverable.copy(type = newType.name))
                     }
                 }
 
                 Task.TaskType.TIME -> { // End Type Is Quantity Work
-                    when(WorkType.valueOf(deliverable.workType)) {
+                    when(WorkType.valueOf(deliverable.deliverable.workType)) {
                         WorkType.QuantityTaskOnce -> {
-                            deliverableWarningDialog.showWarning(
-                                repository.getDeliverable(deliverable.deliverableId),
-                                newType,
-                                ::updateDeliverable
-                            )
+                            val warningTaskDeliverables = mutableListOf<TaskDeliverable>()
+                            deliverable.taskDeliverables.forEach { taskDeliverable ->
+                                when(WorkType.valueOf(taskDeliverable.workType)){
+                                    WorkType.QuantityTaskOnce -> {
+                                        warningTaskDeliverables.add(taskDeliverable)
+                                    }
+                                    else -> {}
+                                }
+                            }
+                            if (warningTaskDeliverables.isNotEmpty()) {
+                                deliverableWarningDialog.showWarning(
+                                    repository.getDeliverable(deliverable.deliverable.deliverableId),
+                                    newType,
+                                    warningTaskDeliverables,
+                                    ::updateDeliverable,
+                                    {repository.getTask(it)},
+                                    {repository.deleteTaskDeliverable(it.taskId,it.deliverableId)}
+                                )
+                            }
+                            else repository.update(deliverable.deliverable.copy(type = newType.name))
                         }
-                        else -> repository.update(deliverable.copy(type = newType.name))
+                        else -> repository.update(deliverable.deliverable.copy(type = newType.name))
                     }
                 }
             }
@@ -441,15 +474,15 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         task.first()?.let { task ->
             task.taskId?.let { taskId ->
                 task.deliverableNormalList.first()
-                    .forEach { it.deliverableId?.let { deliverableId ->
+                    .forEach { it.deliverable.deliverableId?.let { deliverableId ->
                         repository.deleteTaskDeliverable(taskId, deliverableId)
                     } }
                 task.deliverableQuantityList.first()
-                    .forEach { it.deliverableId?.let { deliverableId ->
+                    .forEach { it.deliverable.deliverableId?.let { deliverableId ->
                         repository.deleteTaskDeliverable(taskId, deliverableId)
                     } }
                 task.deliverableTimeList.first()
-                    .forEach { it.deliverableId?.let { deliverableId ->
+                    .forEach { it.deliverable.deliverableId?.let { deliverableId ->
                         repository.deleteTaskDeliverable(taskId, deliverableId)
                     } }
             }
@@ -488,23 +521,23 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     companion object{
-        suspend fun canSaveDeliverable(deliverable: MutableStateFlow<Flow<Deliverable?>?>, showError:(Int, FocusRequester)->Unit): Boolean{
+        suspend fun canSaveDeliverable(deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>, showError:(Int, FocusRequester)->Unit): Boolean{
             deliverable.value?.first()?.let { deliverable ->
-                if (deliverable.deliverable.isEmpty()) {
+                if (deliverable.deliverable.deliverable.isEmpty()) {
                     showError(
                         R.string.please_enter_a_deliverable,
-                        deliverable.deliverableTextFocusRequester
+                        deliverable.deliverable.deliverableTextFocusRequester
                     )
                     return false
                 }
-                if (deliverable.location.isEmpty()) {
+                if (deliverable.deliverable.location.isEmpty()) {
                     showError(
                         R.string.please_enter_a_location,
-                        deliverable.locationFocusRequester
+                        deliverable.deliverable.locationFocusRequester
                     )
                     return false
                 }
-                when (Deliverable.DeliverableEndType.valueOf(deliverable.endType)){
+                when (Deliverable.DeliverableEndType.valueOf(deliverable.deliverable.endType)){
                     Deliverable.DeliverableEndType.UNDEFINED -> {
                         // Do nothing
                     }
@@ -520,7 +553,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                         // Can have a cumulative amount for the quantity/time
                     }
                 }
-                deliverable.times.first().forEach { time ->
+                deliverable.times.forEach { time ->
                     val duration = Converters().toLocalDateTime(
                         time.duration
                     ).value
@@ -549,12 +582,12 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         }
 
         suspend fun editClickedDeliverable(
-            originalDeliverableInput: Flow<Deliverable?>,
+            originalDeliverableInput: Flow<DeliverableWithLists?>,
             repository: AccountableRepository,
             originalTask: MutableStateFlow<Flow<Task?>?>?=null,
-            originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>,
+            originalDeliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>,
             originalMarker: MutableStateFlow<Flow<Marker?>?>?=null,
-            deliverable: MutableStateFlow<Flow<Deliverable?>?>,
+            deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>,
             saveDeliverable: suspend () -> Unit,
             showBottomSheet: suspend (Goal.GoalTab) -> Unit
         ){
@@ -570,7 +603,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             originalTaskInput: Flow<Task?>,
             repository: AccountableRepository,
             originalTask: MutableStateFlow<Flow<Task?>?>,
-            originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+            originalDeliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>?=null,
             originalMarker: MutableStateFlow<Flow<Marker?>?>?=null,
             task: MutableStateFlow<Flow<Task?>?>,
             saveTask: suspend () -> Unit,
@@ -586,10 +619,10 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
 
         suspend fun saveClickedDeliverable(
             repository: AccountableRepository,
-            deliverable: MutableStateFlow<Flow<Deliverable?>?>
+            deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>
         ) {
             deliverable.value?.first()?.let { deliverable ->
-                deliverable.deliverableId = repository.saveDeliverable(deliverable)
+                deliverable.deliverable.deliverableId = repository.saveDeliverable(deliverable.deliverable)
             }
         }
 
@@ -605,13 +638,13 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
 
         suspend fun deleteClickedDeliverable(
             repository: AccountableRepository,
-            deliverable: MutableStateFlow<Flow<Deliverable?>?>
+            deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>
         ) {
             deliverable.value?.first()?.let { deliverable ->
-                deliverable.times.first().forEach {
+                deliverable.times.forEach {
                     repository.deleteGoalTaskDeliverableTime(it)
                 }
-                repository.deleteDeliverable(deliverable)
+                repository.deleteDeliverable(deliverable.deliverable)
             }
         }
 
@@ -631,8 +664,8 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
         }
 
         suspend fun deleteDeliverableClickedCompanionObject(
-            deliverable: MutableStateFlow<Flow<Deliverable?>?>,
-            originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>,
+            deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>,
+            originalDeliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>,
             deleteDeliverable: suspend () -> Unit,
             dismissBottomSheet: suspend () -> Unit
         ) {
@@ -661,12 +694,12 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             bottomSheetType: MutableStateFlow<Goal.GoalTab?>,
             task: MutableStateFlow<Flow<Task?>?>?=null,
             deleteTask: (suspend () -> Unit)?=null,
-            deliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+            deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>?=null,
             deleteDeliverable: (suspend () -> Unit)?=null,
             marker: MutableStateFlow<Flow<Marker?>?>?=null,
             deleteMarker: (suspend () -> Unit)?=null,
             originalTask: MutableStateFlow<Flow<Task?>?>?=null,
-            originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+            originalDeliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>?=null,
             originalMarker: MutableStateFlow<Flow<Marker?>?>?=null,
         ) {
             task?.value?.let {
@@ -754,8 +787,8 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             originalTask: MutableStateFlow<Flow<Task?>?>?=null,
             deleteTask: (suspend () -> Unit)?=null,
             saveTask: (suspend () -> Unit)?=null,
-            deliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
-            originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+            deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>?=null,
+            originalDeliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>?=null,
             deleteDeliverable: (suspend () -> Unit)?=null,
             saveDeliverable: (suspend () -> Unit)?=null,
             marker: MutableStateFlow<Flow<Marker?>?>?=null,
@@ -827,9 +860,9 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             goal: Goal?,
             saveDeliverable: (suspend () -> Unit),
             showBottomSheet: (Goal.GoalTab) -> Unit,
-            deliverable: MutableStateFlow<Flow<Deliverable?>?>,
+            deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>,
             originalTask: MutableStateFlow<Flow<Task?>?>?=null,
-            originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+            originalDeliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>?=null,
             originalMarker: MutableStateFlow<Flow<Marker?>?>?=null
         ) {
             originalTask?.value = null
@@ -856,7 +889,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             showBottomSheet: (Goal.GoalTab) -> Unit,
             task: MutableStateFlow<Flow<Task?>?>,
             originalTask: MutableStateFlow<Flow<Task?>?>?=null,
-            originalDeliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+            originalDeliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>?=null,
             originalMarker: MutableStateFlow<Flow<Marker?>?>?=null
         ) {
             originalTask?.value = null
@@ -884,7 +917,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             saveTime: (suspend (GoalTaskDeliverableTime) -> Long),
             task: MutableStateFlow<Flow<Task?>?>?=null,
             saveTask: (suspend () -> Unit)?=null,
-            deliverable: Flow<Deliverable?>?=null,
+            deliverable: Flow<DeliverableWithLists?>?=null,
             saveDeliverable: (suspend () -> Unit)?=null,
         ) {
             if (
@@ -904,8 +937,8 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                 bottomSheetType.value == Goal.GoalTab.DELIVERABLES
                 && deliverable?.first() != null
             ){
-                if (deliverable.first()?.deliverableId == null) saveDeliverable?.invoke()
-                deliverable.first()?.deliverableId?.let {
+                if (deliverable.first()?.deliverable?.deliverableId == null) saveDeliverable?.invoke()
+                deliverable.first()?.deliverable?.deliverableId?.let {
                     val newTime = GoalTaskDeliverableTime(
                         parent = it,
                         type = GoalTaskDeliverableTime.TimesType.DELIVERABLE.name
@@ -920,7 +953,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
             bottomSheetType: MutableStateFlow<Goal.GoalTab?>,
             timeBlock: GoalTaskDeliverableTime,
             task: MutableStateFlow<Flow<Task?>?>?=null,
-            deliverable: MutableStateFlow<Flow<Deliverable?>?>?=null,
+            deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>?=null,
         ) {
             if (
                 bottomSheetType.value == Goal.GoalTab.TASKS

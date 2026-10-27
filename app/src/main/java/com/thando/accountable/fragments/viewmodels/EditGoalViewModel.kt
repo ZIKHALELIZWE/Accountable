@@ -12,6 +12,7 @@ import com.thando.accountable.MainActivity
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
+import com.thando.accountable.database.tables.DeliverableWithLists
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Marker
@@ -61,9 +62,9 @@ class EditGoalViewModel(
     val addDeliverableDialog = DeliverableAdderDialog()
     val pickDeliverableDialog = DeliverablePickerDialog()
     val deliverableWarningDialog = DeliverableWarningDialog()
-    private val deliverableState: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(null)
+    private val deliverableState: MutableStateFlow<Flow<DeliverableWithLists?>?> = MutableStateFlow(null)
     val deliverable = deliverableState.flatMapLatest { it?:flowOf(null) }
-    private val originalDeliverableState = MutableStateFlow<Flow<Deliverable?>?>(null)
+    private val originalDeliverableState = MutableStateFlow<Flow<DeliverableWithLists?>?>(null)
     val originalDeliverable = originalDeliverableState.flatMapLatest { it?: flowOf(null) }
     private val taskState: MutableStateFlow<Flow<Task?>?> = MutableStateFlow(null)
     val task = taskState.flatMapLatest { it?:flowOf(null) }
@@ -177,9 +178,9 @@ class EditGoalViewModel(
         repository.update(deliverable)
     }
 
-    suspend fun updateDeliverableType(deliverable: Deliverable, newType: Task.TaskType) {
+    suspend fun updateDeliverableType(deliverable: DeliverableWithLists, newType: Task.TaskType) {
         // TODO Add warnings for work relations
-        repository.update(deliverable.copy(type = newType.name))
+        repository.update(deliverable.deliverable.copy(type = newType.name))
     }
 
     suspend fun updateTask(task: Task) {
@@ -225,7 +226,7 @@ class EditGoalViewModel(
         }
     }
 
-    suspend fun editDeliverable(originalDeliverableInput: Flow<Deliverable?>){
+    suspend fun editDeliverable(originalDeliverableInput: Flow<DeliverableWithLists?>){
         editClickedDeliverable(
             originalDeliverableInput = originalDeliverableInput,
             repository = repository,

@@ -14,7 +14,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
@@ -115,37 +114,37 @@ data class Task(
     }.flowOn(MainActivity.IO)
 
     @Ignore
-    val deliverableNormalListNotSelectedState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    val deliverableNormalListNotSelectedState = MutableStateFlow<Flow<List<DeliverableWithLists>>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val deliverableNormalListNotSelected = deliverableNormalListNotSelectedState.flatMapLatest { it }.flowOn(MainActivity.IO)
 
     @Ignore
-    val deliverableQuantityListNotSelectedState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    val deliverableQuantityListNotSelectedState = MutableStateFlow<Flow<List<DeliverableWithLists>>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val deliverableQuantityListNotSelected = deliverableQuantityListNotSelectedState.flatMapLatest { it }.flowOn(MainActivity.IO)
 
     @Ignore
-    val deliverableTimeListNotSelectedState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    val deliverableTimeListNotSelectedState = MutableStateFlow<Flow<List<DeliverableWithLists>>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val deliverableTimeListNotSelected = deliverableTimeListNotSelectedState.flatMapLatest { it }.flowOn(MainActivity.IO)
 
     @Ignore
-    val deliverableNormalListState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    val deliverableNormalListState = MutableStateFlow<Flow<List<DeliverableWithLists>>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val deliverableNormalList = deliverableNormalListState.flatMapLatest { it }.flowOn(MainActivity.IO)
 
     @Ignore
-    val deliverableQuantityListState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    val deliverableQuantityListState = MutableStateFlow<Flow<List<DeliverableWithLists>>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val deliverableQuantityList = deliverableQuantityListState.flatMapLatest { it }.flowOn(MainActivity.IO)
 
     @Ignore
-    val deliverableTimeListState = MutableStateFlow<Flow<List<Deliverable>>>(emptyFlow())
+    val deliverableTimeListState = MutableStateFlow<Flow<List<DeliverableWithLists>>>(emptyFlow())
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val deliverableTimeList = deliverableTimeListState.flatMapLatest { it }.flowOn(MainActivity.IO)
@@ -165,7 +164,7 @@ data class Task(
     @Ignore
     val colourFocusRequester = FocusRequester()
 
-    fun getNotSelectedDeliverablesList():Flow<List<Deliverable>> {
+    fun getNotSelectedDeliverablesList():Flow<List<DeliverableWithLists>> {
         return if (endType == TaskEndType.DELIVERABLE.name){
             when(TaskType.valueOf(type)){
                 TaskType.NORMAL -> deliverableNormalListNotSelected
@@ -177,7 +176,7 @@ data class Task(
         }
     }
 
-    fun getDeliverablesList():Flow<List<Deliverable>> {
+    fun getDeliverablesList():Flow<List<DeliverableWithLists>> {
         return if (endType == TaskEndType.DELIVERABLE.name){
             when(TaskType.valueOf(type)){
                 TaskType.NORMAL -> deliverableNormalList

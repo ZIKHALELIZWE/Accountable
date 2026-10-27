@@ -32,6 +32,7 @@ import com.thando.accountable.database.tables.AppSettings
 import com.thando.accountable.database.tables.Content
 import com.thando.accountable.database.tables.Content.ContentType
 import com.thando.accountable.database.tables.Deliverable
+import com.thando.accountable.database.tables.DeliverableWithLists
 import com.thando.accountable.database.tables.Folder
 import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
@@ -2013,8 +2014,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                 cloneTimesTo(
                     to.id,
-                    from.times,
-                    to.times,
+                    from.times.first(),
+                    to.times.first(),
                     GoalTaskDeliverableTime.TimesType.GOAL,
                     setCloneId
                 )
@@ -2024,32 +2025,32 @@ class AccountableRepository(val application: Application): AutoCloseable {
                         // Delete the ones that are not in from (originally in to)
                         if (
                             !fromDeliverables.any { fromDeliverable ->
-                                toDeliverable.deliverableId == fromDeliverable.cloneId
+                                toDeliverable.deliverable.deliverableId == fromDeliverable.deliverable.cloneId
                             }
                         ) {
-                            dao.delete(toDeliverable)
+                            dao.delete(toDeliverable.deliverable)
                         }
                     }
 
                     for (deliverable in fromDeliverables) {
                         to.id?.let { id ->
                             var newDeliverable = to.goalDeliverables.first()
-                                .find { toDeliverable -> toDeliverable.deliverableId == deliverable.cloneId }
+                                .find { toDeliverable -> toDeliverable.deliverable.deliverableId == deliverable.deliverable.cloneId }
                             if (newDeliverable == null) {
-                                newDeliverable = Deliverable(
+                                newDeliverable = DeliverableWithLists( Deliverable(
                                     parent = id,
-                                    position = deliverable.position,
-                                    type = deliverable.type
-                                )
-                                newDeliverable.deliverableId = saveDeliverable(newDeliverable)
+                                    position = deliverable.deliverable.position,
+                                    type = deliverable.deliverable.type
+                                ))
+                                newDeliverable.deliverable.deliverableId = saveDeliverable(newDeliverable.deliverable)
                             } else {
-                                newDeliverable.parent = id
-                                newDeliverable.position = deliverable.position
-                                newDeliverable.type = deliverable.type
+                                newDeliverable.deliverable.parent = id
+                                newDeliverable.deliverable.position = deliverable.deliverable.position
+                                newDeliverable.deliverable.type = deliverable.deliverable.type
                             }
 
-                            val fromMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(deliverable.deliverableId))
-                            val toMutable: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(getDeliverable(newDeliverable.deliverableId))
+                            val fromMutable: MutableStateFlow<Flow<DeliverableWithLists?>?> = MutableStateFlow(getDeliverable(deliverable.deliverable.deliverableId))
+                            val toMutable: MutableStateFlow<Flow<DeliverableWithLists?>?> = MutableStateFlow(getDeliverable(newDeliverable.deliverable.deliverableId))
                             cloneDeliverableTo(
                                 fromMutable,
                                 toMutable,
@@ -2111,13 +2112,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
     suspend fun cloneTimesTo(
         toId: Long?,
-        fromTimes : Flow<List<GoalTaskDeliverableTime>>,
-        toTimes : Flow<List<GoalTaskDeliverableTime>>,
+        fromTimes : List<GoalTaskDeliverableTime>,
+        toTimes : List<GoalTaskDeliverableTime>,
         timesType : GoalTaskDeliverableTime.TimesType,
         setCloneId: Boolean
     ) {
-        fromTimes.first().let { fromTimes ->
-            toTimes.first().forEach { toTime ->
+        fromTimes.let { fromTimes ->
+            toTimes.forEach { toTime ->
                 // Delete the ones that are not in from (originally in to)
                 if (
                     !fromTimes.any { fromTime ->
@@ -2130,7 +2131,7 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
             for (time in fromTimes) {
                 toId?.let { id ->
-                    var newTime = toTimes.first()
+                    var newTime = toTimes
                         .find { toTime -> toTime.id == time.cloneId }
                     if (newTime == null) {
                         newTime = GoalTaskDeliverableTime(
@@ -2255,8 +2256,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                 cloneTimesTo(
                     to.taskId,
-                    from.times,
-                    to.times,
+                    from.times.first(),
+                    to.times.first(),
                     GoalTaskDeliverableTime.TimesType.TASK,
                     setCloneId
                 )
@@ -2310,13 +2311,13 @@ class AccountableRepository(val application: Application): AutoCloseable {
     }
 
     suspend fun cloneDeliverableTo(
-        from: MutableStateFlow<Flow<Deliverable?>?>,
-        to: MutableStateFlow<Flow<Deliverable?>?>,
+        inputFrom: MutableStateFlow<Flow<DeliverableWithLists?>?>,
+        inputTo: MutableStateFlow<Flow<DeliverableWithLists?>?>,
         setCloneId:Boolean,
         cloneParent:Boolean = true
     ) {
-        from.value?.first()?.let { from ->
-            to.value?.first()?.let { to ->
+        inputFrom.value?.first()?.deliverable?.let { from ->
+            inputTo.value?.first()?.deliverable?.let { to ->
                 if (cloneParent) to.parent = from.parent
                 to.position = from.position
                 to.type = from.type
@@ -2341,8 +2342,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
 
                 cloneTimesTo(
                     to.deliverableId,
-                    from.times,
-                    to.times,
+                    inputFrom.value!!.first()!!.times,
+                    inputTo.value!!.first()!!.times,
                     GoalTaskDeliverableTime.TimesType.DELIVERABLE,
                     setCloneId
                 )
@@ -2352,17 +2353,17 @@ class AccountableRepository(val application: Application): AutoCloseable {
         }
     }
 
-    suspend fun getDeliverableClone(deliverableFlow: Flow<Deliverable?>, setCloneId: Boolean): Flow<Deliverable?>? {
-        deliverableFlow.first()?.let { deliverable ->
-            val mutableOriginal: MutableStateFlow<Flow<Deliverable?>?> =
+    suspend fun getDeliverableClone(deliverableFlow: Flow<DeliverableWithLists?>, setCloneId: Boolean): Flow<DeliverableWithLists?>? {
+        deliverableFlow.first()?.let { deliverableWithLists ->
+            val mutableOriginal: MutableStateFlow<Flow<DeliverableWithLists?>?> =
                 MutableStateFlow(deliverableFlow)
-            val mutableReturn: MutableStateFlow<Flow<Deliverable?>?> = MutableStateFlow(
+            val mutableReturn: MutableStateFlow<Flow<DeliverableWithLists?>?> = MutableStateFlow(
                 getDeliverable(
                     insert(
                         Deliverable(
-                            parent = deliverable.parent,
-                            position = deliverable.position,
-                            type = deliverable.type
+                            parent = deliverableWithLists.deliverable.parent,
+                            position = deliverableWithLists.deliverable.position,
+                            type = deliverableWithLists.deliverable.type
                         )
                     )
                 )
@@ -2499,21 +2500,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
         goals
     }
 
-    fun getDeliverable(deliverableId: Long?): Flow<Deliverable?> =
-        dao.getDeliverable(deliverableId).map { deliverable ->
-            deliverable?.loadTimes(dao)
-            deliverable?.loadTaskDeliverables(dao)
-            deliverable
-        }
+    fun getDeliverable(deliverableId: Long?): Flow<DeliverableWithLists?> =
+        dao.getDeliverable(deliverableId)
 
-    fun getGoalDeliverables(goalId: Long?): Flow<List<Deliverable>> =
-        dao.getGoalDeliverables(goalId).map { deliverables ->
-            deliverables.forEach { deliverable ->
-                deliverable.loadTimes(dao)
-                deliverable.loadTaskDeliverables(dao)
-            }
-            deliverables
-        }
+    fun getGoalDeliverables(goalId: Long?): Flow<List<DeliverableWithLists>> =
+        dao.getGoalDeliverables(goalId)
 
     fun getTasks(parentId: Long, parentType: Task.TaskParentType): Flow<List<Task>> {
         return dao.getTasks(parentId, parentType).map { tasks ->
@@ -2534,14 +2525,8 @@ class AccountableRepository(val application: Application): AutoCloseable {
             tasks
         }
 
-    fun getDeliverables(parentId: Long): Flow<List<Deliverable>> {
-        return dao.getDeliverables(parentId).map { deliverables ->
-            deliverables.forEach { deliverable ->
-                deliverable.loadTimes(dao)
-                deliverable.loadTaskDeliverables(dao)
-            }
-            deliverables
-        }
+    fun getDeliverables(parentId: Long): Flow<List<DeliverableWithLists>> {
+        return dao.getDeliverables(parentId)
     }
 
     fun getMarkers(parentId: Long): Flow<List<Marker>> {

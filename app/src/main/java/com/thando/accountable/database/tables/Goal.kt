@@ -129,7 +129,7 @@ data class Goal(
     }.flowOn(MainActivity.IO)
 
     @Ignore
-    private val goalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    private val goalDeliverablesState: MutableStateFlow<Flow<List<DeliverableWithLists>>?> = MutableStateFlow(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val goalDeliverables = goalDeliverablesState.flatMapLatest {
@@ -153,7 +153,7 @@ data class Goal(
     }.flowOn(MainActivity.IO)
 
     @Ignore
-    private val selectedGoalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    private val selectedGoalDeliverablesState: MutableStateFlow<Flow<List<DeliverableWithLists>>?> = MutableStateFlow(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val selectedGoalDeliverables = selectedGoalDeliverablesState.flatMapLatest {
@@ -161,7 +161,7 @@ data class Goal(
     }.flowOn(MainActivity.IO)
 
     @Ignore
-    private val notSelectedGoalDeliverablesState: MutableStateFlow<Flow<List<Deliverable>>?> = MutableStateFlow(null)
+    private val notSelectedGoalDeliverablesState: MutableStateFlow<Flow<List<DeliverableWithLists>>?> = MutableStateFlow(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     @Ignore
     val notSelectedGoalDeliverables = notSelectedGoalDeliverablesState.flatMapLatest {
