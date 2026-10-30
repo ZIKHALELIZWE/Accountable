@@ -2359,11 +2359,11 @@ class AccountableRepository(val application: Application): AutoCloseable {
                 to.numAudios = from.numAudios
                 to.numDocuments = from.numDocuments
                 to.numScripts = from.numScripts
+                to.goalId = from.goalId
 
                 if (setCloneId) to.cloneId = from.deliverableId
 
                 if (to.deliverableId == null) to.deliverableId = saveDeliverable(to)
-                to.goalId = if (from.goalId!=null) to.deliverableId else null
 
                 cloneTimesTo(
                     to.deliverableId,

@@ -7,12 +7,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TimePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.setSelectedDate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelectable
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -30,10 +35,13 @@ import com.thando.accountable.AccountableNavigationController.AccountableFragmen
 import com.thando.accountable.MainActivityTest.FilteredPrintStream
 import com.thando.accountable.MainActivityTest.Log
 import com.thando.accountable.database.tables.DeliverableWithLists
+import com.thando.accountable.database.tables.Goal
 import com.thando.accountable.database.tables.GoalTaskDeliverableTime
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.database.tables.TaskDeliverable
+import com.thando.accountable.fragments.BackgroundColorKey
 import com.thando.accountable.fragments.viewmodels.EditGoalViewModel
+import com.thando.accountable.fragments.viewmodels.TaskViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -47,6 +55,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.FixMethodOrder
 import org.junit.Rule
@@ -337,10 +346,105 @@ abstract class AccountableComposeRobolectricTest(
                     taskDeliverableOne,
                     taskDeliverableTwo,
                     idsEqual = idsEqual,
-                    parentsEqual = taskIdsEqual
+                    parentsEqual = true
                 )
             }
         }
+    }
+
+    fun testTaskTypeButtons(
+        taskType: Task.TaskType,
+        selected: Boolean,
+        press: Boolean,
+        activity: TestMainActivity
+    ) = runMainTest {
+        val tag = "TasksFragmentAddDeliverableViewTaskTypeButton-"
+        withTag("${tag}${taskType.name}") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertEquals(
+                if (selected) Color.Blue else Color.LightGray,
+                fetchSemanticsNode().config[BackgroundColorKey]
+            )
+            assertTextContains(activity.getString(taskType.stringRes))
+            if (press) performPressWithoutScroll()
+        }
+    }
+
+    fun getGoalTab(name:String): Goal.GoalTab {
+        return try{
+            Goal.GoalTab.valueOf(name)
+        }catch (e: Exception){
+            LogTest.e("Failed to get tab",e.message?:"")
+            Goal.GoalTab.TASKS
+        }
+    }
+
+    fun switchToTab(
+        tab: Goal.GoalTab,
+        taskViewModel: TaskViewModel,
+        activity: TestMainActivity
+    ) = runMainTest {
+        assertNotNull(taskViewModel.goal.first())
+        var goal = taskViewModel.goal.first()!!
+        val previousTab = getGoalTab(goal.selectedTab)
+        val tabsAreTheSame = previousTab == tab
+
+        withTag("TasksFragmentGoalTab-${previousTab.ordinal}"){
+            assertExists()
+            assertIsDisplayed()
+            assertIsSelectable()
+            assertIsSelected()
+            assertTextContains(activity.getString(previousTab.stringRes))
+            assertHasClickAction()
+        }
+
+        withTag("TasksFragmentAddTextButton"){
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertTextContains(activity.getString(previousTab.addStringRes))
+        }
+
+        withTag("TasksFragmentGoalTab-${tab.ordinal}"){
+            assertExists()
+            assertIsDisplayed()
+            assertIsSelectable()
+            assertIsNotSelected()
+            assertTextContains(activity.getString(tab.stringRes))
+            assertHasClickAction()
+            performClick()
+            finishProcesses()
+            assertIsSelected()
+        }
+
+        withTag("TasksFragmentGoalTab-${previousTab.ordinal}") {
+            assertExists()
+            assertIsDisplayed()
+            assertIsSelectable()
+            assertTextContains(activity.getString(previousTab.stringRes))
+            assertIsNotSelected()
+        }
+
+        goal = taskViewModel.goal.first()!!
+        val currentTab = getGoalTab(goal.selectedTab)
+
+        withTag("TasksFragmentAddTextButton"){
+            assertExists()
+            assertIsDisplayed()
+            assertHasClickAction()
+            assertTextContains(activity.getString(currentTab.addStringRes))
+        }
+
+        if (tabsAreTheSame){
+            assertEquals(previousTab,currentTab)
+        }
+        else{
+            assertNotEquals(previousTab,currentTab)
+        }
+        assertEquals(tab,currentTab)
     }
 
     suspend fun getTaskDeliverablesLists(

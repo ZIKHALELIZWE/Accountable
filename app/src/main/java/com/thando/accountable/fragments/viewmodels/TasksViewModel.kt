@@ -1,5 +1,6 @@
 package com.thando.accountable.fragments.viewmodels
 
+import android.content.Context
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
@@ -11,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.thando.accountable.AccountableRepository
+import com.thando.accountable.AppResources
 import com.thando.accountable.R
 import com.thando.accountable.database.Converters
 import com.thando.accountable.database.tables.Deliverable
@@ -21,6 +23,7 @@ import com.thando.accountable.database.tables.Marker
 import com.thando.accountable.database.tables.Task
 import com.thando.accountable.database.tables.TaskDeliverable
 import com.thando.accountable.database.tables.TaskDeliverable.WorkType
+import com.thando.accountable.fragments.getOnlyOneQuantityText
 import com.thando.accountable.ui.cards.ColourPickerDialog
 import com.thando.accountable.ui.cards.DeliverableAdderDialog
 import com.thando.accountable.ui.cards.DeliverablePickerDialog
@@ -379,7 +382,7 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                     }
                 }
             }
-        }
+        } else repository.update(deliverable.deliverable.copy(type = newType.name))
     }
 
     suspend fun updateTask(task: Task) {
@@ -521,7 +524,11 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
     }
 
     companion object{
-        suspend fun canSaveDeliverable(deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>, showError:(Int, FocusRequester)->Unit): Boolean{
+        suspend fun canSaveDeliverable(
+            deliverable: MutableStateFlow<Flow<DeliverableWithLists?>?>,
+            showError:(Int, FocusRequester)->Unit,
+            context: Context
+        ): Boolean{
             deliverable.value?.first()?.let { deliverable ->
                 if (deliverable.deliverable.deliverable.isEmpty()) {
                     showError(
@@ -529,6 +536,35 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                         deliverable.deliverable.deliverableTextFocusRequester
                     )
                     return false
+                }
+                if (Task.TaskType.valueOf(deliverable.deliverable.type) == Task.TaskType.TIME) {
+                    val taskTime = Converters().toLocalDateTime(deliverable.deliverable.time).value
+                    if (deliverable.deliverable.deliverable.trim() == AppResources.getDurationString(context, taskTime)){
+                        showError(
+                            R.string.please_enter_a_deliverable,
+                            deliverable.deliverable.deliverableTextFocusRequester
+                        )
+                        return false
+                    }
+                }
+                if (Task.TaskType.valueOf(deliverable.deliverable.type) == Task.TaskType.QUANTITY){
+                    var isValid = true
+                    getOnlyOneQuantityText(deliverable.deliverable.deliverable)?.let { quantityText ->
+                        Regex("\\d+").find(quantityText)?.value?.toLongOrNull()?.let { quantity ->
+                            if (quantity != deliverable.deliverable.quantity) isValid = false
+                        }?: run {
+                            isValid = false
+                        }
+                    }?: run {
+                        isValid = false
+                    }
+                    if (!isValid) {
+                        showError(
+                            R.string.please_enter_a_value_for_deliverable,
+                            deliverable.deliverable.deliverableTextFocusRequester
+                        )
+                        return false
+                    }
                 }
                 if (deliverable.deliverable.location.isEmpty()) {
                     showError(
@@ -822,7 +858,8 @@ class TaskViewModel(val repository: AccountableRepository) : ViewModel() {
                     if (deliverable?.value != null) {
                         if (!canSaveDeliverable(
                                 deliverable,
-                                showError
+                                showError,
+                                repository.application
                             )
                         ) return
                         if (originalDeliverable?.value != null) {

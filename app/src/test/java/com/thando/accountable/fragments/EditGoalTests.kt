@@ -11,6 +11,9 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsToggleable
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsAtLeast
@@ -1172,7 +1175,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         withTag(
-            "TaskFragmentDeliverableDeliverableText"
+            "TasksFragmentAddDeliverableNormalQuantityTimeTextField"
         ) {
             assertExists()
             performScrollTo()
@@ -1533,27 +1536,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         withTag(
             "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.GOAL.name}"
         ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            Deliverable.DeliverableEndType.GOAL.name,
-            editGoalViewModel.deliverable.first()?.deliverable?.endType
-        )
-
-        assertNull(editGoalViewModel.deliverable.first()?.deliverable?.goalId)
-
-        withTag("TasksFragmentDeliverableSwitch") {
             assertDoesNotExist()
-        }
-
-        withTag("TasksFragmentDeliverableEndTypeButton") {
-            performPressWithScroll()
-        }
-
-        withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
-            assertExists()
-            assertIsDisplayed()
         }
 
         withTag(
@@ -1570,7 +1553,24 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNull(editGoalViewModel.deliverable.first()?.deliverable?.goalId)
 
         withTag("TasksFragmentDeliverableSwitch") {
+            assertExists()
+            performScrollTo()
+            assertIsDisplayed()
+            assertIsToggleable()
+            assertIsOff()
+        }
+
+        assertEquals(
+            Deliverable.DeliverableEndType.UNDEFINED.name,
+            editGoalViewModel.deliverable.first()?.deliverable?.endType
+        )
+
+        assertNull(editGoalViewModel.deliverable.first()?.deliverable?.goalId)
+
+        withTag("TasksFragmentDeliverableSwitch") {
             performPressWithScroll()
+            finishProcesses()
+            assertIsOn()
         }
 
         assertEquals(
@@ -1578,25 +1578,11 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
             editGoalViewModel.deliverable.first()?.deliverable?.goalId
         )
 
-        withTag("TasksFragmentDeliverableEndTypeButton") {
+        withTag("TasksFragmentDeliverableSwitch") {
             performPressWithScroll()
+            finishProcesses()
+            assertIsOff()
         }
-
-        withTag("TasksFragmentDeliverableEndTypeDropDownMenu") {
-            assertExists()
-            assertIsDisplayed()
-        }
-
-        withTag(
-            "TasksFragmentDeliverableDropdownMenuItem-${Deliverable.DeliverableEndType.GOAL.name}"
-        ) {
-            performPressWithoutScroll()
-        }
-
-        assertEquals(
-            Deliverable.DeliverableEndType.GOAL.name,
-            editGoalViewModel.deliverable.first()?.deliverable?.endType
-        )
 
         assertNull(editGoalViewModel.deliverable.first()?.deliverable?.goalId)
     }
@@ -1624,7 +1610,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         assertNull(editGoalViewModel.editGoal.value)
 
         assertEquals(
-            Deliverable.DeliverableEndType.GOAL.name,
+            Deliverable.DeliverableEndType.UNDEFINED.name,
             editGoalViewModel.deliverable.first()?.deliverable?.endType
         )
 
@@ -1856,7 +1842,7 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         val oldDeliverable = editGoalViewModel.originalDeliverable.first()!!
 
         withTag(
-            "TaskFragmentDeliverableDeliverableText"
+            "TasksFragmentAddDeliverableNormalQuantityTimeTextField"
         ) {
             assertExists()
             performScrollTo()
@@ -2073,6 +2059,12 @@ class EditGoalTests: AccountableComposeRobolectricTest() {
         )
 
         assertNotNull(editGoalViewModel.deliverable.first()!!.deliverable.goalId)
+
+        withTag("TasksFragmentAddDeliverableViewLazyColumn") {
+            assertExists()
+            assertIsDisplayed()
+            performScrollToKey("TasksFragmentDeliverableSwitch")
+        }
 
         withTag("TasksFragmentDeliverableSwitch"){
             performPressWithScroll()
